@@ -1,6 +1,6 @@
 package executiondag
 
-import "github.com/oss-risk-guard/src/overrides"
+import "github.com/Risk-Guard/oss-risk-guard/src/overrides"
 
 // StatusProvider is an interface that all node outputs must implement.
 type StatusProvider interface {

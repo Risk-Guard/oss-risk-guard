@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"github.com/oss-risk-guard/src/ctxutil"
-	"github.com/oss-risk-guard/src/environment"
-	"github.com/oss-risk-guard/src/overrides"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 	"sync"
 	"time"
 
