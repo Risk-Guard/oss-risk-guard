@@ -1,4 +1,4 @@
-module github.com/oss-risk-guard
+module github.com/Risk-Guard/oss-risk-guard
 
 go 1.25.1
 
