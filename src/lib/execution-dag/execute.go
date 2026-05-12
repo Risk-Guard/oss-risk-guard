@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/environment"
-	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 	"sync"
 	"time"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/overrides"
 	"go.uber.org/zap"
 )
 
@@ -72,7 +71,7 @@ func (d *DAG[TInput]) executeNode(
 	var execErr error
 
 	// Check if --no-fetch is set and this is a fetch node
-	noFetch := environment.GetConfig(ctx).GetNoFetch()
+	noFetch := IsNoFetch(ctx)
 	startTime := time.Now()
 	if noFetch && entry.GetKind() == "fetch" {
 		readOutput, readErr, canRead := entry.read(ctx, input)

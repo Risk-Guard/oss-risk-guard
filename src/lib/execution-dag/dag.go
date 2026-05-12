@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/overrides"
 	"sync"
 )
 
