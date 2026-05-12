@@ -40,4 +40,4 @@ jobs:
         run: go test -v ./src/...
 
       - name: Build
-        run: go build -o oss-risk-guard ./src/main.go
+        run: go build -o oss-risk-guard ./src/cli
