@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/overrides"
 	"sync"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/overrides"
 )
 
 // mergeable is an internal interface for merging outputs into input

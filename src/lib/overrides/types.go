@@ -2,8 +2,9 @@ package overrides
 
 import (
 	"context"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/ctxutil"
 	"sync"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/ctxutil"
 
 	"go.uber.org/zap"
 )
