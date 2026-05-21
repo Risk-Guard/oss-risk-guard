@@ -1,14 +1,15 @@
 package package_malformed_dependencies
 
 import (
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

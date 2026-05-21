@@ -2,8 +2,9 @@ package gemspec
 
 import (
 	"fmt"
-	"risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/alecthomas/participle/v2/lexer"
 )

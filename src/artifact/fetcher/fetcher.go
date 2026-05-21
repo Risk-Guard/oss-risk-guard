@@ -2,8 +2,9 @@ package fetcher
 
 import (
 	"context"
-	"risk-guard/src/api/routes"
-	"risk-guard/src/models"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type Fetcher interface {

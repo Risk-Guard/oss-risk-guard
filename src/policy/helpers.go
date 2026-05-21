@@ -1,9 +1,10 @@
 package policy
 
 import (
-	"risk-guard/src/category"
 	"sort"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
 )
 
 func stripQuery(s string) string {

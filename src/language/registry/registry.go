@@ -2,14 +2,15 @@ package registry
 
 import (
 	"fmt"
-	"risk-guard/src/language"
-	"risk-guard/src/language/javascript"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/language/python"
-	"risk-guard/src/language/ruby"
 	"sort"
 
-	executiondag "risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/javascript"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/python"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/ruby"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 var metadataMap = map[string]metadata.Metadata{

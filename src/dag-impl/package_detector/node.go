@@ -3,16 +3,17 @@ package package_detector
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/package_detection"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/package_detection"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

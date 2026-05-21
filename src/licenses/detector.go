@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/licenses/patterns"
-	"risk-guard/src/models"
 	"slices"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/licenses/patterns"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/bmatcuk/doublestar/v4"
 )

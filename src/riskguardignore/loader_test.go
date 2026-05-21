@@ -4,9 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/logger"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 )
 
 func TestNormalizePattern(t *testing.T) {

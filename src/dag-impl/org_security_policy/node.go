@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_resolve"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
 
 	"go.uber.org/zap"
 
-	riskhttp "risk-guard/src/http"
+	riskhttp "github.com/Risk-Guard/oss-risk-guard/src/http"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 var rawGitHubBaseURL = "https://raw.githubusercontent.com"

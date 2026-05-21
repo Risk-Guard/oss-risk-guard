@@ -1,8 +1,8 @@
 package ecosystem
 
 import (
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func ParseManifest(manifest models.DetectedManifest, repoRoot string) (*models.ManifestResult, error) {

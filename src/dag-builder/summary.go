@@ -2,12 +2,13 @@ package dag_builder
 
 import (
 	"context"
-	"risk-guard/src/dag-impl/checks"
 	"time"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // AnalysisSummary contains the complete summary of an analysis run

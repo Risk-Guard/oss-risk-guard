@@ -2,21 +2,22 @@ package dag_builder
 
 import (
 	"context"
-	"risk-guard/src/common"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/dag-impl/git_clone_metadata"
-	"risk-guard/src/dag-impl/git_resolve"
-	"risk-guard/src/dag-impl/license_files"
-	"risk-guard/src/dag-impl/org_security_policy"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/dag-impl/policy_loader"
-	"risk-guard/src/dag-impl/unsupported_manifests"
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/language/dag/transformer"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/license_files"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/org_security_policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/unsupported_manifests"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func BuildGitDag(dag *executiondag.DAG[dag_impl.Input], input dag_impl.Input, ctx context.Context) error {

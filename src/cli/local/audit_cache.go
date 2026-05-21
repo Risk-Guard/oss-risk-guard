@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/lib/local/auditcache"
 	"sort"
 	"time"
 
-	dag_builder "risk-guard/src/dag-builder"
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/local/auditcache"
+
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
 	"github.com/owenrumney/go-sarif/v2/sarif"
 	"go.uber.org/zap"

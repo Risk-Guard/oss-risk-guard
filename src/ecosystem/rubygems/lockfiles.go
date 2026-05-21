@@ -1,7 +1,7 @@
 package rubygems
 
 import (
-	"risk-guard/src/ecosystem/rubygems/package_manager/bundler"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/rubygems/package_manager/bundler"
 )
 
 func DetectLockfile(manifestDir, repoRoot string) *string {

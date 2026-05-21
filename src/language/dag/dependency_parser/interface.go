@@ -1,7 +1,7 @@
 package dependency_parser
 
 import (
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type DependencyParser interface {

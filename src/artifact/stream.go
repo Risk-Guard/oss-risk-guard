@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	riskhttp "risk-guard/src/http"
 	"time"
+
+	riskhttp "github.com/Risk-Guard/oss-risk-guard/src/http"
 )
 
 const DownloadTimeout = 5 * time.Minute

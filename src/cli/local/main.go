@@ -3,12 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/logger"
-	"risk-guard/src/runpath"
-	"risk-guard/src/version"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/version"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"

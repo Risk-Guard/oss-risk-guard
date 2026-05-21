@@ -2,11 +2,12 @@ package depscache
 
 import (
 	"context"
-	"risk-guard/src/models"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 // NewMemoryCache returns a DepsCache backed entirely by in-memory maps.

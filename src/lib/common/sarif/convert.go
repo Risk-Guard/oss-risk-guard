@@ -1,12 +1,13 @@
 package sarif
 
 import (
-	"risk-guard/src/policy"
-	"risk-guard/src/version"
 	"sort"
 	"strings"
 
-	dag_builder "risk-guard/src/dag-builder"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/version"
+
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 
 	"github.com/owenrumney/go-sarif/v2/sarif"
 )

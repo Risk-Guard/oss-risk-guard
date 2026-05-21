@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type FieldNotFoundError struct {

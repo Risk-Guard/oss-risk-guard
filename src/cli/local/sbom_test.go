@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"risk-guard/src/depsgraph"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 )
 
 func TestBuildSBOMJSON_SPDX(t *testing.T) {

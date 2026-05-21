@@ -1,9 +1,9 @@
 package artifact_fetch
 
 import (
-	"risk-guard/src/api/routes"
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // Output is the output of the artifact_fetch node.

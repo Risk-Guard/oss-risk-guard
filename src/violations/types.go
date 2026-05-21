@@ -1,8 +1,9 @@
 package violations
 
 import (
-	"risk-guard/src/models"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type Violation struct {

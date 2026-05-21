@@ -1,10 +1,10 @@
 package checks
 
 import (
-	"risk-guard/src/category"
-	"risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 )
 
 // BaseCheckNode provides common fields and all boilerplate methods for check nodes.

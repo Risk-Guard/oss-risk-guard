@@ -1,10 +1,11 @@
 package package_unsafe_source_url
 
 import (
-	"risk-guard/src/lib/common/storage"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

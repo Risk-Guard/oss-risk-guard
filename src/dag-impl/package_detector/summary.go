@@ -3,7 +3,7 @@ package package_detector
 import (
 	"path/filepath"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func (o *Output) Summary(outputDir string) executiondag.NodeSummary {

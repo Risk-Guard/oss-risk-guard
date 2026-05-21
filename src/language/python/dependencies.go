@@ -2,9 +2,10 @@ package python
 
 import (
 	"fmt"
-	"risk-guard/src/models"
-	"risk-guard/src/parsers/python/pep508"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/parsers/python/pep508"
 )
 
 func (p *Python) parseDependencies(requiresDist []string) ([]models.Dependency, error) {

@@ -3,8 +3,9 @@ package git
 import (
 	"context"
 	"errors"
-	"risk-guard/src/environment"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 
 	"github.com/stretchr/testify/require"
 )

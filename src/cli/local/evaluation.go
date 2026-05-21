@@ -5,22 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/policy_loader"
-	"risk-guard/src/helpers"
-	"risk-guard/src/lib/common/sarif"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/policy"
-	"risk-guard/src/violations"
 	"time"
 
-	dag_builder "risk-guard/src/dag-builder"
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
+	"github.com/Risk-Guard/oss-risk-guard/src/helpers"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sarif"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	localdag "risk-guard/src/lib/local/dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
+
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
 
 	"go.uber.org/zap"
 )

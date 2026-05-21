@@ -5,10 +5,11 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"

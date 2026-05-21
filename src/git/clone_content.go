@@ -6,8 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 
 	"github.com/go-git/go-git/v5"
 )

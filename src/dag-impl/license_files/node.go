@@ -3,14 +3,15 @@ package license_files
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/licenses"
-	"risk-guard/src/models"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/licenses"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

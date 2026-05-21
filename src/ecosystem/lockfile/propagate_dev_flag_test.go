@@ -1,8 +1,9 @@
 package lockfile
 
 import (
-	"risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestPropagateDevFlag_ClearsDevWhenProdReachable(t *testing.T) {

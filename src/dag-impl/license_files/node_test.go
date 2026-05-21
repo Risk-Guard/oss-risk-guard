@@ -1,12 +1,13 @@
 package license_files
 
 import (
-	dag_impl "risk-guard/src/dag-impl"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/models"
 	"testing"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

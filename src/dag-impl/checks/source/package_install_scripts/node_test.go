@@ -1,15 +1,16 @@
 package package_install_scripts
 
 import (
-	"risk-guard/src/dag-impl/artifact_fetch"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func strPtr(s string) *string { return &s }

@@ -2,9 +2,10 @@ package gemfile
 
 import (
 	"fmt"
-	"risk-guard/src/models"
-	"risk-guard/src/parsers/ruby/gemspec"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/parsers/ruby/gemspec"
 
 	"github.com/alecthomas/participle/v2/lexer"
 )

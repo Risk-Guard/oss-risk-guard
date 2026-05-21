@@ -1,8 +1,9 @@
 package package_name_mismatch
 
 import (
-	"risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestComputeMaintainerOverlap(t *testing.T) {

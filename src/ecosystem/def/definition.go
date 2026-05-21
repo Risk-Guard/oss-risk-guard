@@ -3,7 +3,7 @@ package def
 import (
 	"fmt"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type NameEncoder func(name string) string

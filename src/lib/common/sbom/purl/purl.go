@@ -2,8 +2,9 @@ package purl
 
 import (
 	"net/url"
-	"risk-guard/src/language/python/normalize"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 )
 
 var ecosystemToType = map[string]string{

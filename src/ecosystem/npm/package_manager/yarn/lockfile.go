@@ -1,9 +1,9 @@
 package yarn
 
 import (
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/ecosystem/lockfile"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 const LockfileName = "yarn.lock"

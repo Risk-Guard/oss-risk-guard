@@ -1,6 +1,6 @@
 package git_clone_content
 
-import executiondag "risk-guard/src/execution-dag"
+import executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 func (o *Output) Summary(outputDir string) executiondag.NodeSummary {
 	var filesWritten []string

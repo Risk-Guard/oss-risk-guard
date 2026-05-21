@@ -2,18 +2,19 @@ package fetcher_test
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/language"
-	"risk-guard/src/language/dag/fetcher"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/models"
-	"risk-guard/src/runpath"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/fetcher"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

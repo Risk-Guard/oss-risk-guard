@@ -108,7 +108,7 @@ jobs:
 
           # Build with version info
           go build -v \
-            -ldflags="-s -w -X risk-guard/src/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X risk-guard/src/version.BuildGitHash=${GITHUB_SHA} -X risk-guard/src/version.Version=${VERSION}" \
+            -ldflags="-s -w -X github.com/Risk-Guard/oss-risk-guard/src/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X github.com/Risk-Guard/oss-risk-guard/src/version.BuildGitHash=${GITHUB_SHA} -X github.com/Risk-Guard/oss-risk-guard/src/version.Version=${VERSION}" \
             -o "dist/${BINARY_NAME}" \
             ./src/cli/local
 

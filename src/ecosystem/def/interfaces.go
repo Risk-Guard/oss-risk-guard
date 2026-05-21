@@ -1,6 +1,6 @@
 package def
 
-import "risk-guard/src/models"
+import "github.com/Risk-Guard/oss-risk-guard/src/models"
 
 type Ecosystem interface {
 	Name() string

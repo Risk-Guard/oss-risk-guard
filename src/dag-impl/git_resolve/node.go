@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/git"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

@@ -1,10 +1,11 @@
 package javascript
 
 import (
-	"risk-guard/src/models"
 	"strings"
 
-	npmregistry "risk-guard/src/registry/npm"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+
+	npmregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/npm"
 )
 
 func (j *JavaScript) extractDistribution(versions map[string]npmregistry.NPMVersionDetails, version string) *models.DistributionInfo {

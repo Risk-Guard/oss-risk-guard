@@ -1,12 +1,13 @@
 package transformer
 
 import (
-	"risk-guard/src/models"
-	"risk-guard/src/overrides"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
+
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func newTestOutput(sourceURL string) *Output {

@@ -3,8 +3,9 @@ package depsgraph
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/violations"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 )
 
 func GetViolations(ctx context.Context, backend storage.ChecksBackend, pathMap map[string]PathInfo, analysisIDs []string) (*violations.ViolationsResult, error) {

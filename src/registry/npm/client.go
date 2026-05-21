@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"risk-guard/src/common"
-	"risk-guard/src/models"
 	"time"
 
-	httputil "risk-guard/src/http"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+
+	httputil "github.com/Risk-Guard/oss-risk-guard/src/http"
 )
 
 // Client handles NPM registry API requests

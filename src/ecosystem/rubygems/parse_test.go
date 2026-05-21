@@ -3,9 +3,10 @@ package rubygems
 import (
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestParseManifest_UnsupportedFilename(t *testing.T) {

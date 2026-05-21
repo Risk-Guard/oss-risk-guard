@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/overrides"
 	"sync"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 
 	"go.uber.org/zap"
 )

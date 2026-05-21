@@ -3,12 +3,13 @@ package deps_extractor
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/language/dag/transformer"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

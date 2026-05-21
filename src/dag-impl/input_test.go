@@ -1,10 +1,11 @@
 package dag_impl
 
 import (
-	"risk-guard/src/models"
 	"testing"
 
-	executiondag "risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // Mock output for testing - uses BaseOutput with Output field set

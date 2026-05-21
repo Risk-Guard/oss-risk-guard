@@ -3,17 +3,18 @@ package artifact_fetch
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/api/routes"
-	"risk-guard/src/artifact/fetcher"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/language"
-	"risk-guard/src/language/dag/transformer"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact/fetcher"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

@@ -1,9 +1,10 @@
 package gemfile
 
 import (
-	"risk-guard/src/models"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func assertDynamicDependencyResult(

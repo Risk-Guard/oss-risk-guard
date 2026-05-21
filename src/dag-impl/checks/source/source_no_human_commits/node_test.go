@@ -2,13 +2,14 @@ package source_no_human_commits
 
 import (
 	"fmt"
-	"risk-guard/src/dag-impl/git_clone_metadata"
-	"risk-guard/src/lib/common/storage"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

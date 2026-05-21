@@ -1,8 +1,8 @@
 package javascript
 
 import (
-	"risk-guard/src/archive"
-	"risk-guard/src/language/javascript/detection"
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/javascript/detection"
 )
 
 func (j *JavaScript) ExtractPackageArchive(artifactPath, destDir string) error {

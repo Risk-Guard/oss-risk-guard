@@ -1,12 +1,12 @@
 package npm
 
 import (
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/ecosystem/npm/package_manager/bun"
-	innernpm "risk-guard/src/ecosystem/npm/package_manager/npm"
-	"risk-guard/src/ecosystem/npm/package_manager/pnpm"
-	"risk-guard/src/ecosystem/npm/package_manager/yarn"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/bun"
+	innernpm "github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/npm"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/pnpm"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/yarn"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type ecosystem struct{}

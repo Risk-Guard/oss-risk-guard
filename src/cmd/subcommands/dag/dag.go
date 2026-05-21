@@ -3,22 +3,23 @@ package dag
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/policy_loader"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/policy"
-	"risk-guard/src/runpath"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	"go.uber.org/zap"
 
-	dag_builder "risk-guard/src/dag-builder"
-	dag_impl "risk-guard/src/dag-impl"
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
-	languageregistry "risk-guard/src/language/registry"
+	languageregistry "github.com/Risk-Guard/oss-risk-guard/src/language/registry"
 )
 
 type DagResponse struct {

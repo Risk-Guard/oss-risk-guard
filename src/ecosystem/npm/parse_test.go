@@ -3,8 +3,9 @@ package npm
 import (
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestParseManifest_PrivateTrue(t *testing.T) {

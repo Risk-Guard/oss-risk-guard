@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"risk-guard/src/api/routes"
-	"risk-guard/src/artifact"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/models"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"go.uber.org/zap"
 )

@@ -3,12 +3,13 @@ package unsupported_manifests
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/language/unsupported"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/unsupported"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

@@ -2,13 +2,14 @@ package uv
 
 import (
 	"fmt"
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/ecosystem/lockfile"
-	"risk-guard/src/models"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/BurntSushi/toml"
 
-	pythonnormalize "risk-guard/src/language/python/normalize"
+	pythonnormalize "github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 )
 
 const LockfileName = "uv.lock"

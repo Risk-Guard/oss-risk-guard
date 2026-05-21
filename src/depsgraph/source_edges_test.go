@@ -1,8 +1,9 @@
 package depsgraph
 
 import (
-	"risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/stretchr/testify/assert"
 )

@@ -2,16 +2,17 @@ package package_name_unexported
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/logger"
-	"risk-guard/src/models"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func makeTestCtx(t *testing.T, manifests []models.ManifestResult) context.Context {

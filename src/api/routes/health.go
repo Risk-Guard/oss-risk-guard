@@ -1,6 +1,6 @@
 package routes
 
-import "risk-guard/src/api/route"
+import "github.com/Risk-Guard/oss-risk-guard/src/api/route"
 
 type HealthCheckResponse struct {
 	Status string `json:"status"`

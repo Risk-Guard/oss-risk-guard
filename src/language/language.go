@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/models"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 // ConvertToType converts data to a typed struct.

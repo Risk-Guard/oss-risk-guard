@@ -4,15 +4,16 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_resolve"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func testCtx() context.Context {

@@ -3,10 +3,11 @@ package npm
 import (
 	"encoding/json"
 	"fmt"
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/ecosystem/lockfile"
-	"risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 const LockfileName = "package-lock.json"

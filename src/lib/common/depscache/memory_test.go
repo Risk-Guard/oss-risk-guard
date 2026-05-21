@@ -2,9 +2,10 @@ package depscache
 
 import (
 	"context"
-	"risk-guard/src/models"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestMemoryCache_LockfileRoundTrip(t *testing.T) {

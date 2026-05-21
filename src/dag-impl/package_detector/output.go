@@ -1,9 +1,9 @@
 package package_detector
 
 import (
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
-	"risk-guard/src/models"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type Output struct {

@@ -2,13 +2,14 @@ package source_no_license
 
 import (
 	"fmt"
-	"risk-guard/src/dag-impl/license_files"
-	"risk-guard/src/lib/common/storage"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/license_files"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

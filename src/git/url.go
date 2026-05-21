@@ -4,8 +4,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/url"
-	"risk-guard/src/common"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
 )
 
 // NormalizeCacheURL normalizes a source URL for use as a cache key component.

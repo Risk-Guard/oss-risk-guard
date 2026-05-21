@@ -8,11 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"risk-guard/src/archive"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/models"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 const cloneMetaFile = ".rg-clone-meta.json"

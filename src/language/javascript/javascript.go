@@ -3,16 +3,17 @@ package javascript
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/language"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/models"
 	"sort"
 	"strings"
 	"time"
 
-	npmregistry "risk-guard/src/registry/npm"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+
+	npmregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/npm"
 
 	"go.uber.org/zap"
 )

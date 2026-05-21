@@ -3,8 +3,9 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
-	"risk-guard/src/category"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
 )
 
 type Severity string

@@ -2,15 +2,16 @@ package git_clone_content
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/logger"
-	"risk-guard/src/runpath"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func setupTestContext(t *testing.T, outputDir string) context.Context {

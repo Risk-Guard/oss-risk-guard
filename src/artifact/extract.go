@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"risk-guard/src/archive"
-	"risk-guard/src/models"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type ExtractionResult struct {

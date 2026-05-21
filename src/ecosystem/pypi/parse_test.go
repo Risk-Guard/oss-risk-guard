@@ -3,8 +3,9 @@ package pypi
 import (
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestParseManifest_SetupPyNoSetupCall_NotAnError(t *testing.T) {
