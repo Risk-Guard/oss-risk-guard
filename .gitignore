@@ -1,0 +1,9 @@
+coverage.out
+.oss-score/
+.env
+reports/
+tmp/
+opensourcescore.dev/
+.activate.sh
+tests/**/*.git
+scratch/

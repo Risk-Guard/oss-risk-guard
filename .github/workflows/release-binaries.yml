@@ -1,0 +1,186 @@
+name: Build Release Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - "pre-release/v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g., v1.0.0)"
+        required: false
+        default: "dev"
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  build-binaries:
+    name: Build binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            platform: linux-armv7
+
+          # macOS
+          - goos: darwin
+            goarch: amd64
+            platform: macos-amd64
+          - goos: darwin
+            goarch: arm64
+            platform: macos-arm64
+
+          # Windows
+          - goos: windows
+            goarch: amd64
+            platform: windows-amd64
+          - goos: windows
+            goarch: arm64
+            platform: windows-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: ./.github/actions/setup-go-private
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ matrix.platform }}-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ matrix.platform }}-
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          elif [[ "$GITHUB_REF" == refs/heads/pre-release/* ]]; then
+            # Extract version from branch name: pre-release/v1.0.0 -> v1.0.0-pre
+            VERSION="${GITHUB_REF#refs/heads/pre-release/}"
+            VERSION="${VERSION}-pre"
+          else
+            VERSION="dev-${GITHUB_SHA:0:8}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BINARY_NAME="risk-guard"
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+
+          # Build with version info
+          go build -v \
+            -ldflags="-s -w -X risk-guard/src/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X risk-guard/src/internal/version.BuildGitHash=${GITHUB_SHA}" \
+            -o "dist/${BINARY_NAME}" \
+            ./src
+
+          # Create archive
+          cd dist
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            zip "risk-guard-${VERSION}-${{ matrix.platform }}.zip" "${BINARY_NAME}"
+            echo "archive=risk-guard-${VERSION}-${{ matrix.platform }}.zip" >> $GITHUB_OUTPUT
+          else
+            tar czf "risk-guard-${VERSION}-${{ matrix.platform }}.tar.gz" "${BINARY_NAME}"
+            echo "archive=risk-guard-${VERSION}-${{ matrix.platform }}.tar.gz" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-guard-${{ matrix.platform }}
+          path: dist/risk-guard-*
+          retention-days: 30
+
+      - name: Create checksums
+        working-directory: dist
+        run: |
+          if command -v sha256sum > /dev/null; then
+            sha256sum risk-guard-* > checksums-${{ matrix.platform }}.txt
+          else
+            shasum -a 256 risk-guard-* > checksums-${{ matrix.platform }}.txt
+          fi
+
+      - name: Upload checksum artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums-${{ matrix.platform }}
+          path: dist/checksums-${{ matrix.platform }}.txt
+          retention-days: 30
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "checksums-*.txt" \) -exec cp {} release-assets/ \;
+
+          # Create combined checksums file
+          cat release-assets/checksums-*.txt > release-assets/checksums.txt
+          rm release-assets/checksums-*.txt
+
+          ls -lah release-assets/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

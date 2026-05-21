@@ -1,0 +1,4 @@
+- When performing a code review, don't comment on lack of test coverage.
+- When performing a code review, don't comment on import order.
+- All ecosystem-specific logic must reside exclusively in src/ecosystem or src/registry/
+- All language-specific logic must reside exclusively in src/language/

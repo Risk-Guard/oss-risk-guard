@@ -1,0 +1,99 @@
+name: Build and Test
+
+on: push
+
+jobs:
+  # NO MORE SQL
+  # lint-sql:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: "3.x"
+
+  #     - name: Install sqlfluff
+  #       run: pip install sqlfluff
+
+  #     - name: Lint SQL with sqlfluff
+  #       run: sqlfluff lint --dialect bigquery src/sql/bq
+
+  lint-openapi:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: ./.github/actions/setup-go-private
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Export OpenAPI spec
+        run: go run src/cli/server/main.go openapi export > openapi.json
+
+      - name: Lint OpenAPI with Spectral
+        run: npx @stoplight/spectral-cli lint openapi.json
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: ./.github/actions/setup-go-private
+        with:
+          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Lint with golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          # install-only: true
+          skip-cache: true
+          version: "v2.10"
+          args: --timeout=5m
+
+      # - name: Run unit tests
+      #   run: staticcheck ./src/...
+
+      - name: Run unit tests
+        run: go test -v ./src/...
+
+      - name: Build
+        run: go build -v ./...

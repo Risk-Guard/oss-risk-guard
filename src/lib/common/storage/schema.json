@@ -1,0 +1,9 @@
+[
+  {"name": "analysis_identifier", "type": "STRING"},
+  {"name": "analyzed_at", "type": "TIMESTAMP"},
+  {"name": "source_url", "type": "STRING"},
+  {"name": "ecosystem", "type": "STRING"},
+  {"name": "package_name", "type": "STRING"},
+  {"name": "package_version", "type": "STRING"},
+  {"name": "data", "type": "JSON"}
+]

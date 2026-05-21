@@ -1,0 +1,12 @@
+version: 2
+workflow:
+  mode: active
+severity:
+  category/critical: blocking
+  category/title-assurance: warning
+  category/license-compliance: warning
+  category/continuity-assurance: warning
+  depth/0/category/continuity-assurance: ignore
+  depth/1/category/continuity-assurance: blocking
+  depth/2+/category/continuity-assurance: warning
+  category/security-vulnerability: warning

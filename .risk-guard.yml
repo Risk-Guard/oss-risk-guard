@@ -1,0 +1,7 @@
+# Risk Guard configuration
+# Generated during initial setup on 2026-01-07
+# Documentation: https://ossriskguard.app/docs/configuration
+
+version: 2
+workflow:
+  mode: active
