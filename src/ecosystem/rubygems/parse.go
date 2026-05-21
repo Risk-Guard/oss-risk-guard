@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/rubygems/package_manager/bundler"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/parsers/ruby/gemfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/parsers/ruby/gemspec"
-	"strings"
 )
 
 func ParseManifest(detected models.DetectedManifest, repoRoot string) (*models.ManifestResult, error) {

@@ -3,12 +3,13 @@ package package_stale_release
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/version_transformer"
-	"time"
 
 	"go.uber.org/zap"
 

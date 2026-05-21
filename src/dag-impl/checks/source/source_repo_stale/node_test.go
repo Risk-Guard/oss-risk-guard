@@ -2,11 +2,12 @@ package source_repo_stale
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

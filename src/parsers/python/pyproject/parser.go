@@ -2,10 +2,11 @@ package pyproject
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"github.com/Risk-Guard/oss-risk-guard/src/parsers/python/pep508"
 	"slices"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/parsers/python/pep508"
 
 	"github.com/BurntSushi/toml"
 

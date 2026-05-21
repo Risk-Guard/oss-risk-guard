@@ -2,11 +2,12 @@ package package_dynamic_name
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

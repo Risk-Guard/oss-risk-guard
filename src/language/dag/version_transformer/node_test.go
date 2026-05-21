@@ -1,9 +1,10 @@
 package version_transformer
 
 import (
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/fetcher"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"

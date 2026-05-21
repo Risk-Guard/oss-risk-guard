@@ -2,8 +2,9 @@ package dag_builder
 
 import (
 	"context"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

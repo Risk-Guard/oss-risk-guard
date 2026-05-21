@@ -2,10 +2,11 @@ package source_repo_new
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

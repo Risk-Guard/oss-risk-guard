@@ -2,6 +2,7 @@ package dag_builder
 
 import (
 	"context"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"

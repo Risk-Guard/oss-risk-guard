@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
 )
 
 type DepsMap map[string]string

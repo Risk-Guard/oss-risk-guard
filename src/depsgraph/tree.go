@@ -1,8 +1,9 @@
 package depsgraph
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 )
 
 type SBOMNode struct {

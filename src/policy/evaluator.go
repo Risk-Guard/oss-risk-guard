@@ -3,10 +3,11 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
-	"time"
 )
 
 type FindingKind string

@@ -1,9 +1,10 @@
 package source_manifest_without_lockfile
 
 import (
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"

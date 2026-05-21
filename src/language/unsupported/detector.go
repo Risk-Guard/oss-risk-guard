@@ -3,6 +3,7 @@ package unsupported
 import (
 	"io/fs"
 	"path/filepath"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
 )
 

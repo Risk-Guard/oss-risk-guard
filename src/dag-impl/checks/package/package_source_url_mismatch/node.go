@@ -3,12 +3,13 @@ package package_source_url_mismatch
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
-	"strings"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

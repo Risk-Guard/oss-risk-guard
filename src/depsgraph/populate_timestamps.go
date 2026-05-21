@@ -2,6 +2,7 @@ package depsgraph
 
 import (
 	"context"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
 )
 

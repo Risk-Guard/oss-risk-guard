@@ -2,9 +2,10 @@ package source_few_contributors
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

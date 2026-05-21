@@ -3,8 +3,9 @@ package pep508
 import (
 	"bufio"
 	"regexp"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	pythonnormalize "github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 )

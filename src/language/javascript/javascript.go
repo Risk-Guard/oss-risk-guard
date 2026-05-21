@@ -3,14 +3,15 @@ package javascript
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"sort"
-	"strings"
-	"time"
 
 	npmregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/npm"
 

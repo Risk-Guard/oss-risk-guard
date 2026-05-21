@@ -2,8 +2,9 @@ package policy
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 )
 
 func evaluateWithBreakdown(

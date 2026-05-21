@@ -3,6 +3,7 @@ package fetcher
 import (
 	"context"
 	"fmt"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/registry"

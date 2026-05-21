@@ -9,11 +9,12 @@ import (
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

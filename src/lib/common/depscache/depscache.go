@@ -2,8 +2,9 @@ package depscache
 
 import (
 	"context"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type DepsCache interface {

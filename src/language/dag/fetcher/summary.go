@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"path/filepath"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/language/registry"
 	"github.com/Risk-Guard/oss-risk-guard/src/metadata"
 

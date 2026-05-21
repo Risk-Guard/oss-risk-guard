@@ -4,12 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/environment"
-	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	"go.uber.org/zap"
 

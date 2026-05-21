@@ -2,10 +2,11 @@ package cdx16
 
 import (
 	"encoding/json"
-	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
-	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

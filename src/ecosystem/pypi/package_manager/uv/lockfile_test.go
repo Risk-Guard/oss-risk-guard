@@ -1,8 +1,9 @@
 package uv
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestParseLockfileBasic(t *testing.T) {

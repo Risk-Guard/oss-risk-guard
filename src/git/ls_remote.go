@@ -5,10 +5,11 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"github.com/Risk-Guard/oss-risk-guard/src/common"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"strings"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 )
 
 const lsRemoteTimeout = 10 * time.Second

@@ -2,6 +2,7 @@ package dag_builder
 
 import (
 	"context"
+
 	artifactfetcher "github.com/Risk-Guard/oss-risk-guard/src/artifact/fetcher"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/deps_extractor"

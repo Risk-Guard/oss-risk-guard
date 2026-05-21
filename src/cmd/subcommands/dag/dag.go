@@ -3,13 +3,14 @@ package dag
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
-	"time"
 
 	"go.uber.org/zap"
 

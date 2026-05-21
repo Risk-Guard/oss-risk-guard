@@ -1,8 +1,9 @@
 package package_unsafe_source_url
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 )

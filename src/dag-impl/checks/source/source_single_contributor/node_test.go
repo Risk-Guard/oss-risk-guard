@@ -3,6 +3,8 @@ package source_single_contributor
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/source/source_repo_abandoned"
@@ -10,7 +12,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

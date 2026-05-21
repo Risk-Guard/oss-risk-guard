@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"context"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )

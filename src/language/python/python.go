@@ -3,11 +3,12 @@ package python
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"time"
 
 	pythonnormalize "github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 	pypiregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/pypi"

@@ -4,9 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/stretchr/testify/require"
 )

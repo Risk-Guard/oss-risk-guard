@@ -4,9 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/purl"
-	"time"
 )
 
 type Builder struct {

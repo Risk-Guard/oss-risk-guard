@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"path/filepath"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/local/auditcache"
 	"sort"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/local/auditcache"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"

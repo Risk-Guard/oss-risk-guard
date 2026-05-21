@@ -2,11 +2,12 @@ package git_clone_content
 
 import (
 	"context"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

@@ -3,6 +3,8 @@ package package_name_mismatch
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
@@ -12,7 +14,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

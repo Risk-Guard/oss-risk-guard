@@ -3,11 +3,12 @@ package dag_builder
 import (
 	"context"
 	"fmt"
+	"sort"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/registry"
-	"sort"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

@@ -2,12 +2,13 @@ package registry
 
 import (
 	"fmt"
+	"sort"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/javascript"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/python"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/ruby"
-	"sort"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

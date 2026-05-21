@@ -3,11 +3,12 @@ package package_name_unexported
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
-	"strings"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

@@ -2,11 +2,12 @@ package sarif
 
 import (
 	"encoding/json"
+	"strings"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
-	"strings"
-	"testing"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 )

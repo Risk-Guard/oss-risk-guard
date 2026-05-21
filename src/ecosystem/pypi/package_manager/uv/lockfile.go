@@ -2,6 +2,7 @@ package uv
 
 import (
 	"fmt"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"

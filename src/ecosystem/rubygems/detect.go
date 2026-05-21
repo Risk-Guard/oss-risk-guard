@@ -6,9 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
 )
 
 var gemspecDirectiveRegex = regexp.MustCompile(`(?m)^\s*gemspec\b`)

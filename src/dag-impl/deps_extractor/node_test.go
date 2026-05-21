@@ -2,11 +2,12 @@ package deps_extractor
 
 import (
 	"context"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"

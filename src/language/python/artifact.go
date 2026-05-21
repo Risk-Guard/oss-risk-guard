@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 )
 
 func (p *Python) ExtractInstallScriptsFromFiles(files map[string]string) ([]string, error) {

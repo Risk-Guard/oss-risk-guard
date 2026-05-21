@@ -3,10 +3,11 @@ package depsgraph
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
 )
 
 // edgesToDepsMap converts lockfile/BFS edges into a parent→child-keys map for SBOM dep population.

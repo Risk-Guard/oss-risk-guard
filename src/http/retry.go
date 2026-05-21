@@ -4,9 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"slices"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 
 	"github.com/avast/retry-go/v4"
 	"go.uber.org/zap"

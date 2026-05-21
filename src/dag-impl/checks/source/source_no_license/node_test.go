@@ -2,9 +2,10 @@ package source_no_license
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/license_files"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

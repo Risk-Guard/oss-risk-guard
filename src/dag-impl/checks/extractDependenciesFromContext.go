@@ -2,6 +2,7 @@ package checks
 
 import (
 	"context"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/deps_extractor"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"

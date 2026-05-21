@@ -1,8 +1,9 @@
 package dag_impl
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

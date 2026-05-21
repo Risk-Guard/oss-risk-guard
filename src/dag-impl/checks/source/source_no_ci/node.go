@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
-	"sort"
-	"strings"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

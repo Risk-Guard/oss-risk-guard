@@ -1,10 +1,11 @@
 package license_files
 
 import (
+	"testing"
+
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"testing"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

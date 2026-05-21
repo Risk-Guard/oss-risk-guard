@@ -1,9 +1,10 @@
 package policy
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
 
 	"github.com/stretchr/testify/require"
 )

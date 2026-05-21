@@ -3,6 +3,7 @@ package source_malformed_metadata
 import (
 	"context"
 	"fmt"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"

@@ -4,9 +4,10 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
-	"testing"
 
 	"go.uber.org/zap"
 

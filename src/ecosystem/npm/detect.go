@@ -2,6 +2,7 @@ package npm
 
 import (
 	"path/filepath"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/bun"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/pnpm"

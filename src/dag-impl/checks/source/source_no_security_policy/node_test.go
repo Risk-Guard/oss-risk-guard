@@ -3,11 +3,12 @@ package source_no_security_policy
 import (
 	"os"
 	"path/filepath"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/org_security_policy"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"testing"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

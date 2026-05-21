@@ -3,8 +3,9 @@ package dag_impl
 import (
 	"fmt"
 	"net/url"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

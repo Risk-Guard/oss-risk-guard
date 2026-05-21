@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
@@ -15,8 +18,6 @@ import (
 	licpatterns "github.com/Risk-Guard/oss-risk-guard/src/licenses/patterns"
 	"github.com/Risk-Guard/oss-risk-guard/src/riskguardignore"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
-	"sort"
-	"strings"
 
 	"go.uber.org/zap"
 

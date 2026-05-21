@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 )
 
 func (r *Ruby) ExtractInstallScriptsFromFiles(files map[string]string) ([]string, error) {

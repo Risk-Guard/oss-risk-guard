@@ -2,9 +2,10 @@ package depsgraph
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

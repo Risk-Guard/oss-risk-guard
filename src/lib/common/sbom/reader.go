@@ -5,9 +5,10 @@ package sbom
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
-	"sort"
 )
 
 // ReadDirectDeps sniffs the SBOM format from the JSON payload and returns the

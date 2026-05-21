@@ -1,9 +1,10 @@
 package depsgraph
 
 import (
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/types"
-	"time"
 )
 
 type DepsTreeEdge struct {

@@ -2,12 +2,13 @@ package depsgraph
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
-	"time"
 
 	"go.uber.org/zap"
 )

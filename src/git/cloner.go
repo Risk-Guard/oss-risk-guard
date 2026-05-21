@@ -7,12 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"github.com/Risk-Guard/oss-risk-guard/src/common"
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 
 	"github.com/go-git/go-git/v5"
 )

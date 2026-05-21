@@ -1,10 +1,11 @@
 package bun
 
 import (
+	"slices"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"slices"
 )
 
 var LockfileNames = []string{"bun.lock", "bun.lockb"}

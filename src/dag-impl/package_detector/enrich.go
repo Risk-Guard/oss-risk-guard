@@ -2,10 +2,11 @@ package package_detector
 
 import (
 	"path/filepath"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"strings"
 )
 
 func enrichManifests(manifests []models.DetectedManifest, repoRootPath, sourceKey string) []models.ManifestResult {

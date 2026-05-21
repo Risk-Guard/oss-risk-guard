@@ -1,8 +1,9 @@
 package package_detector
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"

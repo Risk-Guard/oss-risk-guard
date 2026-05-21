@@ -1,13 +1,14 @@
 package package_stale_release
 
 import (
+	"testing"
+	"time"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/version_transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"testing"
-	"time"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 

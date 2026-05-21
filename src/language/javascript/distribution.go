@@ -1,8 +1,9 @@
 package javascript
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	npmregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/npm"
 )

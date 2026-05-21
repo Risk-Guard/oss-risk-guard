@@ -2,8 +2,9 @@ package package_name_mismatch
 
 import (
 	"fmt"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 // MaintainerOverlap represents the comparison result between two packages' maintainers

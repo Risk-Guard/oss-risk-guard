@@ -3,6 +3,7 @@ package source_unsupported_manifest_file
 import (
 	"context"
 	"fmt"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/unsupported_manifests"

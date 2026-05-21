@@ -3,8 +3,9 @@ package pypi
 import (
 	"net/url"
 	"regexp"
-	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"strings"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

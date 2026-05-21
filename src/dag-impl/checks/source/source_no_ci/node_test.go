@@ -3,9 +3,10 @@ package source_no_ci
 import (
 	"os"
 	"path/filepath"
+	"testing"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
-	"testing"
 
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )

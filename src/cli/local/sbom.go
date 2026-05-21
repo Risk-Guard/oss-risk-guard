@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem"
@@ -15,7 +17,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/package_detection"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

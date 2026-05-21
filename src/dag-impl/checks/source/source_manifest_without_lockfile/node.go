@@ -3,6 +3,7 @@ package source_manifest_without_lockfile
 import (
 	"context"
 	"fmt"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"

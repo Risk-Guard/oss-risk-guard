@@ -3,9 +3,10 @@ package gemspec
 import (
 	"os"
 	"path/filepath"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func assertDynamicDependencyResult(

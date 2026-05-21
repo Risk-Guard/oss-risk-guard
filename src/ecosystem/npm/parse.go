@@ -3,6 +3,7 @@ package npm
 import (
 	"os"
 	"path/filepath"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/bun"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/pnpm"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/yarn"
