@@ -3,9 +3,9 @@ package policy
 import (
 	"encoding/json"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/models"
-	"risk-guard/src/violations"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"time"
 )
 

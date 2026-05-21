@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"risk-guard/src/overrides"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 	"time"
 )
 

@@ -1,12 +1,12 @@
 package pypi
 
 import (
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/ecosystem/pypi/package_manager/pdm"
-	"risk-guard/src/ecosystem/pypi/package_manager/pipenv"
-	"risk-guard/src/ecosystem/pypi/package_manager/poetry"
-	"risk-guard/src/ecosystem/pypi/package_manager/uv"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pypi/package_manager/pdm"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pypi/package_manager/pipenv"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pypi/package_manager/poetry"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pypi/package_manager/uv"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type ecosystem struct{}

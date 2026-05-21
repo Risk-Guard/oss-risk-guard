@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"time"
 
 	"go.uber.org/zap"

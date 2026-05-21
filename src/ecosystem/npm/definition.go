@@ -2,10 +2,10 @@ package npm
 
 import (
 	"net/url"
-	"risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"strings"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 var Definition = def.Definition{

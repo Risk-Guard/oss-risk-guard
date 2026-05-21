@@ -1,10 +1,10 @@
 package ecosystem
 
 import (
-	"risk-guard/src/ecosystem/def"
-	npmeco "risk-guard/src/ecosystem/npm"
-	"risk-guard/src/ecosystem/pypi"
-	"risk-guard/src/ecosystem/rubygems"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	npmeco "github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pypi"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/rubygems"
 )
 
 func init() {

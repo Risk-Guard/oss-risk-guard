@@ -2,11 +2,11 @@ package transformer
 
 import (
 	"fmt"
-	"risk-guard/src/models"
-	"risk-guard/src/overrides"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type RejectedSourceURL struct {

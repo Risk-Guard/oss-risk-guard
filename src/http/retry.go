@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"slices"
 	"time"
 

@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"risk-guard/src/ecosystem/pathutil"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 )
 

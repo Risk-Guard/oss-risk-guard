@@ -3,9 +3,9 @@ package executiondag
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 	"sync"
 	"testing"
 	"time"

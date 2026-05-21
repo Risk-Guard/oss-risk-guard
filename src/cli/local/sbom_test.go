@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"strings"
 	"testing"
 )

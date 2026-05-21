@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
 )
 
 // Pattern: {outputDir}/packages/{ecosystem}/{packageName}/

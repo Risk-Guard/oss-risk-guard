@@ -7,9 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"time"
 
 	"github.com/avast/retry-go/v4"

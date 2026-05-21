@@ -2,7 +2,7 @@ package policy
 
 import (
 	"fmt"
-	"risk-guard/src/violations"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"time"
 )
 

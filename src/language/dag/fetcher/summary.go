@@ -2,10 +2,10 @@ package fetcher
 
 import (
 	"path/filepath"
-	"risk-guard/src/language/registry"
-	"risk-guard/src/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/registry"
+	"github.com/Risk-Guard/oss-risk-guard/src/metadata"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func (o *Output) Summary(outputDir string) executiondag.NodeSummary {

@@ -6,19 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_resolve"
-	"risk-guard/src/git"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/models"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"time"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 const metadataCacheMaxAge = 365 * 24 * time.Hour

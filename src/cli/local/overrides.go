@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"risk-guard/src/overrides"
+	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 
 	"sigs.k8s.io/yaml"
 )

@@ -2,7 +2,7 @@ package depsgraph
 
 import (
 	"fmt"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 	"time"
 

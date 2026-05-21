@@ -1,6 +1,6 @@
 package def
 
-import "risk-guard/src/ecosystem/lockfile"
+import "github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 
 type BasePackageManager struct {
 	name          string

@@ -3,10 +3,10 @@ package dag_impl
 import (
 	"fmt"
 	"net/url"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // MergeableOutput is an interface that dag-impl outputs can implement

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/git"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func (n *Node) tryCloneCache(ctx context.Context, backend cache.Backend, normalizedURL, commitSHA, sourceURL string, input dag_impl.Input) (*Output, error) {

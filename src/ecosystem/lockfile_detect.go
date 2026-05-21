@@ -1,6 +1,6 @@
 package ecosystem
 
-import "risk-guard/src/ecosystem/def"
+import "github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 
 func DetectLockfileWithManager(ecoName, manifestDir, repoRoot string) (*string, *string) {
 	eco, err := def.Get(ecoName)

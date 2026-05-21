@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/git"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
-	dagcmd "risk-guard/src/cmd/subcommands/dag"
+	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	localdag "risk-guard/src/lib/local/dag"
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

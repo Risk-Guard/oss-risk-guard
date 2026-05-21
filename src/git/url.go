@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/url"
-	"risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"strings"
 )
 

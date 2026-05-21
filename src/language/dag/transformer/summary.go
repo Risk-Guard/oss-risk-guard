@@ -2,9 +2,9 @@ package transformer
 
 import (
 	"path/filepath"
-	"risk-guard/src/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/metadata"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // Summary implements the OutputSummary interface to provide reporting information

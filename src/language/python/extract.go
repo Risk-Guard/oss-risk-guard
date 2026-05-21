@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"sort"
 	"strings"
 	"time"
 
-	pypiregistry "risk-guard/src/registry/pypi"
+	pypiregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/pypi"
 
 	"go.uber.org/zap"
 )

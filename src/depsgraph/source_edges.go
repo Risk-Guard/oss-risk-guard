@@ -2,10 +2,10 @@ package depsgraph
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/ecosystem/lockfile"
-	"risk-guard/src/lib/common/depscache"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 	"time"
 

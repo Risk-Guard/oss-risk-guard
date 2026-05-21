@@ -3,20 +3,20 @@ package package_name_mismatch
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/git_clone_metadata"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/language"
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

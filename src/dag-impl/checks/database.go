@@ -3,13 +3,13 @@ package checks
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/lib/common/depscache"
-	"risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 )
 
 func WriteToStorage(ctx context.Context, checksDoc storage.ChecksResult, input dag_impl.Input) error {

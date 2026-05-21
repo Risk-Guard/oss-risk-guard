@@ -3,18 +3,18 @@ package package_stale_release
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/language/dag/version_transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/version_transformer"
 	"time"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 const violationYears = 3

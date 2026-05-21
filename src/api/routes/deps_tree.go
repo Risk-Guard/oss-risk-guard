@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"risk-guard/src/api/route"
-	"risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/api/route"
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 )
 
 type DepsTreeSourceResponse struct {

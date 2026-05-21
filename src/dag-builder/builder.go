@@ -2,9 +2,9 @@ package dag_builder
 
 import (
 	"context"
-	dag_impl "risk-guard/src/dag-impl"
-	executiondag "risk-guard/src/execution-dag"
-	"risk-guard/src/language"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
 )
 
 type DagBuilder func(

@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"risk-guard/src/ctxutil"
-	dag_impl "risk-guard/src/dag-impl"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/lib/common/storage"
-	localdag "risk-guard/src/lib/local/dag"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
-	dagcmd "risk-guard/src/cmd/subcommands/dag"
+	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

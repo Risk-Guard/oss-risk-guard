@@ -2,8 +2,8 @@ package spdx30
 
 import (
 	"encoding/json"
-	"risk-guard/src/depsgraph"
-	"risk-guard/src/violations"
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"strings"
 	"testing"
 

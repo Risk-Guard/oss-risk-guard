@@ -2,7 +2,7 @@ package depsgraph
 
 import (
 	"context"
-	"risk-guard/src/lib/common/depscache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
 )
 
 func PopulateTimestamps(ctx context.Context, edges []DepsTreeEdge) error {

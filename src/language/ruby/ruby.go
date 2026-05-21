@@ -3,17 +3,17 @@ package ruby
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/language"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"sort"
 	"strings"
 	"time"
 
-	rubynormalize "risk-guard/src/language/ruby/normalize"
-	rubygemsregistry "risk-guard/src/registry/rubygems"
+	rubynormalize "github.com/Risk-Guard/oss-risk-guard/src/language/ruby/normalize"
+	rubygemsregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/rubygems"
 
 	"go.uber.org/zap"
 )

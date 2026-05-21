@@ -3,10 +3,10 @@ package pep508
 import (
 	"bufio"
 	"regexp"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 
-	pythonnormalize "risk-guard/src/language/python/normalize"
+	pythonnormalize "github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 )
 
 type lineWithNumber struct {

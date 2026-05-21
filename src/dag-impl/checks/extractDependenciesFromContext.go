@@ -2,14 +2,14 @@ package checks
 
 import (
 	"context"
-	"risk-guard/src/dag-impl/deps_extractor"
-	"risk-guard/src/dag-impl/policy_loader"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/deps_extractor"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/policy_loader"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func extractDepsForStorage(ctx context.Context, _ dag_impl.Input) ([]models.Dependency, []models.DepsTreeEdge) {

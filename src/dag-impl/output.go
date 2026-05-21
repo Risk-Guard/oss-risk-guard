@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"sigs.k8s.io/yaml"
 )

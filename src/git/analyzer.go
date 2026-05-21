@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"slices"
 	"strings"
 	"time"

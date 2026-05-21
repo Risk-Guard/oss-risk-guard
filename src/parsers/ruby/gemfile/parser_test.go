@@ -1,7 +1,7 @@
 package gemfile
 
 import (
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 	"testing"
 )

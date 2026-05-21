@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"risk-guard/src/common"
-	"risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"strings"
 	"time"
 )

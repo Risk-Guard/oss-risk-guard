@@ -3,14 +3,14 @@ package source_repo_not_found
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/git_resolve"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

@@ -3,16 +3,16 @@ package dag_builder
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	languageregistry "risk-guard/src/language/registry"
-	"risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	languageregistry "github.com/Risk-Guard/oss-risk-guard/src/language/registry"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"sort"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

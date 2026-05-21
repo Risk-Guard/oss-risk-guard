@@ -2,13 +2,13 @@ package javascript
 
 import (
 	"fmt"
-	"risk-guard/src/common"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/common"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"sort"
 	"strings"
 	"time"
 
-	npmregistry "risk-guard/src/registry/npm"
+	npmregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/npm"
 )
 
 // extractMaintainersWithPublishHistory merges npm's top-level maintainers list

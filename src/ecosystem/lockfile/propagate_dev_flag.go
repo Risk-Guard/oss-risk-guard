@@ -1,6 +1,6 @@
 package lockfile
 
-import "risk-guard/src/models"
+import "github.com/Risk-Guard/oss-risk-guard/src/models"
 
 // PropagateDevFlag marks edges as Dev when their ChildKey is only reachable
 // through dev root edges. Root edges are identified by ParentKey == rootKey.

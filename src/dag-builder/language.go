@@ -2,18 +2,18 @@ package dag_builder
 
 import (
 	"context"
-	artifactfetcher "risk-guard/src/artifact/fetcher"
-	"risk-guard/src/dag-impl/artifact_fetch"
-	"risk-guard/src/dag-impl/deps_extractor"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/language"
-	"risk-guard/src/language/dag/fetcher"
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/language/dag/version_transformer"
+	artifactfetcher "github.com/Risk-Guard/oss-risk-guard/src/artifact/fetcher"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/deps_extractor"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/fetcher"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/version_transformer"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 // BuildDag adds language-specific package registry nodes to the DAG.

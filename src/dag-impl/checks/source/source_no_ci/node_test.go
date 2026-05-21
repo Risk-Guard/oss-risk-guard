@@ -3,11 +3,11 @@ package source_no_ci
 import (
 	"os"
 	"path/filepath"
-	"risk-guard/src/dag-impl/git_clone_content"
-	"risk-guard/src/git"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"testing"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

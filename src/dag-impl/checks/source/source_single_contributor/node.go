@@ -3,17 +3,17 @@ package source_single_contributor
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/checks/source/source_repo_abandoned"
-	"risk-guard/src/dag-impl/checks/source/source_repo_stale"
-	"risk-guard/src/dag-impl/git_clone_metadata"
-	"risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/source/source_repo_abandoned"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/source/source_repo_stale"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
 )

@@ -3,14 +3,14 @@ package source_unsupported_manifest_file
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/category"
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/dag-impl/unsupported_manifests"
-	"risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/unsupported_manifests"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

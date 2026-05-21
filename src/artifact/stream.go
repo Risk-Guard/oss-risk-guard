@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	riskhttp "risk-guard/src/http"
+	riskhttp "github.com/Risk-Guard/oss-risk-guard/src/http"
 	"time"
 )
 

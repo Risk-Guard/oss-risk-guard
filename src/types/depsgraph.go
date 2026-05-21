@@ -1,6 +1,6 @@
 package types
 
-import "risk-guard/src/models"
+import "github.com/Risk-Guard/oss-risk-guard/src/models"
 
 type PathInfo struct {
 	Path         []string

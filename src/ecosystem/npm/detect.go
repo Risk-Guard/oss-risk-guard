@@ -2,14 +2,14 @@ package npm
 
 import (
 	"path/filepath"
-	"risk-guard/src/ecosystem/lockfile"
-	"risk-guard/src/ecosystem/npm/package_manager/bun"
-	"risk-guard/src/ecosystem/npm/package_manager/pnpm"
-	"risk-guard/src/ecosystem/npm/package_manager/yarn"
-	"risk-guard/src/ecosystem/pathutil"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/bun"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/pnpm"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/yarn"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/pathutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	innernpm "risk-guard/src/ecosystem/npm/package_manager/npm"
+	innernpm "github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/npm"
 )
 
 func DetectManifests(dir string) ([]models.DetectedManifest, error) {

@@ -2,8 +2,8 @@ package cache
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	"go.uber.org/zap"
 )

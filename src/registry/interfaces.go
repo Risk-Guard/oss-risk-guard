@@ -3,9 +3,9 @@ package registry
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/language"
-	"risk-guard/src/language/metadata"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 type EcosystemRegistryFetcher interface {

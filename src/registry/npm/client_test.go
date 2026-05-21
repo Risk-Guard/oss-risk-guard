@@ -4,17 +4,17 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/environment"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"strings"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
 
-	httputil "risk-guard/src/http"
-	httpCache "risk-guard/src/lib/common/cache"
+	httputil "github.com/Risk-Guard/oss-risk-guard/src/http"
+	httpCache "github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 )
 
 // setupTestContext creates a context with logger and cache backend for testing

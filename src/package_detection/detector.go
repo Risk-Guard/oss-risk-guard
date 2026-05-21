@@ -1,8 +1,8 @@
 package package_detection
 
 import (
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func DetectPackages(dir string, ecosystems []def.Ecosystem) ([]models.DetectedManifest, error) {

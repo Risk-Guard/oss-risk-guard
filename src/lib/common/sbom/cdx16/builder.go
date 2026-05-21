@@ -4,8 +4,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"risk-guard/src/depsgraph"
-	"risk-guard/src/lib/common/sbom/purl"
+	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/purl"
 	"time"
 
 	"github.com/google/uuid"

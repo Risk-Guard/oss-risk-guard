@@ -2,21 +2,21 @@ package package_name_mismatch
 
 import (
 	"context"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_clone_metadata"
-	"risk-guard/src/dag-impl/package_detector"
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/logger"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 	"testing"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
-	languageregistry "risk-guard/src/language/registry"
+	languageregistry "github.com/Risk-Guard/oss-risk-guard/src/language/registry"
 )
 
 func strPtr(s string) *string { return &s }

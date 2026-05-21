@@ -1,17 +1,17 @@
 package package_stale_release
 
 import (
-	"risk-guard/src/dag-impl/checks"
-	"risk-guard/src/language/dag/transformer"
-	"risk-guard/src/language/dag/version_transformer"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/version_transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 	"time"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 func TestNode_GetDependencies(t *testing.T) {

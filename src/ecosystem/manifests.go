@@ -1,6 +1,6 @@
 package ecosystem
 
-import "risk-guard/src/models"
+import "github.com/Risk-Guard/oss-risk-guard/src/models"
 
 type ManifestResult = models.ManifestResult
 

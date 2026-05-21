@@ -2,13 +2,13 @@ package sarif
 
 import (
 	"encoding/json"
-	"risk-guard/src/category"
-	"risk-guard/src/models"
-	"risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 	"strings"
 	"testing"
 
-	dag_builder "risk-guard/src/dag-builder"
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 )
 
 var testChecks = []dag_builder.CheckInfo{

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"risk-guard/src/archive"
+	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 	"strings"
 )
 

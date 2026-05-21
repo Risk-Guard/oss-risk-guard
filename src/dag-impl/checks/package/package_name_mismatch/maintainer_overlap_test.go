@@ -1,7 +1,7 @@
 package package_name_mismatch
 
 import (
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 )
 

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	httputil "risk-guard/src/http"
+	httputil "github.com/Risk-Guard/oss-risk-guard/src/http"
 )
 
 type Client struct {

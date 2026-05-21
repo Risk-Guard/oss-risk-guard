@@ -6,7 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"strings"
 
 	"go.uber.org/zap"

@@ -1,9 +1,9 @@
 package python
 
 import (
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	pypiregistry "risk-guard/src/registry/pypi"
+	pypiregistry "github.com/Risk-Guard/oss-risk-guard/src/registry/pypi"
 )
 
 func (p *Python) extractDistribution(urls []pypiregistry.PyPIURL) *models.DistributionInfo {

@@ -3,7 +3,7 @@ package gemspec
 import (
 	"os"
 	"path/filepath"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 	"testing"
 )

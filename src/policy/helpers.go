@@ -1,7 +1,7 @@
 package policy
 
 import (
-	"risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"sort"
 	"strings"
 )

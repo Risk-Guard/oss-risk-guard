@@ -2,14 +2,14 @@ package pyproject
 
 import (
 	"fmt"
-	"risk-guard/src/models"
-	"risk-guard/src/parsers/python/pep508"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/parsers/python/pep508"
 	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 
-	pythonnormalize "risk-guard/src/language/python/normalize"
+	pythonnormalize "github.com/Risk-Guard/oss-risk-guard/src/language/python/normalize"
 )
 
 type PyProjectToml struct {

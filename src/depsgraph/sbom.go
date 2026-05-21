@@ -3,9 +3,9 @@ package depsgraph
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/lib/common/depscache"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/depscache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 )
 

@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/lib/common/cache"
-	"risk-guard/src/lib/common/sbom"
-	"risk-guard/src/lib/common/storage"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"sort"
 	"sync"
 	"time"
 
-	dag_builder "risk-guard/src/dag-builder"
-	dag_impl "risk-guard/src/dag-impl"
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	commonsarif "risk-guard/src/lib/common/sarif"
+	commonsarif "github.com/Risk-Guard/oss-risk-guard/src/lib/common/sarif"
 
-	localdag "risk-guard/src/lib/local/dag"
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
 
-	dagcmd "risk-guard/src/cmd/subcommands/dag"
+	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
 
 	"github.com/fatih/color"
 	"github.com/owenrumney/go-sarif/v2/sarif"

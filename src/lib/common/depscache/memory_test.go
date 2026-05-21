@@ -2,7 +2,7 @@ package depscache
 
 import (
 	"context"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"testing"
 	"time"
 )

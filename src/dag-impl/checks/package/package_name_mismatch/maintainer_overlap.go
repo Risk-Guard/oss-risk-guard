@@ -2,7 +2,7 @@ package package_name_mismatch
 
 import (
 	"fmt"
-	"risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"strings"
 )
 

@@ -3,14 +3,14 @@ package artifact_hash_mismatch
 import (
 	"context"
 	"fmt"
-	"risk-guard/src/api/routes"
-	"risk-guard/src/category"
-	"risk-guard/src/dag-impl/artifact_fetch"
-	"risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

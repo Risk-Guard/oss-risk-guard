@@ -6,23 +6,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"risk-guard/src/ctxutil"
-	"risk-guard/src/dag-impl/git_resolve"
-	"risk-guard/src/ecosystem/def"
-	"risk-guard/src/git"
-	"risk-guard/src/language/unsupported"
-	"risk-guard/src/lib/common/cache"
-	licpatterns "risk-guard/src/licenses/patterns"
-	"risk-guard/src/riskguardignore"
-	"risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/unsupported"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
+	licpatterns "github.com/Risk-Guard/oss-risk-guard/src/licenses/patterns"
+	"github.com/Risk-Guard/oss-risk-guard/src/riskguardignore"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"sort"
 	"strings"
 
 	"go.uber.org/zap"
 
-	dag_impl "risk-guard/src/dag-impl"
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	executiondag "risk-guard/src/execution-dag"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
 type Node struct {

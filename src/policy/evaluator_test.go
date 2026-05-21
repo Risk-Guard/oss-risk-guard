@@ -1,8 +1,8 @@
 package policy
 
 import (
-	"risk-guard/src/category"
-	"risk-guard/src/violations"
+	"github.com/Risk-Guard/oss-risk-guard/src/category"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 	"testing"
 	"time"
 
