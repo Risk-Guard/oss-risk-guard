@@ -19,6 +19,7 @@ func TestCloneRepository_PublicRepo(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "https://github.com/octocat/Hello-World", repoPath, nil)
 	if err != nil {
@@ -38,6 +39,7 @@ func TestCloneRepository_InvalidURL(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "https://github.com/nonexistent-user-xyz/nonexistent-repo-xyz", repoPath, nil)
 	if err == nil {
@@ -61,6 +63,7 @@ func TestCloneRepository_UnsafeProtocol(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "file:///etc/passwd", repoPath, nil)
 	if err == nil {
@@ -84,6 +87,7 @@ func TestCheckoutCommit_Tag(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	// Clone expressjs/express (has many tags)
 	err := git.CloneRepository(ctx, "https://github.com/expressjs/express", repoPath, nil)
@@ -118,6 +122,7 @@ func TestCheckoutCommit_InvalidRef(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "https://github.com/octocat/Hello-World", repoPath, nil)
 	if err != nil {
@@ -137,6 +142,7 @@ func TestCheckoutCommit_CommitSHA(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "https://github.com/octocat/Hello-World", repoPath, nil)
 	if err != nil {
@@ -212,6 +218,7 @@ func TestCheckoutCommit_InjectionAttempt(t *testing.T) {
 	ctx := context.Background()
 	cfg, _ := environment.Load()
 	ctx = environment.SetConfig(ctx, cfg)
+	ctx = environment.SetSharedConfig(ctx, cfg)
 
 	err := git.CloneRepository(ctx, "https://github.com/octocat/Hello-World", repoPath, nil)
 	if err != nil {
