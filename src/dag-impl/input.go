@@ -30,7 +30,6 @@ type Input struct {
 	// analysis identity / cache key.
 	NoFetch        bool `json:"-"`
 	WriteFetchOnly bool `json:"-"`
-	SaveToDatabase bool `json:"-"`
 }
 
 // GetNoFetch satisfies executiondag.NoFetchProvider so the generic executor can

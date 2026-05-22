@@ -150,8 +150,8 @@ func WriteCheckOutputs(ctx context.Context, input dag_impl.Input, checkOutputs [
 		zap.String("path", checksPath),
 		zap.Int("check_count", len(checkOutputs)))
 
-	if input.SaveToDatabase {
-		if err := WriteToStorage(ctx, doc, input); err != nil {
+	if writer := GetChecksWriter(ctx); writer != nil {
+		if err := writer(ctx, doc, input); err != nil {
 			return fmt.Errorf("writing checks to backend: %w", err)
 		}
 	}
