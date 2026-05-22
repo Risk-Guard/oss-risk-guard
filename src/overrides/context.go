@@ -15,11 +15,3 @@ func GetStore(ctx context.Context) *Store {
 	store, _ := ctx.Value(storeKey{}).(*Store)
 	return store
 }
-
-func GetOverrides(ctx context.Context) []Override {
-	store := GetStore(ctx)
-	if store == nil {
-		return nil
-	}
-	return store.GetAll()
-}

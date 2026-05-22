@@ -2,12 +2,7 @@ package git
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/stretchr/testify/require"
 )
@@ -44,37 +39,6 @@ func TestIsPrivateRequest(t *testing.T) {
 
 func TestExtractCachedRepo_MissingDir(t *testing.T) {
 	err := ExtractCachedRepo("/nonexistent/file.tar.gz", t.TempDir())
-	require.Error(t, err)
-}
-
-func TestCloneMetaRoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	now := time.Now().Truncate(time.Second)
-	commitCount := 42
-	meta := &models.GitMetadata{
-		SourceURL:   "https://github.com/expressjs/express",
-		Status:      "success",
-		CollectedAt: &now,
-		CommitCount: &commitCount,
-	}
-
-	require.NoError(t, WriteCloneMeta(dir, meta))
-
-	got, err := ReadCloneMeta(dir)
-	require.NoError(t, err)
-	require.Equal(t, meta.SourceURL, got.SourceURL)
-	require.Equal(t, meta.Status, got.Status)
-	require.Equal(t, *meta.CommitCount, *got.CommitCount)
-	require.True(t, meta.CollectedAt.Equal(*got.CollectedAt))
-
-	require.FileExists(t, filepath.Join(dir, cloneMetaFile))
-	RemoveCloneMeta(dir)
-	_, err = os.Stat(filepath.Join(dir, cloneMetaFile))
-	require.True(t, os.IsNotExist(err))
-}
-
-func TestReadCloneMeta_Missing(t *testing.T) {
-	_, err := ReadCloneMeta(t.TempDir())
 	require.Error(t, err)
 }
 

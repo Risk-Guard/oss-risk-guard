@@ -3,35 +3,10 @@ package common
 import (
 	"fmt"
 	"net/url"
-	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 )
-
-func urlToPath(sourceURL string) (string, error) {
-	if sourceURL == "" {
-		return "", fmt.Errorf("empty source URL")
-	}
-
-	normalized := NormalizeSourceURL(sourceURL)
-
-	// Try parsing as URL with ://
-	parsed, err := url.Parse(normalized)
-	if err == nil && parsed.Host != "" {
-		pathStr := strings.TrimPrefix(parsed.Path, "/")
-		if pathStr == "" {
-			return parsed.Host, nil
-		}
-		return path.Join(parsed.Host, pathStr), nil
-	}
-
-	// For anything else (git@host:path, etc), sanitize to filesystem-safe
-	safe := strings.ReplaceAll(normalized, ":", "/")
-	safe = strings.ReplaceAll(safe, "@", "-at-")
-	return safe, nil
-}
 
 // Known hosts that support HTTPS for git operations
 var knownHTTPSHosts = []string{
@@ -114,31 +89,4 @@ func IsLocalPath(input string) (bool, error) {
 
 	// Reject anything else as ambiguous
 	return false, fmt.Errorf("ambiguous path format - use explicit scheme (https://...) or local path (/path, ./path, ../path)")
-}
-
-func GetSourcePath(sourceURL string) (string, error) {
-	// Check if this is a local path
-	isLocal, err := IsLocalPath(sourceURL)
-	if err != nil {
-		return "", fmt.Errorf("invalid source URL format: %w", err)
-	}
-
-	if isLocal {
-		// For local paths, create a sanitized version of the absolute path.
-		// This is used for organizing cache directories within the repository.
-		// Local paths use in-repo caching at <repo>/.risk-guard/cache/
-		sanitized, err := filepath.Abs(sourceURL)
-		if err != nil {
-			return "", fmt.Errorf("failed to get absolute path for local source: %w", err)
-		}
-
-		return path.Join("source", "local", sanitized[1:]), nil
-	}
-
-	// For remote URLs, use the existing logic
-	urlPath, err := urlToPath(sourceURL)
-	if err != nil {
-		return "", err
-	}
-	return path.Join("source", urlPath), nil
 }

@@ -40,15 +40,6 @@ func SetRepoOutputDir(ctx context.Context, dir string) context.Context {
 	return context.WithValue(ctx, repoOutputDirKey{}, dir)
 }
 
-// GetRepoOutputDir returns the per-repo cache dir if set, otherwise falls back
-// to the output dir.
-func GetRepoOutputDir(ctx context.Context) string {
-	if dir, ok := ctx.Value(repoOutputDirKey{}).(string); ok && dir != "" {
-		return dir
-	}
-	return GetOutputDir(ctx)
-}
-
 func SetChecksOutputPath(ctx context.Context, path string) context.Context {
 	return context.WithValue(ctx, checksOutputPathKey{}, path)
 }

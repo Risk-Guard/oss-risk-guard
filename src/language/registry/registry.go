@@ -76,37 +76,6 @@ func MustGet(ecosystem string) metadata.Metadata {
 	return meta
 }
 
-// MustGetLanguage retrieves a language implementation from the provided map.
-// Panics if the ecosystem is not found in the map.
-// This is similar to regexp.MustCompile - it should only panic on programming errors.
-func MustGetLanguage(languages map[string]language.Language, ecosystem string) language.Language {
-	lang, ok := languages[ecosystem]
-	if !ok {
-		panic(fmt.Sprintf("language implementation not found for ecosystem: %q", ecosystem))
-	}
-	return lang
-}
-
-// GetLanguage retrieves a language implementation by ecosystem name.
-// Creates a new instance on each call (pure function, no shared state).
-func GetLanguage(ecosystem string) (language.Language, error) {
-	meta, err := Get(ecosystem)
-	if err != nil {
-		return nil, err
-	}
-
-	switch ecosystem {
-	case "npm":
-		return javascript.New(&meta), nil
-	case "pypi":
-		return python.New(&meta), nil
-	case "rubygems":
-		return ruby.New(&meta), nil
-	default:
-		panic(fmt.Sprintf("ecosystem %q exists in metadataMap but has no implementation in GetLanguage() switch - this is a bug", ecosystem))
-	}
-}
-
 // Languages returns a map of all language implementations.
 // Creates fresh instances on each call (pure function, no shared state).
 func Languages() map[string]language.Language {

@@ -2,21 +2,18 @@ package git
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/archive"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
-const cloneMetaFile = ".rg-clone-meta.json"
+// const cloneMetaFile = ".rg-clone-meta.json"
 
 const cloneCacheMaxAge = 365 * 24 * time.Hour
 
@@ -127,29 +124,4 @@ func IsPrivateRequest(ctx context.Context, sourceURL string) (bool, error) {
 	return parsed.User != nil, nil
 }
 
-// WriteCloneMeta serializes GitMetadata as .rg-clone-meta.json inside repoDir.
-func WriteCloneMeta(repoDir string, meta *models.GitMetadata) error {
-	data, err := json.Marshal(meta)
-	if err != nil {
-		return fmt.Errorf("marshaling clone meta: %w", err)
-	}
-	return os.WriteFile(filepath.Join(repoDir, cloneMetaFile), data, 0o600)
-}
-
-// ReadCloneMeta deserializes .rg-clone-meta.json from repoDir.
-func ReadCloneMeta(repoDir string) (*models.GitMetadata, error) {
-	data, err := os.ReadFile(filepath.Join(repoDir, cloneMetaFile)) //nolint:gosec // path is constructed from known repoDir
-	if err != nil {
-		return nil, fmt.Errorf("reading clone meta: %w", err)
-	}
-	var meta models.GitMetadata
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return nil, fmt.Errorf("unmarshaling clone meta: %w", err)
-	}
-	return &meta, nil
-}
-
 // RemoveCloneMeta deletes .rg-clone-meta.json from repoDir, ignoring errors.
-func RemoveCloneMeta(repoDir string) {
-	_ = os.Remove(filepath.Join(repoDir, cloneMetaFile))
-}

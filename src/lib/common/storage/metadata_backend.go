@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -11,10 +10,6 @@ import (
 
 type FieldNotFoundError struct {
 	Field string
-}
-
-func (e *FieldNotFoundError) Error() string {
-	return fmt.Sprintf("field %q does not exist", e.Field)
 }
 
 type MetadataResult struct {
