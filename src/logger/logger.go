@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/blendle/zapdriver"
 	prettyconsole "github.com/thessem/zap-prettyconsole"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -36,40 +35,6 @@ func NewLogger(level string) (*zap.Logger, error) {
 	logger, err := config.Build()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build logger: %w", err)
-	}
-
-	return logger, nil
-}
-
-func NewStructuredLogger(level, projectID string) (*zap.Logger, error) {
-	var zapLevel zapcore.Level
-	switch strings.ToLower(level) {
-	case "debug":
-		zapLevel = zapcore.DebugLevel
-	case "info":
-		zapLevel = zapcore.InfoLevel
-	case "warn", "warning":
-		zapLevel = zapcore.WarnLevel
-	case "error":
-		zapLevel = zapcore.ErrorLevel
-	default:
-		return nil, fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", level)
-	}
-
-	config := zapdriver.NewProductionConfig()
-	config.Level = zap.NewAtomicLevelAt(zapLevel)
-	config.OutputPaths = []string{"stderr"}
-	config.ErrorOutputPaths = []string{"stderr"}
-
-	logger, err := config.Build(zapdriver.WrapCore(
-		zapdriver.ReportAllErrors(true),
-	))
-	if err != nil {
-		return nil, fmt.Errorf("failed to build structured logger: %w", err)
-	}
-
-	if projectID != "" {
-		logger = logger.With(zapdriver.Label("project_id", projectID))
 	}
 
 	return logger, nil

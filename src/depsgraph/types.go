@@ -19,7 +19,3 @@ type DepsNode struct {
 	Deps       []models.Dependency
 	AnalyzedAt *time.Time
 }
-
-func MakeKey(ecosystem, name string) string {
-	return "package/" + ecosystem + "/" + name
-}

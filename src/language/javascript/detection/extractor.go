@@ -3,7 +3,6 @@ package detection
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 )
 
@@ -15,15 +14,6 @@ var packageJSONInstallScriptKeys = []string{
 	// Maybe add these later
 	// "prepare",     // runs on local npm install and when installing git dependencies
 	// "prepublish",  // deprecated but still runs on local npm install
-}
-
-// ExtractInstallScriptsFromPackageJSON extracts install scripts from a package.json file path.
-func ExtractInstallScriptsFromPackageJSON(path string) ([]string, error) {
-	data, err := os.ReadFile(path) // #nosec G304 -- path comes from controlled file walk
-	if err != nil {
-		return nil, fmt.Errorf("failed to read package.json: %w", err)
-	}
-	return ExtractInstallScriptsFromContent(data)
 }
 
 // ExtractInstallScriptsFromContent extracts install scripts from package.json content.

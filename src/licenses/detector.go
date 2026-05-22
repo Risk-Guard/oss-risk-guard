@@ -47,40 +47,6 @@ func ScanLicenseFiles(sourceDir string) ([]models.LicenseFile, error) {
 	return files, nil
 }
 
-// ReadLicenseFile reads relPath under sourceDir, refusing to follow symlinks
-// or escape sourceDir. Returns the file contents.
-func ReadLicenseFile(sourceDir, relPath string) (string, error) {
-	resolvedRoot, err := filepath.EvalSymlinks(sourceDir)
-	if err != nil {
-		return "", fmt.Errorf("resolving source dir: %w", err)
-	}
-
-	candidate := filepath.Join(sourceDir, relPath)
-	info, err := os.Lstat(candidate)
-	if err != nil {
-		return "", err
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return "", fmt.Errorf("refusing to read symlink: %s", relPath)
-	}
-
-	resolved, err := filepath.EvalSymlinks(candidate)
-	if err != nil {
-		return "", err
-	}
-	rel, err := filepath.Rel(resolvedRoot, resolved)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("path escapes source dir: %s", relPath)
-	}
-
-	// #nosec G304 -- resolved path is Lstat'd non-symlink and confirmed under sourceDir
-	content, err := os.ReadFile(resolved)
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}
-
 // findLicenseFiles globs for candidate license paths under sourceDir. Symlinks
 // (file or dir) are rejected via Lstat + a containment check against the
 // symlink-resolved sourceDir, so a hostile symlink in the working tree can't

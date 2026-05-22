@@ -57,11 +57,3 @@ func MustGetVersionHistoryExtractor(extractors map[string]VersionHistoryExtracto
 	}
 	return e
 }
-
-func MustGetArchiveExtractor(extractors map[string]PackageArchiveExtractor, ecosystem string) PackageArchiveExtractor {
-	e, ok := extractors[ecosystem]
-	if !ok {
-		panic(fmt.Sprintf("no archive extractor for ecosystem: %q", ecosystem))
-	}
-	return e
-}

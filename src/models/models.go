@@ -15,13 +15,6 @@ type LocationInfo struct {
 	LineNumber *int    `json:"ln,omitempty"`
 }
 
-func CopyLocation(l *LocationInfo) *LocationInfo {
-	if l == nil {
-		return nil
-	}
-	return &LocationInfo{File: l.File, LineNumber: l.LineNumber}
-}
-
 type Dependency struct {
 	AnalysisIdentifier string   `json:"analysis_identifier"`
 	Specifiers         []string `json:"specifiers"`

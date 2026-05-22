@@ -1,8 +1,6 @@
 package archive
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -31,14 +29,4 @@ func matchPattern(path, pattern string) bool {
 	}
 	matched, _ := filepath.Match(pattern, path)
 	return matched
-}
-
-func ExtractTargetFiles(artifactPath string, patterns []string) (map[string]string, error) {
-	f, err := os.Open(artifactPath) //nolint:gosec // Path from trusted source
-	if err != nil {
-		return nil, fmt.Errorf("opening archive %s: %w", filepath.Base(artifactPath), err)
-	}
-	defer func() { _ = f.Close() }()
-
-	return ExtractTargetFilesFromReader(f, artifactPath, patterns)
 }
