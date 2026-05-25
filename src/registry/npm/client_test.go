@@ -33,7 +33,7 @@ func setupTestContext(t *testing.T) context.Context {
 	ctx = environment.SetSharedConfig(ctx, cfg)
 	ctx = runpath.SetCacheDir(ctx, t.TempDir())
 
-	backend := httpCache.NewFilesystemBackend(runpath.GetCacheDir(ctx))
+	backend := httpCache.NewFilesystemBackend(runpath.GetNetworkCacheDir(ctx))
 	ctx = httpCache.SetCacheBackend(ctx, backend)
 
 	testRetryOpts := httputil.BuildRetryOptions(ctx, "", 3, 100*time.Millisecond, 1*time.Second)

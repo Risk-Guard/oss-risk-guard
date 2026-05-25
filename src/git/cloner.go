@@ -54,7 +54,13 @@ func applyGitCeiling(cmd *exec.Cmd, destDir string) {
 	if cmd.Env == nil {
 		cmd.Env = os.Environ()
 	}
-	cmd.Env = append(cmd.Env, "GIT_CEILING_DIRECTORIES="+abs)
+	filtered := cmd.Env[:0]
+	for _, e := range cmd.Env {
+		if !strings.HasPrefix(e, "GIT_CEILING_DIRECTORIES=") {
+			filtered = append(filtered, e)
+		}
+	}
+	cmd.Env = append(filtered, "GIT_CEILING_DIRECTORIES="+abs)
 }
 
 // SecurityPolicyPaths lists candidate locations for a security policy file.

@@ -41,3 +41,36 @@ func TestApplyGitCeiling_AppendsToExistingEnv(t *testing.T) {
 		t.Errorf("ceiling not appended: %v", cmd.Env)
 	}
 }
+
+func TestApplyGitCeiling_ReplacesExistingCeiling(t *testing.T) {
+	cmd := exec.Command("git", "status")
+	cmd.Env = []string{"FOO=bar", "GIT_CEILING_DIRECTORIES=/elsewhere", "BAZ=qux"}
+	applyGitCeiling(cmd, "/tmp/destdir")
+
+	var ceilings []string
+	for _, e := range cmd.Env {
+		if strings.HasPrefix(e, "GIT_CEILING_DIRECTORIES=") {
+			ceilings = append(ceilings, e)
+		}
+	}
+	if len(ceilings) != 1 {
+		t.Fatalf("expected exactly one GIT_CEILING_DIRECTORIES entry, got %v", ceilings)
+	}
+	wantAbs, _ := filepath.Abs("/tmp/destdir")
+	if ceilings[0] != "GIT_CEILING_DIRECTORIES="+wantAbs {
+		t.Errorf("ceiling not replaced: %q", ceilings[0])
+	}
+	// Other env entries preserved.
+	if !contains(cmd.Env, "FOO=bar") || !contains(cmd.Env, "BAZ=qux") {
+		t.Errorf("non-ceiling env entries lost: %v", cmd.Env)
+	}
+}
+
+func contains(ss []string, want string) bool {
+	for _, s := range ss {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}

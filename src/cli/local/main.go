@@ -23,11 +23,17 @@ var rootCmd = &cobra.Command{
 	Long: `Run the scoring DAG against an already-on-disk git repository.
 
 The single argument must be a path to an existing git repository.
-Results are written to <path>/.risk-guard/cache/.
+
+Cache outputs (DAG results, clones, audit cache, network cache) are written
+under a single cache root, resolved in this order:
+  1. --cache-dir flag
+  2. RISK_GUARD_CACHE_DIR environment variable
+  3. os.UserCacheDir()/risk-guard (platform default)
 
 Examples:
   risk-guard-local .
-  risk-guard-local /abs/path/to/repo`,
+  risk-guard-local /abs/path/to/repo
+  risk-guard-local --cache-dir /var/cache/risk-guard /abs/path/to/repo`,
 	Args: cobra.MaximumNArgs(1),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := environment.Load()
@@ -153,7 +159,8 @@ func init() {
 }
 
 // resolveCacheDir picks the cache root in precedence order:
-// --cache-dir flag > (--output-dir flag applied by caller) > RISK_GUARD_CACHE_DIR env > os.UserCacheDir()/risk-guard.
+// flagValue (already resolved by the caller from --cache-dir, or the deprecated
+// --output-dir) > RISK_GUARD_CACHE_DIR env > os.UserCacheDir()/risk-guard.
 // Falls back to os.MkdirTemp if no user cache dir is available.
 func resolveCacheDir(flagValue string) (string, error) {
 	if flagValue != "" {
