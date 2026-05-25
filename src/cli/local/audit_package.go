@@ -8,7 +8,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
-	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
 
@@ -52,8 +51,6 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
-	ctx = runpath.SetOutputDir(ctx, outputDir)
 
 	// git_clone_content uses the cache backend as its on-disk clone store, so
 	// it must be initialized even though audit-package doesn't memoize results.

@@ -26,7 +26,7 @@ func setupTestContext(t *testing.T, outputDir string) context.Context {
 	cfg := &environment.Config{}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
-	ctx = runpath.SetOutputDir(ctx, t.TempDir())
+	ctx = runpath.SetCacheDir(ctx, t.TempDir())
 
 	return ctx
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
@@ -73,7 +74,24 @@ Examples:
 
 		ctx := environment.SetConfig(cmd.Context(), cfg)
 		ctx = environment.SetSharedConfig(ctx, cfg)
-		ctx = runpath.SetOutputDir(ctx, ".oss-score")
+
+		cacheDir, err := cmd.Flags().GetString("cache-dir")
+		if err != nil {
+			return fmt.Errorf("failed to get cache-dir flag: %w", err)
+		}
+		outputDirFlag, err := cmd.Flags().GetString("output-dir")
+		if err != nil {
+			return fmt.Errorf("failed to get output-dir flag: %w", err)
+		}
+		if outputDirFlag != "" && cacheDir == "" {
+			fmt.Fprintln(os.Stderr, "warning: --output-dir is deprecated; use --cache-dir")
+			cacheDir = outputDirFlag
+		}
+		resolvedCacheDir, err := resolveCacheDir(cacheDir)
+		if err != nil {
+			return fmt.Errorf("resolving cache dir: %w", err)
+		}
+		ctx = runpath.SetCacheDir(ctx, resolvedCacheDir)
 
 		ctx = ctxutil.SetLogger(ctx, log)
 
@@ -129,8 +147,30 @@ func init() {
 	rootCmd.PersistentFlags().Bool("secure-git", false, "Isolate git from local config/credentials (blocks SSH keys, credential helpers)")
 	rootCmd.PersistentFlags().String("logfile", "", "Write debug logs to file (in addition to console)")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (also honors NO_COLOR env var and non-TTY stderr)")
+	rootCmd.PersistentFlags().String("cache-dir", "", "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR or os.UserCacheDir()/risk-guard).")
 
 	registerLocalFlags(rootCmd)
+}
+
+// resolveCacheDir picks the cache root in precedence order:
+// --cache-dir flag > (--output-dir flag applied by caller) > RISK_GUARD_CACHE_DIR env > os.UserCacheDir()/risk-guard.
+// Falls back to os.MkdirTemp if no user cache dir is available.
+func resolveCacheDir(flagValue string) (string, error) {
+	if flagValue != "" {
+		return flagValue, nil
+	}
+	if env := os.Getenv("RISK_GUARD_CACHE_DIR"); env != "" {
+		return env, nil
+	}
+	cacheBase, err := os.UserCacheDir()
+	if err != nil {
+		tmp, mkErr := os.MkdirTemp("", "risk-guard-")
+		if mkErr != nil {
+			return "", fmt.Errorf("user cache dir unavailable (%v) and tmp fallback failed: %w", err, mkErr)
+		}
+		return tmp, nil
+	}
+	return filepath.Join(cacheBase, "risk-guard"), nil
 }
 
 func main() {

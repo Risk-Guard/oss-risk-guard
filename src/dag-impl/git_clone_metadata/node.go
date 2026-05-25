@@ -135,8 +135,8 @@ func (n *Node) tryMetadataCache(ctx context.Context, backend cache.Backend, norm
 
 func (n *Node) cloneAndAnalyze(ctx context.Context, sourceURL string, input dag_impl.Input, backend cache.Backend, normalizedURL, commitSHA string, shouldCache bool) (*Output, error) {
 	logger := ctxutil.GetLogger(ctx)
-	outputDir := runpath.GetOutputDir(ctx)
-	cloneDir := filepath.Join(outputDir, input.BasePath(), "metadata-repo")
+	cloneCacheDir := runpath.GetCloneCacheDir(ctx)
+	cloneDir := filepath.Join(cloneCacheDir, input.BasePath(), "metadata-repo")
 
 	if err := os.MkdirAll(filepath.Dir(cloneDir), 0o750); err != nil {
 		return nil, fmt.Errorf("creating directory: %w", err)

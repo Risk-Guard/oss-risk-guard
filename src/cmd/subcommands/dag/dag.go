@@ -57,8 +57,8 @@ func BuildAndRunDAG(ctx context.Context, input dag_impl.Input, build dag_builder
 	entriesWriteStart := time.Now()
 	entries := dag_builder.CollectEntries(ctx, dag, enrichedInput)
 	backend := storage.MustGetBackend(ctx)
-	outputDir := runpath.GetOutputDir(ctx)
-	if err := backend.Metadata().WriteAll(ctx, outputDir, entries, enrichedInput); err != nil {
+	dagDir := runpath.GetDAGCacheDir(ctx)
+	if err := backend.Metadata().WriteAll(ctx, dagDir, entries, enrichedInput); err != nil {
 		return nil, fmt.Errorf("writing entries to storage: %w", err)
 	}
 	entriesWriteDurationMs := time.Since(entriesWriteStart).Milliseconds()
@@ -88,8 +88,7 @@ func BuildAndRunDAG(ctx context.Context, input dag_impl.Input, build dag_builder
 		return nil, err
 	}
 
-	outputDir = runpath.GetOutputDir(ctx)
-	summary := dag_builder.AggregateSummary(ctx, dag, checkOutputs, outputDir)
+	summary := dag_builder.AggregateSummary(ctx, dag, checkOutputs, runpath.GetDAGCacheDir(ctx))
 	summaryWriteStart := time.Now()
 	err = dag_builder.WriteSummary(ctx, enrichedInput, summary)
 	summaryWriteDurationMs := time.Since(summaryWriteStart).Milliseconds()

@@ -59,6 +59,7 @@ func CloneMetadataOnly(ctx context.Context, sourceURL, destDir string) error {
 		destDir,
 	)
 	applySecureGitEnv(ctx, cmd)
+	applyGitCeiling(cmd, destDir)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

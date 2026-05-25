@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
@@ -38,8 +36,6 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 
 	ctx := command.Context()
 
-	ctx = runpath.SetOutputDir(ctx, outputDir)
-
 	if checksOutFile != "" {
 		ctx = runpath.SetChecksOutputPath(ctx, checksOutFile)
 	}
@@ -48,17 +44,6 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("invalid git repository: %w", err)
 	}
-
-	inRepoCache := filepath.Join(repoPath, ".risk-guard", "cache")
-	if err := os.MkdirAll(inRepoCache, 0o750); err != nil {
-		return fmt.Errorf("failed to create in-repo cache directory: %w", err)
-	}
-
-	ctx = runpath.SetRepoOutputDir(ctx, inRepoCache)
-
-	logger.Info("using in-repo cache for local repository",
-		zap.String("path", repoPath),
-		zap.String("cache", inRepoCache))
 
 	ctx, err = cache.InitializeCacheBackend(ctx)
 	if err != nil {
@@ -79,7 +64,7 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 
 	logger.Info("collecting metadata using DAG execution",
 		zap.String("path", repoPath),
-		zap.String("outputDir", outputDir))
+		zap.String("cacheDir", runpath.GetCacheDir(ctx)))
 
 	input := dag_impl.NewSourceInputWithOverrides(repoPath, nil, false, overridesHash)
 
@@ -117,7 +102,7 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 // registerSharedDAGFlags wires the flags every DAG-running local command needs:
 // where to write artifacts, which overrides to apply, and which commit to scan.
 func registerSharedDAGFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&outputDir, "output-dir", ".oss-score", "Output directory for metadata files")
+	cmd.Flags().StringVar(&outputDir, "output-dir", "", "Deprecated: use --cache-dir instead")
 	cmd.Flags().StringVar(&overridesFile, "overrides", "", "YAML file with field overrides")
 }
 

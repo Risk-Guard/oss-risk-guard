@@ -84,7 +84,7 @@ func TestNode_Execute_NoPackages(t *testing.T) {
 	cfg := &environment.Config{}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
-	ctx = runpath.SetOutputDir(ctx, t.TempDir())
+	ctx = runpath.SetCacheDir(ctx, t.TempDir())
 
 	node := fetcher.NewNode(map[string]language.Language{}, nil)
 	input := &dag_impl.Input{Packages: []models.PackageInfo{}}
@@ -107,7 +107,7 @@ func TestNode_Execute_SinglePackage_Success(t *testing.T) {
 	cfg := &environment.Config{}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
-	ctx = runpath.SetOutputDir(ctx, t.TempDir())
+	ctx = runpath.SetCacheDir(ctx, t.TempDir())
 
 	mockResp := &language.RegistryResponse{
 		Data:       map[string]any{"name": "test"},
@@ -157,7 +157,7 @@ func TestNode_Execute_MultiplePackages_MixedEcosystems(t *testing.T) {
 	cfg := &environment.Config{}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
-	ctx = runpath.SetOutputDir(ctx, t.TempDir())
+	ctx = runpath.SetCacheDir(ctx, t.TempDir())
 
 	npmResp := &language.RegistryResponse{
 		Data:       map[string]any{"name": "express"},

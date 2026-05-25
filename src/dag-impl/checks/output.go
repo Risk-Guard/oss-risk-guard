@@ -111,7 +111,7 @@ func outputFilepath(ctx context.Context, input dag_impl.Input) (string, error) {
 	if p := runpath.GetChecksOutputPath(ctx); p != "" {
 		return p, nil
 	}
-	return filepath.Join(runpath.GetOutputDir(ctx), input.BasePath(), "checks.yml"), nil
+	return filepath.Join(runpath.GetDAGCacheDir(ctx), input.BasePath(), "checks.yml"), nil
 }
 
 func WriteCheckOutputs(ctx context.Context, input dag_impl.Input, checkOutputs []Output) error {
@@ -179,6 +179,5 @@ func WriteSummary(ctx context.Context, input dag_impl.Input, summary any) error 
 }
 
 func summaryFilepath(ctx context.Context, input dag_impl.Input) string {
-	outputDir := runpath.GetOutputDir(ctx)
-	return filepath.Join(outputDir, input.BasePath(), "summary.yml")
+	return filepath.Join(runpath.GetDAGCacheDir(ctx), input.BasePath(), "summary.yml")
 }

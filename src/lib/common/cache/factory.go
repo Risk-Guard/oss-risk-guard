@@ -11,10 +11,10 @@ import (
 
 func InitializeCacheBackend(ctx context.Context) (context.Context, error) {
 	logger := ctxutil.GetLogger(ctx)
-	outputDir := runpath.GetOutputDir(ctx)
+	dir := runpath.GetNetworkCacheDir(ctx)
 
 	logger.Debug("initializing filesystem cache backend",
-		zap.String("output_dir", outputDir))
+		zap.String("dir", dir))
 
-	return SetCacheBackend(ctx, NewFilesystemBackend(outputDir)), nil
+	return SetCacheBackend(ctx, NewFilesystemBackend(dir)), nil
 }

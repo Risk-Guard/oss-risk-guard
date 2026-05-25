@@ -47,7 +47,7 @@ func setupTestContext(t *testing.T) (context.Context, string) {
 	cfg := &environment.Config{}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
-	ctx = runpath.SetOutputDir(ctx, outputDir)
+	ctx = runpath.SetCacheDir(ctx, outputDir)
 	return ctx, outputDir
 }
 

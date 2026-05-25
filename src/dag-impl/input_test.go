@@ -467,3 +467,28 @@ func TestNewPackageInputWithVersion_OverridesOnly(t *testing.T) {
 		t.Errorf("Expected AnalysisIdentifier '%s', got '%s'", expected, input.AnalysisIdentifier)
 	}
 }
+
+func TestBasePath_DistinctVersionsDoNotCollide(t *testing.T) {
+	tests := []struct {
+		analysisID string
+		want       string
+	}{
+		{"package/npm/lodash", "package/npm/lodash"},
+		{"package/npm/lodash?version=4.17.20", "package/npm/lodash_version=4.17.20"},
+		{"package/npm/lodash?version=4.17.23&overrides=abc", "package/npm/lodash_version=4.17.23_overrides=abc"},
+		{"package/npm/lodash?overrides=abc", "package/npm/lodash_overrides=abc"},
+		{"source/github.com/foo/bar?commit=deadbeef&trusted=true", "source/github.com/foo/bar_commit=deadbeef_trusted=true"},
+	}
+	seen := map[string]string{}
+	for _, tt := range tests {
+		i := Input{AnalysisIdentifier: tt.analysisID}
+		got := i.BasePath()
+		if got != tt.want {
+			t.Errorf("BasePath(%q) = %q, want %q", tt.analysisID, got, tt.want)
+		}
+		if prior, dup := seen[got]; dup {
+			t.Errorf("BasePath collision: %q and %q both produced %q", prior, tt.analysisID, got)
+		}
+		seen[got] = tt.analysisID
+	}
+}

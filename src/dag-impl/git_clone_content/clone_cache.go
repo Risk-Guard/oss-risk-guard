@@ -29,8 +29,8 @@ func (n *Node) tryCloneCache(ctx context.Context, backend cache.Backend, normali
 		return nil, nil
 	}
 
-	outputDir := runpath.GetOutputDir(ctx)
-	repoPath := filepath.Join(outputDir, input.BasePath(), "repo")
+	cloneCacheDir := runpath.GetCloneCacheDir(ctx)
+	repoPath := filepath.Join(cloneCacheDir, input.BasePath(), "repo")
 	if err := git.ExtractCachedRepo(tarPath, repoPath); err != nil {
 		git.CleanupTarFile(tarPath)
 		return nil, fmt.Errorf("extracting cached clone: %w", err)
