@@ -217,6 +217,9 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 	sort.Slice(results, func(i, j int) bool { return results[i].key < results[j].key })
 	runs := make([]*sarif.Run, 0, len(results))
 	for _, r := range results {
+		if r.run.AutomationDetails == nil {
+			r.run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID(r.key))
+		}
 		runs = append(runs, r.run)
 	}
 	return runs, totals, nil

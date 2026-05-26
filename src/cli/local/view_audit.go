@@ -66,6 +66,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 	}
 
 	grouped, skipped := collectFindings(report, pkgFilter, levelFilter)
+	clean := cleanRunIDs(report, pkgFilter, grouped)
 
 	for _, rule := range skipped {
 		if _, err := fmt.Fprintf(w, "warning: skipping result with no package logical-location (rule=%s)\n", rule); err != nil {
@@ -73,7 +74,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		}
 	}
 
-	if len(grouped) == 0 {
+	if len(grouped) == 0 && len(clean) == 0 {
 		_, err := fmt.Fprintln(w, "no findings")
 		return err
 	}
@@ -83,6 +84,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	sort.Strings(clean)
 
 	for i, name := range names {
 		findings := grouped[name]
@@ -95,13 +97,47 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		if err := renderPackage(w, name, findings); err != nil {
 			return err
 		}
-		if i < len(names)-1 {
+		if i < len(names)-1 || len(clean) > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
+		}
+	}
+	for i, id := range clean {
+		if _, err := fmt.Fprintf(w, "%s — no findings\n", humanPackageName(id)); err != nil {
+			return err
+		}
+		if i < len(clean)-1 {
 			if _, err := fmt.Fprintln(w); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// cleanRunIDs returns the AutomationDetails.ID of every Run that produced no
+// findings in grouped — i.e. packages that were audited and passed cleanly.
+// Runs without an ID (older SARIF, local-source) are skipped.
+func cleanRunIDs(report *sarif.Report, pkgFilter map[string]bool, grouped map[string][]auditFinding) []string {
+	var out []string
+	for _, run := range report.Runs {
+		if run.AutomationDetails == nil || run.AutomationDetails.ID == nil {
+			continue
+		}
+		id := *run.AutomationDetails.ID
+		if id == "" || id == "local-source" {
+			continue
+		}
+		if len(pkgFilter) > 0 && !pkgFilter[id] {
+			continue
+		}
+		if _, hasFindings := grouped[id]; hasFindings {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 func collectFindings(report *sarif.Report, pkgFilter map[string]bool, levelFilter string) (map[string][]auditFinding, []string) {

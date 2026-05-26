@@ -149,7 +149,11 @@ func scoreLocalSourceRun(ctx context.Context, repoPath, overridesHash string) (*
 	if len(report.Runs) == 0 {
 		return nil, fmt.Errorf("sarif conversion produced no runs")
 	}
-	return report.Runs[0], nil
+	run := report.Runs[0]
+	if run.AutomationDetails == nil {
+		run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID("local-source"))
+	}
+	return run, nil
 }
 
 // auditDirectDeps runs the parallel audit pipeline (same as `audit`) and
