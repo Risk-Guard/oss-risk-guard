@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"path/filepath"
 	"sort"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/local/auditcache"
+	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -24,7 +24,7 @@ type cacheConfig struct {
 	builderHash string
 }
 
-func buildCacheConfig(checkMetadata []dag_builder.CheckInfo) (cacheConfig, error) {
+func buildCacheConfig(ctx context.Context, checkMetadata []dag_builder.CheckInfo) (cacheConfig, error) {
 	if auditNoCache {
 		return cacheConfig{enabled: false}, nil
 	}
@@ -35,10 +35,7 @@ func buildCacheConfig(checkMetadata []dag_builder.CheckInfo) (cacheConfig, error
 	if maxAge == 0 {
 		return cacheConfig{enabled: false}, nil
 	}
-	dir := auditCacheDir
-	if dir == "" {
-		dir = filepath.Join(outputDir, "audit-cache")
-	}
+	dir := runpath.GetAuditCacheDir(ctx)
 	policyHash, err := auditcache.PolicyHash(policyOverride, policyDefault)
 	if err != nil {
 		return cacheConfig{}, err

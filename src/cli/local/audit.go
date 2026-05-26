@@ -13,7 +13,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -37,7 +36,6 @@ var (
 	auditJobs     int
 	auditMaxAge   string
 	auditNoCache  bool
-	auditCacheDir string
 )
 
 var auditCmd = &cobra.Command{
@@ -65,7 +63,6 @@ func init() {
 	auditCmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
 	auditCmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", "Maximum cache age (e.g. 30m, 48h, 2d). 0 disables caching")
 	auditCmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh scoring; do not read or write the audit cache")
-	auditCmd.Flags().StringVar(&auditCacheDir, "cache-dir", "", "Audit result cache directory (default <output-dir>/audit-cache)")
 	if err := auditCmd.MarkFlagRequired("sbom"); err != nil {
 		panic(fmt.Errorf("marking --sbom required: %w", err))
 	}
@@ -100,7 +97,6 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
 
-	ctx = runpath.SetOutputDir(ctx, outputDir)
 	ctx, err = cache.InitializeCacheBackend(ctx)
 	if err != nil {
 		return err
@@ -117,7 +113,7 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 
 	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.PackageBuilder)
 
-	cacheCfg, err := buildCacheConfig(checkMetadata)
+	cacheCfg, err := buildCacheConfig(ctx, checkMetadata)
 	if err != nil {
 		return err
 	}

@@ -1,43 +1,66 @@
-// Package runpath carries per-run filesystem paths on the context: where to
-// write outputs, where to read cached inputs, the per-repo cache dir, and the
-// checks output file. These are runtime values set by command wiring, not env
-// vars, so they live on ctx rather than on environment.Config.
+// Package runpath carries per-run filesystem paths on the context: the single
+// cache root and any explicit input dir for --no-fetch replays. These are
+// runtime values set by command wiring, not env vars, so they live on ctx
+// rather than on environment.Config.
 package runpath
 
-import "context"
+import (
+	"context"
+	"path/filepath"
+)
 
 type (
-	outputDirKey        struct{}
+	cacheDirKey         struct{}
 	inputDirKey         struct{}
-	repoOutputDirKey    struct{}
 	checksOutputPathKey struct{}
 )
 
-func SetOutputDir(ctx context.Context, dir string) context.Context {
-	return context.WithValue(ctx, outputDirKey{}, dir)
+// SetCacheDir stores the single cache root. All cache subdirs (dag, clones,
+// audit, network) are computed relative to this root.
+func SetCacheDir(ctx context.Context, dir string) context.Context {
+	return context.WithValue(ctx, cacheDirKey{}, dir)
 }
 
-func GetOutputDir(ctx context.Context) string {
-	dir, _ := ctx.Value(outputDirKey{}).(string)
+// GetCacheDir returns the cache root.
+func GetCacheDir(ctx context.Context) string {
+	dir, _ := ctx.Value(cacheDirKey{}).(string)
 	return dir
+}
+
+// GetDAGCacheDir is where DAG node yml outputs are written and read back from
+// during --no-fetch replays.
+func GetDAGCacheDir(ctx context.Context) string {
+	return filepath.Join(GetCacheDir(ctx), "dag")
+}
+
+// GetCloneCacheDir is where per-package unpacked git working trees live.
+func GetCloneCacheDir(ctx context.Context) string {
+	return filepath.Join(GetCacheDir(ctx), "clones")
+}
+
+// GetAuditCacheDir is where the audit-cache stores per-package SARIF results.
+func GetAuditCacheDir(ctx context.Context) string {
+	return filepath.Join(GetCacheDir(ctx), "audit")
+}
+
+// GetNetworkCacheDir is the root for the cache backend's filesystem storage:
+// compressed clone tarballs, registry JSON, HTTP response cache.
+func GetNetworkCacheDir(ctx context.Context) string {
+	return filepath.Join(GetCacheDir(ctx), "network")
 }
 
 func SetInputDir(ctx context.Context, dir string) context.Context {
 	return context.WithValue(ctx, inputDirKey{}, dir)
 }
 
-// GetInputDir returns the explicit input dir if set, otherwise falls back to
-// the output dir. Callers that want cached results from a prior run set
-// InputDir explicitly; the fallback keeps single-run flows simple.
+// GetInputDir returns the explicit --input-dir if set, otherwise falls back
+// to the DAG cache. The fallback lets a single-run flow read its own ymls
+// without the caller having to set --input-dir.
 func GetInputDir(ctx context.Context) string {
 	if dir, ok := ctx.Value(inputDirKey{}).(string); ok && dir != "" {
 		return dir
 	}
-	return GetOutputDir(ctx)
-}
-
-func SetRepoOutputDir(ctx context.Context, dir string) context.Context {
-	return context.WithValue(ctx, repoOutputDirKey{}, dir)
+	return GetDAGCacheDir(ctx)
 }
 
 func SetChecksOutputPath(ctx context.Context, path string) context.Context {
@@ -47,4 +70,19 @@ func SetChecksOutputPath(ctx context.Context, path string) context.Context {
 func GetChecksOutputPath(ctx context.Context) string {
 	path, _ := ctx.Value(checksOutputPathKey{}).(string)
 	return path
+}
+
+// SetOutputDir is a deprecated alias for SetCacheDir. Kept so the deprecated
+// --output-dir flag keeps working while callers migrate.
+//
+// Deprecated: use SetCacheDir.
+func SetOutputDir(ctx context.Context, dir string) context.Context {
+	return SetCacheDir(ctx, dir)
+}
+
+// GetOutputDir is a deprecated alias for GetCacheDir.
+//
+// Deprecated: use GetCacheDir.
+func GetOutputDir(ctx context.Context) string {
+	return GetCacheDir(ctx)
 }

@@ -40,6 +40,29 @@ func applySecureGitEnv(ctx context.Context, cmd *exec.Cmd) {
 	}
 }
 
+// applyGitCeiling prevents git from walking above destDir when searching for
+// a .git directory. Without this, `git -C destDir <subcmd>` will ascend
+// parent directories if destDir lacks .git (e.g. because a parallel worker
+// just removed it), and can mutate the first ancestor repo it finds —
+// including the user's CWD repo. Apply this on every git invocation that
+// targets destDir.
+func applyGitCeiling(cmd *exec.Cmd, destDir string) {
+	abs, err := filepath.Abs(destDir)
+	if err != nil {
+		abs = destDir
+	}
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
+	}
+	filtered := cmd.Env[:0]
+	for _, e := range cmd.Env {
+		if !strings.HasPrefix(e, "GIT_CEILING_DIRECTORIES=") {
+			filtered = append(filtered, e)
+		}
+	}
+	cmd.Env = append(filtered, "GIT_CEILING_DIRECTORIES="+abs)
+}
+
 // SecurityPolicyPaths lists candidate locations for a security policy file.
 // Used by the sparse checkout (to fetch these files) and the SOURCE_NO_SECURITY_POLICY check.
 var SecurityPolicyPaths = []string{
@@ -118,6 +141,7 @@ func embedTokenInURL(sourceURL, token string) (string, error) {
 func configureSparseCheckoutNative(ctx context.Context, destDir string, patterns []string) error {
 	initCmd := exec.Command("git", "-C", destDir, "sparse-checkout", "init", "--no-cone") //nolint:gosec // Args are hardcoded git subcommands
 	applySecureGitEnv(ctx, initCmd)
+	applyGitCeiling(initCmd, destDir)
 	if output, err := initCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to init sparse checkout: %w: %s", err, string(output))
 	}

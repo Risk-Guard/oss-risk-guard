@@ -184,12 +184,16 @@ func (i *Input) HasSourceKey() bool {
 	return strings.HasPrefix(i.AnalysisIdentifier, "source/")
 }
 
+// BasePath returns a filesystem-safe path derived from AnalysisIdentifier.
+// The query-string portion (?version=..., &overrides=..., &trusted=...) is
+// preserved as part of the path so distinct work items get distinct dirs;
+// otherwise concurrent audits of the same package at different versions race
+// on a single destDir and corrupt each other's clones.
 func (i *Input) BasePath() string {
-	if idx := strings.Index(i.AnalysisIdentifier, "?"); idx != -1 {
-		return i.AnalysisIdentifier[:idx]
-	}
-	return i.AnalysisIdentifier
+	return basePathReplacer.Replace(i.AnalysisIdentifier)
 }
+
+var basePathReplacer = strings.NewReplacer("?", "_", "&", "_")
 
 func (i *Input) HasSourceURL() bool {
 	return i.SourceURL != nil && *i.SourceURL != ""

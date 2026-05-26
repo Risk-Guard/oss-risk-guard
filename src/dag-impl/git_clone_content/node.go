@@ -152,8 +152,8 @@ func (n *Node) handleCloneError(err error) error {
 
 func (n *Node) executeCloneRemote(ctx context.Context, sourceURL, commitSHA string, input dag_impl.Input) (string, error) {
 	logger := ctxutil.GetLogger(ctx)
-	outputDir := runpath.GetOutputDir(ctx)
-	repoPath := filepath.Join(outputDir, input.BasePath(), "repo")
+	cloneCacheDir := runpath.GetCloneCacheDir(ctx)
+	repoPath := filepath.Join(cloneCacheDir, input.BasePath(), "repo")
 
 	if err := os.MkdirAll(filepath.Dir(repoPath), 0o750); err != nil {
 		return "", fmt.Errorf("creating source directory: %w", err)
@@ -229,8 +229,8 @@ func (n *Node) Read(ctx context.Context, input dag_impl.Input) (*Output, error) 
 		return nil, fmt.Errorf("reading clone_content.yml: %w", err)
 	}
 
-	inputDir := runpath.GetInputDir(ctx)
-	repoPath := filepath.Join(inputDir, input.BasePath(), "repo")
+	cloneCacheDir := runpath.GetCloneCacheDir(ctx)
+	repoPath := filepath.Join(cloneCacheDir, input.BasePath(), "repo")
 
 	if _, err := os.Stat(repoPath); err != nil {
 		if os.IsNotExist(err) {
