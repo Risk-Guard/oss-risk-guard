@@ -30,6 +30,26 @@ var (
 	sarifOutFile   string
 )
 
+var scanCmd = &cobra.Command{
+	Use:   "scan <path>",
+	Short: "Score the local source repo only (no dependency audit)",
+	Long: `Run the local-source scoring DAG against an on-disk git repository
+without auditing its dependencies. Outputs are written only when the relevant
+output flag is set (--sarif, --evaluation, --checks).
+
+Examples:
+  risk-guard-local scan .
+  risk-guard-local scan . --sarif out.sarif
+  risk-guard-local scan /abs/path/to/repo --evaluation eval.yaml --checks checks.yaml`,
+	Args: cobra.ExactArgs(1),
+	RunE: runScoreLocal,
+}
+
+func init() {
+	registerLocalFlags(scanCmd)
+	rootCmd.AddCommand(scanCmd)
+}
+
 func runScoreLocal(command *cobra.Command, args []string) error {
 	logger := ctxutil.GetLogger(command.Context())
 	path := args[0]

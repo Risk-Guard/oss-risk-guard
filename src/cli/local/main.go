@@ -19,10 +19,15 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "risk-guard-local <path>",
-	Short: "Score a local on-disk git repository",
-	Long: `Run the scoring DAG against an already-on-disk git repository.
+	Short: "Run the full pipeline: source scoring + SBOM + dep audit → one SARIF",
+	Long: `Run the complete risk-guard pipeline against an on-disk git repository:
+score the local source, build an SBOM in memory, audit each direct dependency,
+and emit a single merged SARIF report containing the local-source Run plus one
+Run per audited package.
 
 The single argument must be a path to an existing git repository.
+
+For source-only scoring (no dependency audit) use the "scan" subcommand.
 
 Cache outputs (DAG results, clones, audit cache, network cache) are written
 under a single cache root, resolved in this order:
@@ -32,9 +37,12 @@ under a single cache root, resolved in this order:
 
 Examples:
   risk-guard-local .
-  risk-guard-local /abs/path/to/repo
-  risk-guard-local --cache-dir /var/cache/risk-guard /abs/path/to/repo`,
-	Args: cobra.MaximumNArgs(1),
+  risk-guard-local /abs/path/to/repo --sarif report.sarif
+  risk-guard-local . --sbom-format cyclonedx --sbom-out sbom.cdx.json
+  risk-guard-local . --continue-on-error=false`,
+	Args:          cobra.MaximumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := environment.Load()
 		if err != nil {
@@ -85,13 +93,11 @@ Examples:
 		if err != nil {
 			return fmt.Errorf("failed to get cache-dir flag: %w", err)
 		}
-		outputDirFlag, err := cmd.Flags().GetString("output-dir")
-		if err != nil {
-			return fmt.Errorf("failed to get output-dir flag: %w", err)
-		}
-		if outputDirFlag != "" && cacheDir == "" {
+		// --output-dir is only registered on subcommands that predated --cache-dir;
+		// look it up best-effort so the root command (which omits it) still works.
+		if f := cmd.Flags().Lookup("output-dir"); f != nil && f.Value.String() != "" && cacheDir == "" {
 			fmt.Fprintln(os.Stderr, "warning: --output-dir is deprecated; use --cache-dir")
-			cacheDir = outputDirFlag
+			cacheDir = f.Value.String()
 		}
 		resolvedCacheDir, err := resolveCacheDir(cacheDir)
 		if err != nil {
@@ -143,7 +149,7 @@ Examples:
 		if len(args) == 0 {
 			return cmd.Help()
 		}
-		return runScoreLocal(cmd, args)
+		return runAll(cmd, args)
 	},
 }
 
@@ -155,7 +161,23 @@ func init() {
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (also honors NO_COLOR env var and non-TTY stderr)")
 	rootCmd.PersistentFlags().String("cache-dir", "", "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR or os.UserCacheDir()/risk-guard).")
 
-	registerLocalFlags(rootCmd)
+	registerRunAllFlags(rootCmd)
+}
+
+// registerRunAllFlags wires the flags for the unified pipeline root command.
+// Reuses the same package-level globals as the audit/scan subcommands so the
+// shared `evaluate`, `scoreAll`, and `buildCacheConfig` helpers pick them up.
+func registerRunAllFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for merged SARIF report (default ./risk-guard-report.sarif)")
+	cmd.Flags().StringVar(&overridesFile, "overrides", "", "YAML file with field overrides")
+	cmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
+	cmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
+	cmd.Flags().StringVar(&runAllSBOMFormat, "sbom-format", sbomFormatSPDX, "In-memory SBOM format used to enumerate deps: spdx or cyclonedx")
+	cmd.Flags().StringVar(&runAllSBOMOut, "sbom-out", "", "Also persist the generated SBOM to this path (optional)")
+	cmd.Flags().IntVar(&auditJobs, "jobs", 4, "Maximum number of packages to audit in parallel")
+	cmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", "Maximum audit cache age (e.g. 30m, 48h). 0 disables caching")
+	cmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh audit scoring; do not read or write the audit cache")
+	cmd.Flags().BoolVar(&runAllContinueOnError, "continue-on-error", true, "Continue and emit a partial SARIF when SBOM/audit steps fail")
 }
 
 // resolveCacheDir picks the cache root in precedence order:

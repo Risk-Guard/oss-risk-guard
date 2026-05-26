@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -60,24 +61,44 @@ func init() {
 }
 
 func runSBOM(command *cobra.Command, args []string) error {
-	switch sbomFormat {
-	case sbomFormatSPDX, sbomFormatCycloneDX:
-	default:
-		return fmt.Errorf("unsupported --format %q (want %q or %q)", sbomFormat, sbomFormatSPDX, sbomFormatCycloneDX)
+	data, err := buildSBOMBytes(command.Context(), args[0], sbomFormat)
+	if err != nil {
+		return err
 	}
 
-	logger := ctxutil.GetLogger(command.Context())
+	if err := writeSBOMOutput(sbomOutput, data); err != nil {
+		return err
+	}
+	if sbomOutput != "-" {
+		ctxutil.GetLogger(command.Context()).Info("wrote SBOM",
+			zap.String("path", sbomOutput),
+			zap.String("format", sbomFormat))
+	}
+	return nil
+}
 
-	repoPath, err := git.ValidateGitRepo(args[0])
+// buildSBOMBytes runs manifest detection on repoPath and returns the SBOM as
+// JSON bytes in the requested format ("spdx" or "cyclonedx"). It performs no
+// disk I/O on the output. Validates repoPath as a git repo.
+func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
+	switch format {
+	case sbomFormatSPDX, sbomFormatCycloneDX:
+	default:
+		return nil, fmt.Errorf("unsupported sbom format %q (want %q or %q)", format, sbomFormatSPDX, sbomFormatCycloneDX)
+	}
+
+	logger := ctxutil.GetLogger(ctx)
+
+	repoPath, err := git.ValidateGitRepo(path)
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return nil, fmt.Errorf("invalid git repository: %w", err)
 	}
 
 	rootKey := sourceKey(repoPath)
 
 	manifests, err := package_detection.DetectPackages(repoPath, def.All())
 	if err != nil {
-		return fmt.Errorf("detecting packages: %w", err)
+		return nil, fmt.Errorf("detecting packages: %w", err)
 	}
 	logger.Info("detected manifests", zap.Int("count", len(manifests)))
 
@@ -92,18 +113,7 @@ func runSBOM(command *cobra.Command, args []string) error {
 	nodes := buildSBOMNodes(rootKey, edges)
 	logger.Info("collected SBOM nodes", zap.Int("count", len(nodes)))
 
-	data, err := buildSBOMJSON(sbomFormat, rootKey, nodes)
-	if err != nil {
-		return err
-	}
-
-	if err := writeSBOMOutput(sbomOutput, data); err != nil {
-		return err
-	}
-	if sbomOutput != "-" {
-		logger.Info("wrote SBOM", zap.String("path", sbomOutput), zap.String("format", sbomFormat))
-	}
-	return nil
+	return buildSBOMJSON(format, rootKey, nodes)
 }
 
 // sourceKey mirrors dag_impl.NewSourceInputWithOverrides's analysis-identifier
