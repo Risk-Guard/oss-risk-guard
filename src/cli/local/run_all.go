@@ -46,6 +46,10 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid git repository: %w", err)
 	}
 
+	if auditJobs < 1 {
+		return fmt.Errorf("--jobs must be >= 1")
+	}
+
 	ctx, err = cache.InitializeCacheBackend(ctx)
 	if err != nil {
 		return err

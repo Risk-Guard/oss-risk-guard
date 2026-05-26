@@ -40,7 +40,9 @@ Examples:
   risk-guard-local /abs/path/to/repo --sarif report.sarif
   risk-guard-local . --sbom-format cyclonedx --sbom-out sbom.cdx.json
   risk-guard-local . --continue-on-error=false`,
-	Args: cobra.MaximumNArgs(1),
+	Args:          cobra.MaximumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := environment.Load()
 		if err != nil {
