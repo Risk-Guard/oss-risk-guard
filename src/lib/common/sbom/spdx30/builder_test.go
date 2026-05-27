@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	"github.com/stretchr/testify/assert"
@@ -344,4 +345,133 @@ func TestBuilder_NoViolationsOmitsField(t *testing.T) {
 
 	assert.False(t, strings.Contains(string(data), "extension"),
 		"JSON should not contain extension key when no violations exist")
+}
+
+func TestBuilder_LocationWithLineEmitsSnippet(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+	file := "package.json"
+	line := 42
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+			Location:    &models.LocationInfo{File: &file, LineNumber: &line},
+		},
+		{Key: "source/repo"},
+	}
+
+	doc, err := NewBuilder("source/repo", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+
+	var fileEl *File
+	var snippet *Snippet
+	var manifestRel *Relationship
+	for i, elem := range doc.Graph {
+		switch v := elem.(type) {
+		case File:
+			f := doc.Graph[i].(File)
+			fileEl = &f
+		case Snippet:
+			s := doc.Graph[i].(Snippet)
+			snippet = &s
+		case Relationship:
+			if v.RelationshipType == RelationshipHasDependencyManifest {
+				r := doc.Graph[i].(Relationship)
+				manifestRel = &r
+			}
+		}
+	}
+
+	require.NotNil(t, fileEl, "software_File element missing")
+	assert.Equal(t, "software_File", fileEl.Type)
+	assert.Equal(t, "package.json", fileEl.Name)
+
+	require.NotNil(t, snippet, "software_Snippet element missing")
+	assert.Equal(t, "software_Snippet", snippet.Type)
+	assert.Equal(t, fileEl.SpdxID, snippet.SnippetFromFile)
+	require.NotNil(t, snippet.LineRange)
+	assert.Equal(t, "PositiveIntegerRange", snippet.LineRange.Type)
+	assert.Equal(t, 42, snippet.LineRange.BeginIntegerRange)
+	assert.Equal(t, 42, snippet.LineRange.EndIntegerRange)
+
+	require.NotNil(t, manifestRel, "hasDependencyManifest relationship missing")
+	require.Len(t, manifestRel.To, 1)
+	assert.Equal(t, snippet.SpdxID, manifestRel.To[0],
+		"relationship should target the Snippet, not the File, when a line is known")
+}
+
+func TestBuilder_LocationFileOnlyOmitsSnippet(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+	file := "package.json"
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+			Location:    &models.LocationInfo{File: &file},
+		},
+		{Key: "source/repo"},
+	}
+
+	doc, err := NewBuilder("source/repo", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+
+	var fileEl *File
+	var manifestRel *Relationship
+	snippetCount := 0
+	for i, elem := range doc.Graph {
+		switch v := elem.(type) {
+		case File:
+			f := doc.Graph[i].(File)
+			fileEl = &f
+		case Snippet:
+			snippetCount++
+		case Relationship:
+			if v.RelationshipType == RelationshipHasDependencyManifest {
+				r := doc.Graph[i].(Relationship)
+				manifestRel = &r
+			}
+		}
+	}
+
+	require.NotNil(t, fileEl)
+	assert.Zero(t, snippetCount, "no Snippet should be emitted without a line number")
+	require.NotNil(t, manifestRel)
+	require.Len(t, manifestRel.To, 1)
+	assert.Equal(t, fileEl.SpdxID, manifestRel.To[0],
+		"relationship should target the File directly when no line is known")
+}
+
+func TestBuilder_NoLocationNoFileOrSnippet(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+		},
+	}
+
+	doc, err := NewBuilder("package/npm/lodash", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+
+	for _, elem := range doc.Graph {
+		switch v := elem.(type) {
+		case File:
+			t.Errorf("unexpected File element: %+v", v)
+		case Snippet:
+			t.Errorf("unexpected Snippet element: %+v", v)
+		case Relationship:
+			if v.RelationshipType == RelationshipHasDependencyManifest {
+				t.Errorf("unexpected hasDependencyManifest relationship: %+v", v)
+			}
+		}
+	}
 }

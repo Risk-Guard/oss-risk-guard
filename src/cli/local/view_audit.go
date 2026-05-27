@@ -51,13 +51,6 @@ type auditFinding struct {
 	Message string // full multi-line rationale + evidence
 }
 
-const (
-	levelError   = "error"
-	levelWarning = "warning"
-	levelNote    = "note"
-	levelInfo    = "info" // user-facing label for SARIF "none"
-)
-
 func renderAudit(w io.Writer, report *sarif.Report, level string, packages []string) error {
 	pkgFilter := stringSet(packages)
 	levelFilter, err := normalizeLevelFilter(level)
@@ -66,6 +59,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 	}
 
 	grouped, skipped := collectFindings(report, pkgFilter, levelFilter)
+	clean := cleanRunIDs(report, pkgFilter, grouped)
 
 	for _, rule := range skipped {
 		if _, err := fmt.Fprintf(w, "warning: skipping result with no package logical-location (rule=%s)\n", rule); err != nil {
@@ -73,7 +67,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		}
 	}
 
-	if len(grouped) == 0 {
+	if len(grouped) == 0 && len(clean) == 0 {
 		_, err := fmt.Fprintln(w, "no findings")
 		return err
 	}
@@ -83,6 +77,7 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		names = append(names, name)
 	}
 	sort.Strings(names)
+	sort.Strings(clean)
 
 	for i, name := range names {
 		findings := grouped[name]
@@ -95,13 +90,47 @@ func renderAudit(w io.Writer, report *sarif.Report, level string, packages []str
 		if err := renderPackage(w, name, findings); err != nil {
 			return err
 		}
-		if i < len(names)-1 {
+		if i < len(names)-1 || len(clean) > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
+		}
+	}
+	for i, id := range clean {
+		if _, err := fmt.Fprintf(w, "%s — no findings\n", humanPackageName(id)); err != nil {
+			return err
+		}
+		if i < len(clean)-1 {
 			if _, err := fmt.Fprintln(w); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// cleanRunIDs returns the AutomationDetails.ID of every Run that produced no
+// findings in grouped — i.e. packages that were audited and passed cleanly.
+// Runs without an ID (older SARIF, local-source) are skipped.
+func cleanRunIDs(report *sarif.Report, pkgFilter map[string]bool, grouped map[string][]auditFinding) []string {
+	var out []string
+	for _, run := range report.Runs {
+		if run.AutomationDetails == nil || run.AutomationDetails.ID == nil {
+			continue
+		}
+		id := *run.AutomationDetails.ID
+		if id == "" || id == "local-source" {
+			continue
+		}
+		if len(pkgFilter) > 0 && !pkgFilter[id] {
+			continue
+		}
+		if _, hasFindings := grouped[id]; hasFindings {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 func collectFindings(report *sarif.Report, pkgFilter map[string]bool, levelFilter string) (map[string][]auditFinding, []string) {
@@ -191,46 +220,6 @@ func humanPackageName(key string) string {
 	return name + " (" + eco + ")"
 }
 
-func formatCounts(c levelCounts) string {
-	parts := make([]string, 0, 4)
-	for _, lc := range []struct {
-		label string
-		n     int
-	}{
-		{"error", c.Error},
-		{"warning", c.Warning},
-		{"note", c.Note},
-		{"info", c.Info},
-	} {
-		if lc.n > 0 {
-			parts = append(parts, fmt.Sprintf("%d %s", lc.n, lc.label))
-		}
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return ": " + strings.Join(parts, ", ")
-}
-
-type levelCounts struct{ Error, Warning, Note, Info int }
-
-func countByLevel(fs []auditFinding) levelCounts {
-	var c levelCounts
-	for _, f := range fs {
-		switch f.Level {
-		case levelError:
-			c.Error++
-		case levelWarning:
-			c.Warning++
-		case levelNote:
-			c.Note++
-		case levelInfo:
-			c.Info++
-		}
-	}
-	return c
-}
-
 func packageFromResult(res *sarif.Result) string {
 	for _, loc := range res.Locations {
 		for _, ll := range loc.LogicalLocations {
@@ -243,52 +232,6 @@ func packageFromResult(res *sarif.Result) string {
 		}
 	}
 	return ""
-}
-
-// normalizeLevel maps SARIF levels (including the bare "none") to the
-// user-facing labels used throughout the view: error/warning/note/info.
-func normalizeLevel(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case levelError:
-		return levelError
-	case levelNote:
-		return levelNote
-	case "none":
-		return levelInfo
-	case "", levelWarning:
-		return levelWarning
-	default:
-		return levelWarning
-	}
-}
-
-func normalizeLevelFilter(level string) (string, error) {
-	f := strings.ToLower(strings.TrimSpace(level))
-	if f == "" {
-		return "all", nil
-	}
-	switch f {
-	case "all", levelError, levelWarning, levelNote, levelInfo:
-		return f, nil
-	case "none":
-		return levelInfo, nil
-	}
-	return "", fmt.Errorf("invalid --level %q (want one of: all, error, warning, note, info)", level)
-}
-
-func levelRank(level string) int {
-	switch level {
-	case levelError:
-		return 0
-	case levelWarning:
-		return 1
-	case levelNote:
-		return 2
-	case levelInfo:
-		return 3
-	default:
-		return 4
-	}
 }
 
 func stringSet(in []string) map[string]bool {

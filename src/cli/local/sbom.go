@@ -177,20 +177,34 @@ func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot 
 
 func buildSBOMNodes(rootKey string, edges []models.DepsTreeEdge) []depsgraph.SBOMNode {
 	depsByParent := make(map[string][]string, len(edges))
+	depsSeen := make(map[string]map[string]bool, len(edges))
+	directLocation := make(map[string]*models.LocationInfo)
 	seen := make(map[string]bool, len(edges)*2)
 	seen[rootKey] = true
 
 	for _, e := range edges {
-		depsByParent[e.ParentKey] = append(depsByParent[e.ParentKey], e.ChildKey)
+		if depsSeen[e.ParentKey] == nil {
+			depsSeen[e.ParentKey] = make(map[string]bool)
+		}
+		if !depsSeen[e.ParentKey][e.ChildKey] {
+			depsSeen[e.ParentKey][e.ChildKey] = true
+			depsByParent[e.ParentKey] = append(depsByParent[e.ParentKey], e.ChildKey)
+		}
 		seen[e.ParentKey] = true
 		seen[e.ChildKey] = true
+		if e.ParentKey == rootKey && e.Location != nil {
+			if _, exists := directLocation[e.ChildKey]; !exists {
+				directLocation[e.ChildKey] = e.Location
+			}
+		}
 	}
 
 	nodes := make([]depsgraph.SBOMNode, 0, len(seen))
 	for key := range seen {
 		node := depsgraph.SBOMNode{
-			Key:  key,
-			Deps: depsByParent[key],
+			Key:      key,
+			Deps:     depsByParent[key],
+			Location: directLocation[key],
 		}
 		if eco, name, version := parseKeyIdentity(key); eco != "" {
 			node.Ecosystem = &eco

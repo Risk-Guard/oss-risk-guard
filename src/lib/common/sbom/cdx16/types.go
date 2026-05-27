@@ -32,11 +32,21 @@ type Component struct {
 	Version    string     `json:"version,omitempty"`
 	PURL       string     `json:"purl,omitempty"`
 	Properties []Property `json:"properties,omitempty"`
+	Evidence   *Evidence  `json:"evidence,omitempty"`
 }
 
 type Property struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type Evidence struct {
+	Occurrences []Occurrence `json:"occurrences,omitempty"`
+}
+
+type Occurrence struct {
+	Location string `json:"location"`
+	Line     int    `json:"line,omitempty"`
 }
 
 type Dep struct {

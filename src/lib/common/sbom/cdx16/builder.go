@@ -120,6 +120,14 @@ func buildComponent(node depsgraph.SBOMNode) Component {
 		comp.Properties = props
 	}
 
+	if node.Location != nil && node.Location.File != nil {
+		occ := Occurrence{Location: *node.Location.File}
+		if node.Location.LineNumber != nil {
+			occ.Line = *node.Location.LineNumber
+		}
+		comp.Evidence = &Evidence{Occurrences: []Occurrence{occ}}
+	}
+
 	return comp
 }
 

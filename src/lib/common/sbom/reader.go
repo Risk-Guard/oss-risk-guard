@@ -9,11 +9,33 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
+
+// DirectDep pairs an analysis-identifier key with optional manifest-source
+// provenance. Location is nil when the SBOM did not record it.
+type DirectDep struct {
+	Key      string
+	Location *models.LocationInfo
+}
 
 // ReadDirectDeps sniffs the SBOM format from the JSON payload and returns the
 // deduped, sorted analysis-identifier keys for direct (depth=1) dependencies.
 func ReadDirectDeps(raw []byte) ([]string, error) {
+	deps, err := ReadDirectDepsWithLocations(raw)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(deps))
+	for _, d := range deps {
+		out = append(out, d.Key)
+	}
+	return out, nil
+}
+
+// ReadDirectDepsWithLocations is the same as ReadDirectDeps but also returns
+// each direct dep's manifest-file provenance when the SBOM carries it.
+func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	var probe struct {
 		BOMFormat string `json:"bomFormat"`
 		Context   string `json:"@context"`
@@ -22,32 +44,42 @@ func ReadDirectDeps(raw []byte) ([]string, error) {
 		return nil, fmt.Errorf("not valid JSON: %w", err)
 	}
 
-	var keys []string
-	var err error
 	switch {
 	case probe.BOMFormat == "CycloneDX":
-		keys, err = cdx16.ReadDirectDeps(raw)
+		deps, err := cdx16.ReadDirectDepsWithLocations(raw)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]DirectDep, 0, len(deps))
+		for _, d := range deps {
+			out = append(out, DirectDep{Key: d.Key, Location: d.Location})
+		}
+		return dedupeAndSort(out), nil
 	case probe.Context != "":
-		keys, err = spdx30.ReadDirectDeps(raw)
+		deps, err := spdx30.ReadDirectDepsWithLocations(raw)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]DirectDep, 0, len(deps))
+		for _, d := range deps {
+			out = append(out, DirectDep{Key: d.Key, Location: d.Location})
+		}
+		return dedupeAndSort(out), nil
 	default:
 		return nil, fmt.Errorf("unrecognized SBOM format (expected SPDX 3.0 or CycloneDX 1.6)")
 	}
-	if err != nil {
-		return nil, err
-	}
-	return dedupeAndSort(keys), nil
 }
 
-func dedupeAndSort(in []string) []string {
+func dedupeAndSort(in []DirectDep) []DirectDep {
 	seen := make(map[string]bool, len(in))
-	out := make([]string, 0, len(in))
-	for _, k := range in {
-		if seen[k] {
+	out := make([]DirectDep, 0, len(in))
+	for _, d := range in {
+		if seen[d.Key] {
 			continue
 		}
-		seen[k] = true
-		out = append(out, k)
+		seen[d.Key] = true
+		out = append(out, d)
 	}
-	sort.Strings(out)
+	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
 }

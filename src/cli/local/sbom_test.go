@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
 func TestBuildSBOMJSON_SPDX(t *testing.T) {
@@ -53,6 +54,52 @@ func TestBuildSBOMJSON_CycloneDX(t *testing.T) {
 	components, ok := parsed["components"].([]any)
 	if !ok || len(components) == 0 {
 		t.Errorf("expected non-empty components array, got %v", parsed["components"])
+	}
+}
+
+func TestBuildSBOMNodes_DedupesDuplicateEdges(t *testing.T) {
+	root := "source/repo"
+	lodash := "package/npm/lodash"
+	file := "package.json"
+	line := 12
+
+	// Same child appears twice in two edges from the root — a real case when
+	// multiple manifests in a polyglot repo declare the same package.
+	edges := []models.DepsTreeEdge{
+		{
+			ParentKey: root, ChildKey: lodash, Ecosystem: "npm",
+			Location: &models.LocationInfo{File: &file, LineNumber: &line},
+		},
+		{ParentKey: root, ChildKey: lodash, Ecosystem: "npm"},
+	}
+
+	nodes := buildSBOMNodes(root, edges)
+
+	var rootNode *depsgraph.SBOMNode
+	for i := range nodes {
+		if nodes[i].Key == root {
+			rootNode = &nodes[i]
+		}
+	}
+	if rootNode == nil {
+		t.Fatal("root node missing from buildSBOMNodes output")
+	}
+	if len(rootNode.Deps) != 1 || rootNode.Deps[0] != lodash {
+		t.Errorf("expected one deduped Deps entry %q, got %v", lodash, rootNode.Deps)
+	}
+
+	// The first non-nil Location should win; verify the child has it set.
+	var child *depsgraph.SBOMNode
+	for i := range nodes {
+		if nodes[i].Key == lodash {
+			child = &nodes[i]
+		}
+	}
+	if child == nil {
+		t.Fatal("lodash child node missing")
+	}
+	if child.Location == nil || child.Location.File == nil || *child.Location.File != file {
+		t.Errorf("expected Location {%q,:%d} on child, got %+v", file, line, child.Location)
 	}
 }
 
