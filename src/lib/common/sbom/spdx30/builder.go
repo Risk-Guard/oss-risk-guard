@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
@@ -64,7 +65,19 @@ func (b *Builder) Build() (*Document, error) {
 	var elementIDs []string
 	relIndex := 0
 
-	for key, node := range b.nodes {
+	files := make(map[string]File)
+	var snippets []Snippet
+
+	// Sort keys for deterministic output ordering of packages, files, and
+	// hasDependencyManifest relationships.
+	keys := make([]string, 0, len(b.nodes))
+	for k := range b.nodes {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, key := range keys {
+		node := b.nodes[key]
 		pkg := b.buildPackage(key, node, creationInfoID)
 		packages = append(packages, pkg)
 		elementIDs = append(elementIDs, pkg.SpdxID)
@@ -85,6 +98,65 @@ func (b *Builder) Build() (*Document, error) {
 				elementIDs = append(elementIDs, relID)
 			}
 		}
+
+		if node.Location != nil && node.Location.File != nil {
+			filePath := *node.Location.File
+			fileID := b.namespace + "#file-" + b64(filePath)
+			if _, ok := files[filePath]; !ok {
+				files[filePath] = File{
+					Type:         "software_File",
+					SpdxID:       fileID,
+					Name:         filePath,
+					CreationInfo: creationInfoID,
+				}
+			}
+
+			// Target the File directly when no line is known; otherwise emit a
+			// Snippet element carrying the line range and target that.
+			manifestTarget := fileID
+			if node.Location.LineNumber != nil {
+				ln := *node.Location.LineNumber
+				snipID := b.namespace + "#snippet-" + b64(key+"@"+filePath)
+				snippets = append(snippets, Snippet{
+					Type:            "software_Snippet",
+					SpdxID:          snipID,
+					Name:            fmt.Sprintf("%s#L%d", filePath, ln),
+					CreationInfo:    creationInfoID,
+					SnippetFromFile: fileID,
+					LineRange: &PositiveIntegerRange{
+						Type:              "PositiveIntegerRange",
+						BeginIntegerRange: ln,
+						EndIntegerRange:   ln,
+					},
+				})
+				elementIDs = append(elementIDs, snipID)
+				manifestTarget = snipID
+			}
+
+			relID := fmt.Sprintf("%s#Relationship-%d", b.namespace, relIndex)
+			relIndex++
+			rel := Relationship{
+				Type:             "Relationship",
+				SpdxID:           relID,
+				CreationInfo:     creationInfoID,
+				RelationshipType: RelationshipHasDependencyManifest,
+				From:             b.namespace + "#" + b64(key),
+				To:               []string{manifestTarget},
+			}
+			relationships = append(relationships, rel)
+			elementIDs = append(elementIDs, relID)
+		}
+	}
+
+	filePaths := make([]string, 0, len(files))
+	for p := range files {
+		filePaths = append(filePaths, p)
+	}
+	sort.Strings(filePaths)
+	fileElements := make([]File, 0, len(files))
+	for _, p := range filePaths {
+		fileElements = append(fileElements, files[p])
+		elementIDs = append(elementIDs, files[p].SpdxID)
 	}
 
 	var rootElements []string
@@ -115,10 +187,16 @@ func (b *Builder) Build() (*Document, error) {
 		ProfileConformance: []string{ProfileSoftware},
 	}
 
-	graph := make([]any, 0, 4+len(packages)+len(relationships))
+	graph := make([]any, 0, 4+len(packages)+len(relationships)+len(fileElements)+len(snippets))
 	graph = append(graph, creationInfo, org, tool, spdxDoc)
 	for i := range packages {
 		graph = append(graph, packages[i])
+	}
+	for i := range fileElements {
+		graph = append(graph, fileElements[i])
+	}
+	for i := range snippets {
+		graph = append(graph, snippets[i])
 	}
 	for i := range relationships {
 		graph = append(graph, relationships[i])

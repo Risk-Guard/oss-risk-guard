@@ -5,8 +5,9 @@ const (
 	SpecVer     = "3.0.1"
 	NoAssertion = "NOASSERTION"
 
-	RelationshipDescribes = "describes"
-	RelationshipDependsOn = "dependsOn"
+	RelationshipDescribes             = "describes"
+	RelationshipDependsOn             = "dependsOn"
+	RelationshipHasDependencyManifest = "hasDependencyManifest"
 
 	ProfileSoftware = "software"
 )
@@ -80,4 +81,26 @@ type Relationship struct {
 	RelationshipType string   `json:"relationshipType"`
 	From             string   `json:"from"`
 	To               []string `json:"to"`
+}
+
+type File struct {
+	Type         string `json:"type"`
+	SpdxID       string `json:"spdxId"`
+	Name         string `json:"name"`
+	CreationInfo string `json:"creationInfo"`
+}
+
+type Snippet struct {
+	Type             string                `json:"type"`
+	SpdxID           string                `json:"spdxId"`
+	Name             string                `json:"name,omitempty"`
+	CreationInfo     string                `json:"creationInfo"`
+	SnippetFromFile  string                `json:"software_snippetFromFile"`
+	LineRange        *PositiveIntegerRange `json:"software_lineRange,omitempty"`
+}
+
+type PositiveIntegerRange struct {
+	Type              string `json:"type"`
+	BeginIntegerRange int    `json:"beginIntegerRange"`
+	EndIntegerRange   int    `json:"endIntegerRange"`
 }
