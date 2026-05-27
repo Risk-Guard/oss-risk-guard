@@ -31,7 +31,7 @@ func TestReader_RoundTripWithAndWithoutLocation(t *testing.T) {
 		},
 		{
 			Key:         "package/pypi/requests",
-			Ecosystem:   &(*&eco),
+			Ecosystem:   &eco,
 			PackageName: &requests,
 			Location:    &models.LocationInfo{File: &reqTxt},
 		},
