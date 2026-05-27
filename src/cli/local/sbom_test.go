@@ -66,8 +66,10 @@ func TestBuildSBOMNodes_DedupesDuplicateEdges(t *testing.T) {
 	// Same child appears twice in two edges from the root — a real case when
 	// multiple manifests in a polyglot repo declare the same package.
 	edges := []models.DepsTreeEdge{
-		{ParentKey: root, ChildKey: lodash, Ecosystem: "npm",
-			Location: &models.LocationInfo{File: &file, LineNumber: &line}},
+		{
+			ParentKey: root, ChildKey: lodash, Ecosystem: "npm",
+			Location: &models.LocationInfo{File: &file, LineNumber: &line},
+		},
 		{ParentKey: root, ChildKey: lodash, Ecosystem: "npm"},
 	}
 

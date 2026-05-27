@@ -91,12 +91,12 @@ type File struct {
 }
 
 type Snippet struct {
-	Type             string                `json:"type"`
-	SpdxID           string                `json:"spdxId"`
-	Name             string                `json:"name,omitempty"`
-	CreationInfo     string                `json:"creationInfo"`
-	SnippetFromFile  string                `json:"software_snippetFromFile"`
-	LineRange        *PositiveIntegerRange `json:"software_lineRange,omitempty"`
+	Type            string                `json:"type"`
+	SpdxID          string                `json:"spdxId"`
+	Name            string                `json:"name,omitempty"`
+	CreationInfo    string                `json:"creationInfo"`
+	SnippetFromFile string                `json:"software_snippetFromFile"`
+	LineRange       *PositiveIntegerRange `json:"software_lineRange,omitempty"`
 }
 
 type PositiveIntegerRange struct {
