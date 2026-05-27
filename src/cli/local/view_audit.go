@@ -51,10 +51,40 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("reading SARIF: %w", err)
 	}
+	mode := DisplayText
 	if viewAuditGitHub {
-		return renderGitHub(os.Stdout, os.Stderr, report, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot)
+		mode = DisplayGitHub
 	}
-	return renderAudit(os.Stdout, report, viewAuditLevel, viewAuditPackages)
+	return renderReport(os.Stdout, os.Stderr, report, mode, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot)
+}
+
+// DisplayMode selects how an in-memory SARIF report is rendered to the user
+// after a command finishes. DisplayNone is the historical default (write
+// SARIF only). DisplayText is the per-package human summary. DisplayGitHub
+// emits one GH Actions workflow command per finding.
+type DisplayMode int
+
+const (
+	DisplayNone DisplayMode = iota
+	DisplayText
+	DisplayGitHub
+)
+
+// renderReport dispatches an in-memory report to the requested renderer.
+// Reuses renderAudit and renderGitHub verbatim. level and packages are the
+// existing view-audit filters; repoRoot is only used by DisplayGitHub.
+// DisplayNone is a no-op so callers can call this unconditionally.
+func renderReport(out io.Writer, warn io.Writer, report *sarif.Report, mode DisplayMode, level string, packages []string, repoRoot string) error {
+	switch mode {
+	case DisplayNone:
+		return nil
+	case DisplayText:
+		return renderAudit(out, report, level, packages)
+	case DisplayGitHub:
+		return renderGitHub(out, warn, report, level, packages, repoRoot)
+	default:
+		return fmt.Errorf("unknown display mode: %d", mode)
+	}
 }
 
 type auditFinding struct {

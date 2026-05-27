@@ -5,8 +5,6 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
@@ -51,13 +49,10 @@ func init() {
 }
 
 func runScoreLocal(command *cobra.Command, args []string) error {
-	logger := ctxutil.GetLogger(command.Context())
 	path := args[0]
 
-	ctx := command.Context()
-
 	if checksOutFile != "" {
-		ctx = runpath.SetChecksOutputPath(ctx, checksOutFile)
+		command.SetContext(runpath.SetChecksOutputPath(command.Context(), checksOutFile))
 	}
 
 	repoPath, err := git.ValidateGitRepo(path)
@@ -65,22 +60,11 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid git repository: %w", err)
 	}
 
-	ctx, err = cache.InitializeCacheBackend(ctx)
+	ctx, overridesHash, err := setupAuditContext(command)
 	if err != nil {
 		return err
 	}
-	ctx, err = storage.InitializeStorageBackend(ctx)
-	if err != nil {
-		return err
-	}
-
-	var overridesHash string
-	ctx, overridesHash, err = loadAndSetupOverrides(ctx, overridesFile)
-	if err != nil {
-		return err
-	}
-
-	command.SetContext(ctx)
+	logger := ctxutil.GetLogger(ctx)
 
 	logger.Info("collecting metadata using DAG execution",
 		zap.String("path", repoPath),

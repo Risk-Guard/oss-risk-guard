@@ -178,6 +178,7 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", "Maximum audit cache age (e.g. 30m, 48h). 0 disables caching")
 	cmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh audit scoring; do not read or write the audit cache")
 	cmd.Flags().BoolVar(&runAllContinueOnError, "continue-on-error", true, "Continue and emit a partial SARIF when SBOM/audit steps fail")
+	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
 }
 
 // resolveCacheDir picks the cache root in precedence order:

@@ -3,22 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
-	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
-	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
-
-	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
-
-	"github.com/fatih/color"
-	"github.com/owenrumney/go-sarif/v2/sarif"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 var (
@@ -61,27 +49,15 @@ func init() {
 }
 
 func runAudit(cmd *cobra.Command, _ []string) error {
-	ctx := cmd.Context()
-	logger := ctxutil.GetLogger(ctx)
-
 	raw, err := os.ReadFile(auditSBOMFile) //nolint:gosec // user-provided flag
 	if err != nil {
 		return fmt.Errorf("reading SBOM: %w", err)
 	}
-
 	deps, err := sbom.ReadDirectDepsWithLocations(raw)
 	if err != nil {
 		return fmt.Errorf("parsing SBOM: %w", err)
 	}
-
-	keys := make([]string, len(deps))
-	locationByKey := make(map[string]*models.LocationInfo, len(deps))
-	for i, d := range deps {
-		keys[i] = d.Key
-		if d.Location != nil {
-			locationByKey[d.Key] = d.Location
-		}
-	}
+	keys, locByKey := keysAndLocations(deps)
 
 	if auditList {
 		for _, k := range keys {
@@ -89,7 +65,6 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		}
 		return nil
 	}
-
 	if sarifOutFile == "" {
 		return fmt.Errorf("--sarif is required when not using --list")
 	}
@@ -97,70 +72,19 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
 
-	ctx, err = cache.InitializeCacheBackend(ctx)
-	if err != nil {
-		return err
-	}
-	ctx, err = storage.InitializeStorageBackend(ctx)
-	if err != nil {
-		return err
-	}
-	ctx, overridesHash, err := loadAndSetupOverrides(ctx, overridesFile)
-	if err != nil {
-		return err
-	}
-	cmd.SetContext(ctx)
-
-	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.PackageBuilder)
-
-	cacheCfg, err := buildCacheConfig(ctx, checkMetadata)
+	ctx, overridesHash, err := setupAuditContext(cmd)
 	if err != nil {
 		return err
 	}
 
-	bold := color.New(color.Bold).FprintfFunc()
-	bold(os.Stderr, "Auditing %d direct dependencies (jobs=%d)…\n", len(keys), auditJobs)
-	if cacheCfg.enabled {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("cache: %s (max-age %s)", cacheCfg.dir, cacheCfg.maxAge))
-	} else {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("cache: disabled"))
-	}
-
-	logger.Info("auditing direct dependencies",
-		zap.Int("count", len(keys)),
-		zap.Int("jobs", auditJobs))
-
-	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg, locationByKey)
+	auditRuns, err := runPackageAudits(ctx, keys, locByKey, overridesHash)
 	if err != nil {
 		return err
 	}
 
-	report, err := sarif.New(sarif.Version210, true)
+	report, err := assembleReport(nil, auditRuns)
 	if err != nil {
-		return fmt.Errorf("creating SARIF report: %w", err)
+		return err
 	}
-	for _, r := range runs {
-		report.AddRun(r)
-	}
-	if err := os.MkdirAll(filepath.Dir(sarifOutFile), 0o750); err != nil {
-		return fmt.Errorf("creating SARIF output directory: %w", err)
-	}
-	if err := report.WriteFile(sarifOutFile); err != nil {
-		return fmt.Errorf("writing SARIF: %w", err)
-	}
-	logger.Info("wrote SARIF report", zap.String("path", sarifOutFile), zap.Int("runs", len(runs)))
-
-	bold(os.Stderr, "\nWrote %d runs to %s\n", len(runs), sarifOutFile)
-	fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s\n",
-		color.RedString("%d errors", totals.errors),
-		color.YellowString("%d warnings", totals.warnings),
-		color.CyanString("%d notes", totals.notes),
-		color.HiBlackString("%d info", totals.info))
-	if totals.audit > 0 {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%d packages failed to score", totals.audit))
-	}
-	if cacheCfg.enabled {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("%d/%d packages served from cache", totals.cached, len(runs)))
-	}
-	return nil
+	return writeReport(report, sarifOutFile)
 }
