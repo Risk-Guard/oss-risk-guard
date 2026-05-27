@@ -137,8 +137,17 @@ func extractCommitHistory(ctx context.Context, repoPath string) ([]CommitInfo, e
 	out, err := cmd.Output()
 	if err != nil {
 		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
-			return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		if errors.As(err, &exitErr) {
+			stderr := string(exitErr.Stderr)
+			// Unborn branch (`git init` with no commits yet). Valid state —
+			// treat as empty history so callers return GitMetadata with just
+			// SourceURL rather than failing the whole analysis.
+			if strings.Contains(stderr, "does not have any commits yet") {
+				return nil, nil
+			}
+			if len(stderr) > 0 {
+				return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr))
+			}
 		}
 		return nil, err
 	}

@@ -2,10 +2,44 @@ package git
 
 import (
 	"context"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 )
+
+// An init'd repo with no commits is a valid state (`git init` then nothing
+// committed yet). `git log` exits 128 in that case. AnalyzeRepository must
+// return GitMetadata with the resolved SourceURL and no commit stats —
+// not fail analysis.
+func TestAnalyzeRepository_EmptyRepoNoCommits(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "repo")
+	// Use an empty template so the sandbox doesn't block hook copies.
+	tmplDir := filepath.Join(t.TempDir(), "tmpl")
+	if err := exec.Command("git", "init", "-q", "--template="+tmplDir, dir).Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+
+	cfg := &environment.Config{}
+	ctx := environment.SetSharedConfig(context.Background(), cfg)
+
+	meta, err := AnalyzeRepository(ctx, dir)
+	if err != nil {
+		t.Fatalf("AnalyzeRepository on empty repo returned error: %v", err)
+	}
+	if meta == nil {
+		t.Fatal("expected non-nil GitMetadata for empty repo")
+	}
+	if meta.SourceURL == "" {
+		t.Errorf("expected SourceURL fallback to repo path, got empty")
+	}
+	if meta.CommitCount != nil && *meta.CommitCount != 0 {
+		t.Errorf("expected nil/zero CommitCount, got %v", meta.CommitCount)
+	}
+}
 
 func TestAnalyzeRepository_ErrorHandling(t *testing.T) {
 	_, err := AnalyzeRepository(context.Background(), "/nonexistent/path/to/repo")
