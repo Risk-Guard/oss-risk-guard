@@ -1,19 +1,25 @@
 package git
 
 import (
+	"context"
+	"errors"
 	"fmt"
-
-	"github.com/go-git/go-git/v5"
+	"os/exec"
+	"strings"
 )
 
-func GetHeadCommit(repoPath string) (string, error) {
-	repo, err := git.PlainOpenWithOptions(repoPath, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
+func GetHeadCommit(ctx context.Context, repoPath string) (string, error) {
+	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "HEAD")
+	applySecureGitEnv(ctx, cmd)
+	applyGitCeiling(cmd, repoPath)
+	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("opening repository: %w", err)
-	}
-	ref, err := repo.Head()
-	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && len(exitErr.Stderr) > 0 {
+			return "", fmt.Errorf("getting HEAD: %w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return "", fmt.Errorf("getting HEAD: %w", err)
 	}
-	return ref.Hash().String(), nil
+	return strings.TrimSpace(string(out)), nil
 }

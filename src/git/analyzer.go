@@ -1,18 +1,20 @@
 package git
 
 import (
+	"bufio"
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 func ValidateGitRepo(path string) (string, error) {
@@ -44,20 +46,16 @@ func ValidateGitRepo(path string) (string, error) {
 	return absPath, nil
 }
 
-func AnalyzeRepository(repoPath string) (*models.GitMetadata, error) {
-	// Open the repository
-	repo, err := git.PlainOpenWithOptions(repoPath, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
-	if err != nil {
+func AnalyzeRepository(ctx context.Context, repoPath string) (*models.GitMetadata, error) {
+	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	// Get remote origin URL
-	sourceURL, found, err := getRemoteURL(repo)
+	sourceURL, found, err := getRemoteURL(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read git remotes: %w", err)
 	}
 	if !found {
-		// No origin remote found - falling back to absolute repository path
 		absPath, err := filepath.Abs(repoPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve absolute path: %w", err)
@@ -65,29 +63,13 @@ func AnalyzeRepository(repoPath string) (*models.GitMetadata, error) {
 		sourceURL = absPath
 	}
 
-	// Extract commit history
-	commits, err := extractCommitHistory(repo)
-
-	// Handle partial failure (shallow clone)
-	var statusReason *string
+	commits, err := extractCommitHistory(ctx, repoPath)
 	if err != nil {
-		msg := err.Error()
-		statusReason = &msg
-		// If we have no commits at all, this is a complete failure
-		if len(commits) == 0 {
-			return &models.GitMetadata{
-				SourceURL:    sourceURL,
-				StatusReason: statusReason,
-			}, nil
-		}
-		// Otherwise, continue with partial data
+		return nil, fmt.Errorf("failed to read commit history: %w", err)
 	}
 
 	if len(commits) == 0 {
-		// Empty repository
-		return &models.GitMetadata{
-			SourceURL: sourceURL,
-		}, nil
+		return &models.GitMetadata{SourceURL: sourceURL}, nil
 	}
 
 	metrics := analyzeCommitMetrics(commits)
@@ -100,7 +82,6 @@ func AnalyzeRepository(repoPath string) (*models.GitMetadata, error) {
 		LatestHumanCommit:      &metrics.LatestHumanCommit,
 		CommitCount:            &metrics.CommitCount,
 		HumanCommitCount:       &metrics.HumanCommitCount,
-		StatusReason:           statusReason,
 	}
 	if !metrics.MaxMonthlyWindowStart.IsZero() && !metrics.MaxMonthlyWindowEnd.IsZero() {
 		metadata.MaxMonthlyWindowStart = &metrics.MaxMonthlyWindowStart
@@ -109,21 +90,29 @@ func AnalyzeRepository(repoPath string) (*models.GitMetadata, error) {
 	return metadata, nil
 }
 
-func getRemoteURL(repo *git.Repository) (string, bool, error) {
-	remotes, err := repo.Remotes()
+func getRemoteURL(ctx context.Context, repoPath string) (string, bool, error) {
+	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "config", "--get", "remote.origin.url")
+	applySecureGitEnv(ctx, cmd)
+	applyGitCeiling(cmd, repoPath)
+	out, err := cmd.Output()
 	if err != nil {
-		return "", false, err // Real error - can't read remotes
-	}
-
-	for _, remote := range remotes {
-		if remote.Config().Name == "origin" {
-			if len(remote.Config().URLs) > 0 {
-				return stripURLCredentials(remote.Config().URLs[0]), true, nil
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if exitErr.ExitCode() == 1 {
+				return "", false, nil
+			}
+			if len(exitErr.Stderr) > 0 {
+				return "", false, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
 			}
 		}
+		return "", false, err
 	}
-
-	return "", false, nil // No origin found - not an error
+	url := strings.TrimSpace(string(out))
+	if url == "" {
+		return "", false, nil
+	}
+	return stripURLCredentials(url), true, nil
 }
 
 func stripURLCredentials(rawURL string) string {
@@ -140,38 +129,49 @@ type CommitInfo struct {
 	Timestamp   time.Time
 }
 
-func extractCommitHistory(repo *git.Repository) ([]CommitInfo, error) {
-	ref, err := repo.Head()
+func extractCommitHistory(ctx context.Context, repoPath string) ([]CommitInfo, error) {
+	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
+	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", "--date-order", "--format=%ae%x09%aI")
+	applySecureGitEnv(ctx, cmd)
+	applyGitCeiling(cmd, repoPath)
+	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get HEAD: %w", err)
-	}
-
-	// Get all references to handle shallow clones better
-	commitIter, err := repo.Log(&git.LogOptions{
-		From:  ref.Hash(),
-		Order: git.LogOrderCommitterTime,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create log iterator: %w", err)
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			stderr := string(exitErr.Stderr)
+			// Unborn branch (`git init` with no commits yet). Valid state —
+			// treat as empty history so callers return GitMetadata with just
+			// SourceURL rather than failing the whole analysis.
+			if strings.Contains(stderr, "does not have any commits yet") {
+				return nil, nil
+			}
+			if len(stderr) > 0 {
+				return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr))
+			}
+		}
+		return nil, err
 	}
 
 	var commits []CommitInfo
-	err = commitIter.ForEach(func(c *object.Commit) error {
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		email, tsStr, ok := strings.Cut(scanner.Text(), "\t")
+		if !ok {
+			continue
+		}
+		ts, err := time.Parse(time.RFC3339, tsStr)
+		if err != nil {
+			continue
+		}
 		commits = append(commits, CommitInfo{
-			AuthorEmail: c.Author.Email,
-			Timestamp:   c.Author.When,
+			AuthorEmail: email,
+			Timestamp:   ts,
 		})
-		return nil
-	})
-	// Handle errors from iteration
-	// Note: Shallow clones may cause "object not found" errors, but we still
-	// return the commits we were able to collect
-	if err != nil {
-		// Log the error but return partial data
-		// The caller can see we have some commits and decide how to proceed
-		return commits, fmt.Errorf("partial commit history (shallow clone or incomplete): %w", err)
 	}
-
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning git log output: %w", err)
+	}
 	return commits, nil
 }
 

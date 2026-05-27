@@ -65,7 +65,7 @@ func (n *Node) handleLocal(ctx context.Context, sourceURL string, resolveOut *gi
 		), nil
 	}
 
-	gitMeta, err := git.AnalyzeRepository(repoPath)
+	gitMeta, err := git.AnalyzeRepository(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("analyzing repository: %w", err)
 	}
@@ -146,7 +146,7 @@ func (n *Node) cloneAndAnalyze(ctx context.Context, sourceURL string, input dag_
 		return nil, fmt.Errorf("metadata clone failed after resolve succeeded: %w", err)
 	}
 
-	gitMeta, err := git.AnalyzeRepository(cloneDir)
+	gitMeta, err := git.AnalyzeRepository(ctx, cloneDir)
 	if err != nil {
 		return nil, fmt.Errorf("analyzing repository: %w", err)
 	}
