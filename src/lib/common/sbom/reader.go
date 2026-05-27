@@ -50,31 +50,24 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 		if err != nil {
 			return nil, err
 		}
-		return dedupeAndSort(toDirectDeps(deps)), nil
+		out := make([]DirectDep, 0, len(deps))
+		for _, d := range deps {
+			out = append(out, DirectDep{Key: d.Key, Location: d.Location})
+		}
+		return dedupeAndSort(out), nil
 	case probe.Context != "":
 		deps, err := spdx30.ReadDirectDepsWithLocations(raw)
 		if err != nil {
 			return nil, err
 		}
-		return dedupeAndSort(toDirectDeps(deps)), nil
+		out := make([]DirectDep, 0, len(deps))
+		for _, d := range deps {
+			out = append(out, DirectDep{Key: d.Key, Location: d.Location})
+		}
+		return dedupeAndSort(out), nil
 	default:
 		return nil, fmt.Errorf("unrecognized SBOM format (expected SPDX 3.0 or CycloneDX 1.6)")
 	}
-}
-
-func toDirectDeps[T interface {
-	cdx16.DirectDep | spdx30.DirectDep
-}](in []T) []DirectDep {
-	out := make([]DirectDep, 0, len(in))
-	for _, d := range in {
-		switch v := any(d).(type) {
-		case cdx16.DirectDep:
-			out = append(out, DirectDep{Key: v.Key, Location: v.Location})
-		case spdx30.DirectDep:
-			out = append(out, DirectDep{Key: v.Key, Location: v.Location})
-		}
-	}
-	return out
 }
 
 func dedupeAndSort(in []DirectDep) []DirectDep {

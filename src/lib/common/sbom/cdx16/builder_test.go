@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	"github.com/stretchr/testify/assert"
@@ -161,6 +162,90 @@ func TestBuilder_NoPropertiesWhenClean(t *testing.T) {
 
 	assert.False(t, strings.Contains(string(data), "properties"),
 		"JSON should not contain properties key when no violations exist")
+}
+
+func TestBuilder_LocationEmitsEvidenceOccurrence(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+	file := "package.json"
+	line := 42
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+			Location:    &models.LocationInfo{File: &file, LineNumber: &line},
+		},
+		{
+			Key: "source/repo",
+		},
+	}
+
+	bom, err := NewBuilder("source/repo", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+
+	var comp *Component
+	for i := range bom.Components {
+		if bom.Components[i].Name == "lodash" {
+			comp = &bom.Components[i]
+			break
+		}
+	}
+	require.NotNil(t, comp, "lodash component missing")
+	require.NotNil(t, comp.Evidence, "evidence should be set")
+	require.Len(t, comp.Evidence.Occurrences, 1)
+	assert.Equal(t, "package.json", comp.Evidence.Occurrences[0].Location)
+	assert.Equal(t, 42, comp.Evidence.Occurrences[0].Line)
+}
+
+func TestBuilder_LocationFileOnlyOmitsLine(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+	file := "package.json"
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+			Location:    &models.LocationInfo{File: &file},
+		},
+		{Key: "source/repo"},
+	}
+
+	bom, err := NewBuilder("source/repo", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+
+	for _, c := range bom.Components {
+		if c.Name != "lodash" {
+			continue
+		}
+		require.NotNil(t, c.Evidence)
+		require.Len(t, c.Evidence.Occurrences, 1)
+		assert.Equal(t, "package.json", c.Evidence.Occurrences[0].Location)
+		assert.Zero(t, c.Evidence.Occurrences[0].Line, "line should be omitted when unset")
+		return
+	}
+	t.Fatal("lodash component missing")
+}
+
+func TestBuilder_NoLocationNoEvidence(t *testing.T) {
+	eco := "npm"
+	name := "lodash"
+
+	nodes := []depsgraph.SBOMNode{
+		{
+			Key:         "package/npm/lodash",
+			Ecosystem:   &eco,
+			PackageName: &name,
+		},
+	}
+
+	bom, err := NewBuilder("package/npm/lodash", nodes, "risk-guard-test").Build()
+	require.NoError(t, err)
+	require.Len(t, bom.Components, 1)
+	assert.Nil(t, bom.Components[0].Evidence)
 }
 
 func TestBuilder_SkipsUnknownDeps(t *testing.T) {
