@@ -14,6 +14,8 @@ import (
 var (
 	viewAuditLevel    string
 	viewAuditPackages []string
+	viewAuditGitHub   bool
+	viewAuditRepoRoot string
 )
 
 var viewAuditCmd = &cobra.Command{
@@ -22,10 +24,16 @@ var viewAuditCmd = &cobra.Command{
 	Long: `Read a SARIF 2.1.0 report produced by 'audit' or 'audit-package' and
 print a per-package summary of findings.
 
+With --github, emit GitHub Actions workflow annotations instead of the text
+summary, one line per finding. When the SARIF carries physicalLocation, the
+annotation points at the manifest file + line (relative to --repo-root or
+$GITHUB_WORKSPACE, defaulting to the current directory).
+
 Examples:
   risk-guard-local view-audit audit.sarif
   risk-guard-local view-audit audit.sarif --level error
-  risk-guard-local view-audit audit.sarif --package lodash --package express`,
+  risk-guard-local view-audit audit.sarif --package lodash --package express
+  risk-guard-local view-audit audit.sarif --github`,
 	Args: cobra.ExactArgs(1),
 	RunE: runViewAudit,
 }
@@ -33,6 +41,8 @@ Examples:
 func init() {
 	viewAuditCmd.Flags().StringVar(&viewAuditLevel, "level", "all", "Filter findings by level: error, warning, note, info, all")
 	viewAuditCmd.Flags().StringArrayVar(&viewAuditPackages, "package", nil, "Filter to specific package names (repeatable)")
+	viewAuditCmd.Flags().BoolVar(&viewAuditGitHub, "github", false, "Emit GitHub Actions workflow annotations instead of human-readable summary")
+	viewAuditCmd.Flags().StringVar(&viewAuditRepoRoot, "repo-root", "", "Root to make file paths relative to (defaults to $GITHUB_WORKSPACE then CWD); used with --github")
 	rootCmd.AddCommand(viewAuditCmd)
 }
 
@@ -41,7 +51,40 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("reading SARIF: %w", err)
 	}
-	return renderAudit(os.Stdout, report, viewAuditLevel, viewAuditPackages)
+	mode := DisplayText
+	if viewAuditGitHub {
+		mode = DisplayGitHub
+	}
+	return renderReport(os.Stdout, os.Stderr, report, mode, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot)
+}
+
+// DisplayMode selects how an in-memory SARIF report is rendered to the user
+// after a command finishes. DisplayNone is the historical default (write
+// SARIF only). DisplayText is the per-package human summary. DisplayGitHub
+// emits one GH Actions workflow command per finding.
+type DisplayMode int
+
+const (
+	DisplayNone DisplayMode = iota
+	DisplayText
+	DisplayGitHub
+)
+
+// renderReport dispatches an in-memory report to the requested renderer.
+// Reuses renderAudit and renderGitHub verbatim. level and packages are the
+// existing view-audit filters; repoRoot is only used by DisplayGitHub.
+// DisplayNone is a no-op so callers can call this unconditionally.
+func renderReport(out io.Writer, warn io.Writer, report *sarif.Report, mode DisplayMode, level string, packages []string, repoRoot string) error {
+	switch mode {
+	case DisplayNone:
+		return nil
+	case DisplayText:
+		return renderAudit(out, report, level, packages)
+	case DisplayGitHub:
+		return renderGitHub(out, warn, report, level, packages, repoRoot)
+	default:
+		return fmt.Errorf("unknown display mode: %d", mode)
+	}
 }
 
 type auditFinding struct {
@@ -49,6 +92,8 @@ type auditFinding struct {
 	RuleID  string
 	Title   string // rule short description, fallback to RuleID
 	Message string // full multi-line rationale + evidence
+	File    string // physical location URI, empty if absent
+	Line    int    // physical location startLine, 0 if absent
 }
 
 func renderAudit(w io.Writer, report *sarif.Report, level string, packages []string) error {
@@ -156,15 +201,41 @@ func collectFindings(report *sarif.Report, pkgFilter map[string]bool, levelFilte
 			if title == "" {
 				title = ruleID
 			}
+			file, line := physicalFromResult(res)
 			grouped[pkg] = append(grouped[pkg], auditFinding{
 				Level:   lvl,
 				RuleID:  ruleID,
 				Title:   title,
 				Message: strings.TrimSpace(derefString(res.Message.Text)),
+				File:    file,
+				Line:    line,
 			})
 		}
 	}
 	return grouped, skipped
+}
+
+// physicalFromResult extracts the first location's physicalLocation file URI
+// and startLine from a SARIF result. Returns ("", 0) if absent.
+func physicalFromResult(res *sarif.Result) (string, int) {
+	for _, loc := range res.Locations {
+		if loc == nil || loc.PhysicalLocation == nil {
+			continue
+		}
+		phys := loc.PhysicalLocation
+		var file string
+		if phys.ArtifactLocation != nil && phys.ArtifactLocation.URI != nil {
+			file = *phys.ArtifactLocation.URI
+		}
+		var line int
+		if phys.Region != nil && phys.Region.StartLine != nil {
+			line = *phys.Region.StartLine
+		}
+		if file != "" || line > 0 {
+			return file, line
+		}
+	}
+	return "", 0
 }
 
 func ruleTitleIndex(run *sarif.Run) map[string]string {
@@ -251,3 +322,6 @@ func derefString(s *string) string {
 	}
 	return *s
 }
+
+// renderGitHub and its helpers live in view_audit_github.go to keep this file
+// focused on the text rendering path.
