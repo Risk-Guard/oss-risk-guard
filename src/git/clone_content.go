@@ -9,8 +9,6 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-
-	"github.com/go-git/go-git/v5"
 )
 
 func CloneContentOnly(ctx context.Context, sourceURL, destDir, commitSHA string, sparseCheckoutPatterns []string) error {
@@ -37,13 +35,8 @@ func CloneContentOnly(ctx context.Context, sourceURL, destDir, commitSHA string,
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
-	if _, err := os.Stat(destDir); err == nil {
-		if _, err := git.PlainOpen(destDir); err == nil {
-			return nil
-		}
-		if err := os.RemoveAll(destDir); err != nil {
-			return fmt.Errorf("failed to remove existing directory: %w", err)
-		}
+	if err := os.RemoveAll(destDir); err != nil {
+		return fmt.Errorf("failed to remove existing directory: %w", err)
 	}
 
 	cloneURL := sourceURL

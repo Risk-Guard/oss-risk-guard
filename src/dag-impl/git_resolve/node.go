@@ -61,7 +61,7 @@ func (n *Node) handleLocalResolve(ctx context.Context, sourceURL string, input d
 		), nil
 	}
 
-	commit, err := git.GetHeadCommit(repoPath)
+	commit, err := git.GetHeadCommit(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("getting HEAD commit: %w", err)
 	}

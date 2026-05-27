@@ -8,6 +8,109 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
+// uv.lock edges must carry the manifest Location (file + line of the dep in
+// pyproject.toml) so SARIF physicalLocation gets populated.
+//   - Direct edges (ParentKey == "") inherit the manifest dep's Location.
+//   - Transitive edges inherit the Location of the direct ancestor.
+func TestParseManifest_UvLockfile_CarriesManifestLocation(t *testing.T) {
+	dir := t.TempDir()
+	pyproject := `[project]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+  "requests>=2.31.0",
+  "pytest>=7.0",
+]
+`
+	// requests depends on certifi (transitive)
+	uvLock := `version = 1
+requires-python = ">=3.10"
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+  { name = "requests" },
+  { name = "pytest" },
+]
+
+[[package]]
+name = "requests"
+version = "2.31.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+  { name = "certifi" },
+]
+
+[[package]]
+name = "certifi"
+version = "2024.1.4"
+source = { registry = "https://pypi.org/simple" }
+
+[[package]]
+name = "pytest"
+version = "7.4.4"
+source = { registry = "https://pypi.org/simple" }
+`
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(pyproject), 0o600); err != nil {
+		t.Fatalf("write pyproject.toml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "uv.lock"), []byte(uvLock), 0o600); err != nil {
+		t.Fatalf("write uv.lock: %v", err)
+	}
+
+	lockfile := "uv.lock"
+	detected := models.DetectedManifest{
+		Ecosystem: "pypi",
+		Paths:     []string{"pyproject.toml"},
+		Lockfile:  &lockfile,
+	}
+
+	result, err := ParseManifest(detected, dir)
+	if err != nil {
+		t.Fatalf("ParseManifest: %v", err)
+	}
+	if len(result.LockfileDependencies) == 0 {
+		t.Fatalf("expected lockfile edges, got none")
+	}
+
+	// pyproject lines (1-indexed):
+	//   line 5: "requests>=2.31.0"
+	//   line 6: "pytest>=7.0"
+	want := map[string]int{
+		"package/pypi/requests?version=2.31.0":  5,
+		"package/pypi/pytest?version=7.4.4":     6,
+		"package/pypi/certifi?version=2024.1.4": 5, // inherited from requests
+	}
+
+	byChild := map[string]models.DepsTreeEdge{}
+	for _, e := range result.LockfileDependencies {
+		byChild[e.ChildKey] = e
+	}
+	for key, wantLine := range want {
+		e, ok := byChild[key]
+		if !ok {
+			t.Errorf("missing edge for %s", key)
+			continue
+		}
+		if e.Location == nil || e.Location.File == nil {
+			t.Errorf("%s: expected Location with File set, got %+v", key, e.Location)
+			continue
+		}
+		if *e.Location.File != "pyproject.toml" {
+			t.Errorf("%s: File = %q, want pyproject.toml", key, *e.Location.File)
+		}
+		got := -1
+		if e.Location.LineNumber != nil {
+			got = *e.Location.LineNumber
+		}
+		if got != wantLine {
+			t.Errorf("%s: LineNumber = %d, want %d", key, got, wantLine)
+		}
+	}
+}
+
 func TestParseManifest_SetupPyNoSetupCall_NotAnError(t *testing.T) {
 	tmpDir := t.TempDir()
 

@@ -1,19 +1,19 @@
 package git
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 )
 
 func TestAnalyzeRepository_ErrorHandling(t *testing.T) {
-	_, err := AnalyzeRepository("/nonexistent/path/to/repo")
+	_, err := AnalyzeRepository(context.Background(), "/nonexistent/path/to/repo")
 
 	if err == nil {
 		t.Fatal("Expected error for non-existent repository")
 	}
 
-	// Should return a proper error, not panic or silently fail
 	if !strings.Contains(err.Error(), "failed to open repository") {
 		t.Errorf("Expected 'failed to open repository' error, got: %v", err)
 	}

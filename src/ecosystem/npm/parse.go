@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/lockfile"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/bun"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/pnpm"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/npm/package_manager/yarn"
@@ -53,7 +54,7 @@ func ParseManifest(detected models.DetectedManifest, repoRoot string) (*models.M
 			result.ParseError = &parseErr
 			return result, nil
 		}
-		result.LockfileDependencies = edges
+		result.LockfileDependencies = lockfile.AttachManifestLocations(edges, deps)
 	}
 
 	return result, nil

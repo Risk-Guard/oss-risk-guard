@@ -7,3 +7,4 @@ opensourcescore.dev/
 .activate.sh
 tests/**/*.git
 scratch/
+*.sarif
