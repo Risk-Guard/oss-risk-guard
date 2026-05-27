@@ -12,6 +12,7 @@ import (
 	commonsarif "github.com/Risk-Guard/oss-risk-guard/src/lib/common/sarif"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -100,7 +101,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	keys, err := sbom.ReadDirectDeps(sbomBytes)
+	deps, err := sbom.ReadDirectDepsWithLocations(sbomBytes)
 	if err != nil {
 		if !runAllContinueOnError {
 			return fmt.Errorf("parsing SBOM direct deps: %w", err)
@@ -110,7 +111,16 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return writeMergedReport(outPath, localRun, nil)
 	}
 
-	auditRuns, err := auditDirectDeps(ctx, keys, overridesHash)
+	keys := make([]string, len(deps))
+	locationByKey := make(map[string]*models.LocationInfo, len(deps))
+	for i, d := range deps {
+		keys[i] = d.Key
+		if d.Location != nil {
+			locationByKey[d.Key] = d.Location
+		}
+	}
+
+	auditRuns, err := auditDirectDeps(ctx, keys, overridesHash, locationByKey)
 	if err != nil {
 		if !runAllContinueOnError {
 			return err
@@ -158,7 +168,10 @@ func scoreLocalSourceRun(ctx context.Context, repoPath, overridesHash string) (*
 
 // auditDirectDeps runs the parallel audit pipeline (same as `audit`) and
 // returns the per-package Runs. Returns an empty slice if keys is empty.
-func auditDirectDeps(ctx context.Context, keys []string, overridesHash string) ([]*sarif.Run, error) {
+// locationByKey maps each key to its manifest provenance (file+line) so the
+// audit Runs can carry SARIF physicalLocation pointing back at the consumer's
+// manifest. Keys absent from the map score without physicalLocation.
+func auditDirectDeps(ctx context.Context, keys []string, overridesHash string, locationByKey map[string]*models.LocationInfo) ([]*sarif.Run, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("no direct dependencies to audit"))
 		return nil, nil
@@ -178,7 +191,7 @@ func auditDirectDeps(ctx context.Context, keys []string, overridesHash string) (
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("cache: disabled"))
 	}
 
-	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg)
+	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg, locationByKey)
 	if err != nil {
 		return nil, err
 	}

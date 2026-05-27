@@ -158,3 +158,182 @@ func TestRenderAudit_HeaderOmitsZeroCounts(t *testing.T) {
 		t.Errorf("expected zero-counts to be omitted: %s", out)
 	}
 }
+
+func TestGithubEscapeMessage(t *testing.T) {
+	in := "line1\nline2\rwith, comma: colon 50% off"
+	got := githubEscapeMessage(in)
+	want := "line1%0Aline2%0Dwith%2C comma%3A colon 50%25 off"
+	if got != want {
+		t.Errorf("escape mismatch:\n  got:  %q\n  want: %q", got, want)
+	}
+}
+
+func TestGithubEscapeTitle_CollapsesNewlines(t *testing.T) {
+	got := githubEscapeTitle("line1\nline2\r\nline3")
+	// Newlines should be spaces (not %0A) so the title stays single-line.
+	if strings.Contains(got, "%0A") || strings.Contains(got, "%0D") {
+		t.Errorf("title should not contain CR/LF escapes, got %q", got)
+	}
+	if !strings.Contains(got, "line1 line2 line3") {
+		t.Errorf("expected newlines collapsed to spaces, got %q", got)
+	}
+}
+
+func TestFormatGithubAnnotation_Levels(t *testing.T) {
+	cases := []struct {
+		viewLevel string
+		ghPrefix  string
+	}{
+		{levelError, "::error "},
+		{levelWarning, "::warning "},
+		{levelNote, "::notice "},
+		{levelInfo, "::notice "},
+	}
+	for _, c := range cases {
+		got := formatGithubAnnotation("package/npm/lodash", "package/npm/lodash",
+			auditFinding{Level: c.viewLevel, RuleID: "R", Title: "t", Message: "m"}, "")
+		if !strings.HasPrefix(got, c.ghPrefix) {
+			t.Errorf("level %q: expected prefix %q, got %q", c.viewLevel, c.ghPrefix, got)
+		}
+	}
+}
+
+func TestFormatGithubAnnotation_FileAndLine(t *testing.T) {
+	got := formatGithubAnnotation(
+		"package/npm/lodash", "package/npm/lodash",
+		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg", File: "package.json", Line: 42},
+		"",
+	)
+	if !strings.Contains(got, "file=package.json") {
+		t.Errorf("expected file= segment: %s", got)
+	}
+	if !strings.Contains(got, "line=42") {
+		t.Errorf("expected line= segment: %s", got)
+	}
+	if !strings.Contains(got, "title=[package/npm/lodash] Stale") {
+		t.Errorf("expected bracketed title with package key: %s", got)
+	}
+}
+
+func TestFormatGithubAnnotation_NoFileOmitsBothSegments(t *testing.T) {
+	got := formatGithubAnnotation(
+		"package/npm/lodash", "package/npm/lodash",
+		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg"},
+		"",
+	)
+	if strings.Contains(got, "file=") {
+		t.Errorf("expected no file= segment when File empty: %s", got)
+	}
+	if strings.Contains(got, "line=") {
+		t.Errorf("expected no line= segment when File empty: %s", got)
+	}
+}
+
+func TestFormatGithubAnnotation_FileOnlyNoLine(t *testing.T) {
+	got := formatGithubAnnotation(
+		"package/npm/lodash", "package/npm/lodash",
+		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg", File: "Gemfile"},
+		"",
+	)
+	if !strings.Contains(got, "file=Gemfile") {
+		t.Errorf("expected file= segment: %s", got)
+	}
+	if strings.Contains(got, "line=") {
+		t.Errorf("expected no line= segment when Line is zero: %s", got)
+	}
+}
+
+func TestFormatGithubAnnotation_LocalSourceDropsBracketedPrefix(t *testing.T) {
+	got := formatGithubAnnotation(
+		"local-source", "pypi/test",
+		auditFinding{Level: levelError, RuleID: "R", Title: "Bad", Message: "msg"},
+		"",
+	)
+	if strings.Contains(got, "[local-source]") {
+		t.Errorf("local-source runID should not produce a bracketed prefix: %s", got)
+	}
+	if !strings.Contains(got, "title=Bad") {
+		t.Errorf("expected plain title: %s", got)
+	}
+}
+
+func TestFormatGithubAnnotation_TitleFallsBackToPkgKeyWhenNoRunID(t *testing.T) {
+	got := formatGithubAnnotation(
+		"", "package/npm/lodash",
+		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg"},
+		"",
+	)
+	if !strings.Contains(got, "title=[package/npm/lodash] Stale") {
+		t.Errorf("expected package key fallback in title: %s", got)
+	}
+}
+
+func TestFormatGithubAnnotation_MessageEscaped(t *testing.T) {
+	got := formatGithubAnnotation(
+		"local-source", "local-source",
+		auditFinding{Level: levelError, RuleID: "R", Title: "T", Message: "line1\nline2, with: colons"},
+		"",
+	)
+	if !strings.Contains(got, "line1%0Aline2%2C with%3A colons") {
+		t.Errorf("expected encoded message body: %s", got)
+	}
+}
+
+func TestRelativizePath(t *testing.T) {
+	cases := []struct {
+		name, file, root, want string
+	}{
+		{"empty", "", "/repo", ""},
+		{"already relative", "package.json", "/repo", "package.json"},
+		{"abs under root", "/repo/src/package.json", "/repo", "src/package.json"},
+		{"abs outside root", "/elsewhere/package.json", "/repo", ""},
+		{"abs without root", "/repo/foo", "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := relativizePath(c.file, c.root); got != c.want {
+				t.Errorf("relativizePath(%q,%q): got %q want %q", c.file, c.root, got, c.want)
+			}
+		})
+	}
+}
+
+func TestRenderGitHub_EndToEnd(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/npm/lodash", RuleID: "R1", Level: "error", Message: "boom", ShortDescription: "Boom title"},
+		{Package: "package/npm/express", RuleID: "R2", Level: "warning", Message: "warn", ShortDescription: "Warn title"},
+	})
+
+	var out, errBuf bytes.Buffer
+	if err := renderGitHub(&out, &errBuf, report, "all", nil, ""); err != nil {
+		t.Fatalf("renderGitHub: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 annotation lines, got %d:\n%s", len(lines), out.String())
+	}
+	// sorted by package key; express comes before lodash
+	if !strings.HasPrefix(lines[0], "::warning ") || !strings.Contains(lines[0], "package/npm/express") {
+		t.Errorf("line 0 unexpected: %s", lines[0])
+	}
+	if !strings.HasPrefix(lines[1], "::error ") || !strings.Contains(lines[1], "package/npm/lodash") {
+		t.Errorf("line 1 unexpected: %s", lines[1])
+	}
+}
+
+func TestRenderGitHub_LevelFilter(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "p1", RuleID: "R1", Level: "error", Message: "e"},
+		{Package: "p2", RuleID: "R2", Level: "warning", Message: "w"},
+		{Package: "p3", RuleID: "R3", Level: "note", Message: "n"},
+	})
+	var out, errBuf bytes.Buffer
+	if err := renderGitHub(&out, &errBuf, report, "error", nil, ""); err != nil {
+		t.Fatalf("renderGitHub: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], "::error ") {
+		t.Errorf("expected single ::error line, got: %v", lines)
+	}
+}

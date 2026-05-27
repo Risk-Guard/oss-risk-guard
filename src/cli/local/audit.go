@@ -13,6 +13,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -78,9 +79,18 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("reading SBOM: %w", err)
 	}
 
-	keys, err := sbom.ReadDirectDeps(raw)
+	deps, err := sbom.ReadDirectDepsWithLocations(raw)
 	if err != nil {
 		return fmt.Errorf("parsing SBOM: %w", err)
+	}
+
+	keys := make([]string, len(deps))
+	locationByKey := make(map[string]*models.LocationInfo, len(deps))
+	for i, d := range deps {
+		keys[i] = d.Key
+		if d.Location != nil {
+			locationByKey[d.Key] = d.Location
+		}
 	}
 
 	if auditList {
@@ -130,7 +140,7 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		zap.Int("count", len(keys)),
 		zap.Int("jobs", auditJobs))
 
-	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg)
+	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg, locationByKey)
 	if err != nil {
 		return err
 	}
@@ -173,7 +183,13 @@ type auditTotals struct {
 // Run per key, ordered by key for deterministic output. A failure scoring one
 // package becomes a synthetic error Run; it does not abort siblings.
 // Prints a per-package progress line to stderr as each package finishes.
-func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMetadata []dag_builder.CheckInfo, jobs int, cc cacheConfig) ([]*sarif.Run, auditTotals, error) {
+//
+// locationByKey is consulted to stamp result.locations[].physicalLocation onto
+// every Run.Results entry whose key is present. This happens AFTER scoring
+// (and after any cache lookup) so the audit cache stays consumer-location
+// agnostic: identical analysis is reused across consumers that declared the
+// dep at different manifest lines.
+func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMetadata []dag_builder.CheckInfo, jobs int, cc cacheConfig, locationByKey map[string]*models.LocationInfo) ([]*sarif.Run, auditTotals, error) {
 	type indexedRun struct {
 		key string
 		run *sarif.Run
@@ -220,9 +236,33 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 		if r.run.AutomationDetails == nil {
 			r.run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID(r.key))
 		}
+		if loc, ok := locationByKey[r.key]; ok && loc != nil {
+			injectPhysicalLocation(r.run, loc)
+		}
 		runs = append(runs, r.run)
 	}
 	return runs, totals, nil
+}
+
+// injectPhysicalLocation walks every result in run and sets the first location's
+// physicalLocation to point at loc.File (and loc.LineNumber when present).
+// Overwrites any existing physicalLocation so re-runs with a moved manifest
+// line reflect the new position.
+func injectPhysicalLocation(run *sarif.Run, loc *models.LocationInfo) {
+	if run == nil || loc == nil || loc.File == nil {
+		return
+	}
+	for _, res := range run.Results {
+		if len(res.Locations) == 0 {
+			res.Locations = []*sarif.Location{sarif.NewLocation()}
+		}
+		phys := sarif.NewPhysicalLocation().
+			WithArtifactLocation(sarif.NewSimpleArtifactLocation(*loc.File))
+		if loc.LineNumber != nil {
+			phys = phys.WithRegion(sarif.NewSimpleRegion(*loc.LineNumber, *loc.LineNumber))
+		}
+		res.Locations[0].WithPhysicalLocation(phys)
+	}
 }
 
 // summarizeRun counts findings by SARIF level in a Run and detects audit-time
