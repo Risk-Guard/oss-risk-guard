@@ -9,7 +9,9 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	"github.com/fatih/color"
 	"github.com/owenrumney/go-sarif/v2/sarif"
@@ -119,7 +121,7 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 		return nil, fmt.Errorf("--jobs must be >= 1")
 	}
 
-	ctx, overridesHash, err := setupAuditContext(cmd)
+	ctx, overridesHash, err := setupAuditContext(cmd, repoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -127,12 +129,16 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "Scoring local source: %s\n", repoPath)
-	localRun, err := scoreLocalSourceRun(ctx, repoPath, overridesHash)
+	localViolations, sourceInput, err := scoreLocalSource(ctx, repoPath, overridesHash)
 	if err != nil {
 		return nil, fmt.Errorf("scoring local source: %w", err)
 	}
 
-	var auditRuns []*sarif.Run
+	var (
+		depViolations []*violations.AnalysisViolations
+		failures      []packageError
+		locByKey      map[string]*models.LocationInfo
+	)
 	bold(os.Stderr, "Building SBOM (%s)…\n", runAllSBOMFormat)
 	sbomBytes, sbomErr := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
 	if sbomErr != nil {
@@ -143,17 +149,19 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 		if derr != nil {
 			fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("parsing SBOM failed: %v", derr))
 		} else {
-			keys, locByKey := keysAndLocations(deps)
-			runs, aerr := runPackageAudits(ctx, keys, locByKey, overridesHash)
+			var keys []string
+			keys, locByKey = keysAndLocations(deps)
+			audited, fails, aerr := runPackageAudits(ctx, keys, overridesHash)
 			if aerr != nil {
 				logger.Warn("audit failed; continuing with partial report", zap.Error(aerr))
 				fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("audit failed: %v", aerr))
 			}
-			auditRuns = runs
+			depViolations = audited
+			failures = fails
 		}
 	}
 
-	return assembleReport(localRun, auditRuns)
+	return assembleReport(ctx, sourceInput.AnalysisIdentifier, localViolations, depViolations, failures, locByKey)
 }
 
 func minimalPolicy() *policy.Policy {

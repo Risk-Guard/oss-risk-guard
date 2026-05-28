@@ -17,6 +17,28 @@ import (
 // "Error: …" — the GitHub annotations already explained what failed.
 var errBlockingFindings = errors.New("blocking findings detected")
 
+// loadRepoPolicy reads and compiles .risk-guard.yml from the validated repo
+// root. Returns (nil, nil, nil) when the file does not exist — callers should
+// treat that as "use defaults" rather than an error. The raw bytes are returned
+// alongside the LoadResult because policy_loader's Output carries both.
+func loadRepoPolicy(repoPath string) (*policy.LoadResult, []byte, error) {
+	if repoPath == "" {
+		return nil, nil, nil
+	}
+	raw, err := os.ReadFile(filepath.Join(repoPath, policy.PolicyFileName)) //nolint:gosec // repoPath is the validated git repo
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, nil
+		}
+		return nil, nil, fmt.Errorf("reading %s: %w", policy.PolicyFileName, err)
+	}
+	res, err := policy.LoadFullFromBytes(raw, policy.PolicyFileName)
+	if err != nil {
+		return nil, nil, err
+	}
+	return res, raw, nil
+}
+
 // resolveWorkflowMode picks the effective mode using the precedence:
 // CLI --mode flag > .risk-guard.yml workflow.mode > default "active".
 // repoPath is the validated git repo root used for the second tier; an
@@ -30,21 +52,11 @@ func resolveWorkflowMode(modeOverride, repoPath string) (policy.WorkflowMode, er
 		}
 		return m, nil
 	}
-	if repoPath == "" {
-		return policy.WorkflowModeActive, nil
-	}
-	raw, err := os.ReadFile(filepath.Join(repoPath, policy.PolicyFileName)) //nolint:gosec // repoPath is the validated git repo
-	if err != nil {
-		if os.IsNotExist(err) {
-			return policy.WorkflowModeActive, nil
-		}
-		return "", fmt.Errorf("reading %s: %w", policy.PolicyFileName, err)
-	}
-	res, err := policy.LoadFullFromBytes(raw, policy.PolicyFileName)
+	res, _, err := loadRepoPolicy(repoPath)
 	if err != nil {
 		return "", err
 	}
-	if res.Policy == nil || res.Policy.Workflow == nil || res.Policy.Workflow.Mode == "" {
+	if res == nil || res.Policy == nil || res.Policy.Workflow == nil || res.Policy.Workflow.Mode == "" {
 		return policy.WorkflowModeActive, nil
 	}
 	m := res.Policy.Workflow.Mode

@@ -12,6 +12,8 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -28,9 +30,12 @@ import (
 
 // setupAuditContext factors out the cache + storage backend init and
 // overrides-load sequence that runAll, runAudit, and runScoreLocal all
-// repeat. Returns the augmented ctx (also written back to cmd via
-// cmd.SetContext) and the overrides hash for use by package Inputs.
-func setupAuditContext(cmd *cobra.Command) (context.Context, string, error) {
+// repeat. When repoPath is non-empty its .risk-guard.yml is also loaded and
+// stashed in context via policy.SetRootPolicy, so every DAG in the run
+// (local-source and per-package audits) sees the same user-supplied policy.
+// Returns the augmented ctx (also written back to cmd via cmd.SetContext)
+// and the overrides hash for use by package Inputs.
+func setupAuditContext(cmd *cobra.Command, repoPath string) (context.Context, string, error) {
 	ctx := cmd.Context()
 	ctx, err := cache.InitializeCacheBackend(ctx)
 	if err != nil {
@@ -43,6 +48,15 @@ func setupAuditContext(cmd *cobra.Command) (context.Context, string, error) {
 	ctx, overridesHash, err := loadAndSetupOverrides(ctx, overridesFile)
 	if err != nil {
 		return nil, "", err
+	}
+	if repoPath != "" {
+		res, raw, err := loadRepoPolicy(repoPath)
+		if err != nil {
+			return nil, "", err
+		}
+		if res != nil && res.Policy != nil {
+			ctx = policy.SetRootPolicy(ctx, res.Policy, string(raw), res.Overrides)
+		}
 	}
 	cmd.SetContext(ctx)
 	return ctx, overridesHash, nil
@@ -63,22 +77,20 @@ func keysAndLocations(deps []sbom.DirectDep) ([]string, map[string]*models.Locat
 	return keys, byKey
 }
 
-// runPackageAudits owns the per-batch audit progress UI: cache config probe,
-// "Auditing N direct dependencies (jobs=K)…" header, cache header line,
-// scoreAll call, totals line, "M packages failed to score" line, cache hit
-// summary. Returns the Run slice; an empty keys slice returns nil cleanly
-// after printing a short "no direct dependencies to audit" notice.
-func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*models.LocationInfo, overridesHash string) ([]*sarif.Run, error) {
+// runPackageAudits owns the per-batch audit progress UI and scoring loop.
+// Returns the raw per-package violations and any per-package failures. The
+// rulebook is NOT applied here — that happens once at merge time.
+func runPackageAudits(ctx context.Context, keys []string, overridesHash string) ([]*violations.AnalysisViolations, []packageError, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("no direct dependencies to audit"))
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	logger := ctxutil.GetLogger(ctx)
 	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.PackageBuilder)
-	cacheCfg, err := buildCacheConfig(ctx, checkMetadata)
+	cacheCfg, err := buildCacheConfig(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("building audit cache config: %w", err)
+		return nil, nil, fmt.Errorf("building audit cache config: %w", err)
 	}
 
 	bold := color.New(color.Bold).FprintfFunc()
@@ -93,39 +105,140 @@ func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*m
 		zap.Int("count", len(keys)),
 		zap.Int("jobs", auditJobs))
 
-	runs, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg, locByKey)
+	analyses, failures, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fmt.Fprintf(os.Stderr, "  %s  %s\n",
+		color.YellowString("%d violations across %d packages", totals.violations, totals.scored),
+		color.HiBlackString("(graded at merge)"))
+	if totals.failed > 0 {
+		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%d packages failed to score", totals.failed))
+	}
+	if cacheCfg.enabled {
+		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("%d/%d packages served from cache", totals.cached, len(keys)))
+	}
+	return analyses, failures, nil
+}
+
+// assembleReport runs the merge step: applies the resolved root policy
+// against the union of local + per-package violations, converts to SARIF,
+// stamps physical locations from the SBOM, and appends synthetic Runs for
+// any per-package failures so they still drive exit code.
+func assembleReport(ctx context.Context, sourceID string, local *violations.AnalysisViolations, deps []*violations.AnalysisViolations, failures []packageError, locByKey map[string]*models.LocationInfo) (*sarif.Report, error) {
+	po := policyOverride
+	if po == "" {
+		po = policyFile
+	}
+	result, err := gradeViolations(ctx, sourceID, local, deps, po, policyDefault)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s\n",
-		color.RedString("%d errors", totals.errors),
-		color.YellowString("%d warnings", totals.warnings),
-		color.CyanString("%d notes", totals.notes),
-		color.HiBlackString("%d info", totals.info))
-	if totals.audit > 0 {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%d packages failed to score", totals.audit))
-	}
-	if cacheCfg.enabled {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("%d/%d packages served from cache", totals.cached, len(runs)))
-	}
-	return runs, nil
-}
-
-// assembleReport builds a SARIF 2.1.0 Report with localRun (optional, may be
-// nil) followed by auditRuns in order. No I/O.
-func assembleReport(localRun *sarif.Run, auditRuns []*sarif.Run) (*sarif.Report, error) {
-	report, err := sarif.New(sarif.Version210, true)
+	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.Builder)
+	report, err := commonsarif.FromEvaluationResult(result, checkMetadata)
 	if err != nil {
-		return nil, fmt.Errorf("creating SARIF report: %w", err)
+		return nil, fmt.Errorf("sarif conversion: %w", err)
 	}
-	if localRun != nil {
-		report.AddRun(localRun)
+	if len(report.Runs) == 0 {
+		return nil, fmt.Errorf("sarif conversion produced no runs")
 	}
-	for _, r := range auditRuns {
-		report.AddRun(r)
+	gradedRun := report.Runs[0]
+	if gradedRun.AutomationDetails == nil {
+		gradedRun.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID("risk-guard"))
+	}
+	applyPhysicalLocations(gradedRun, locByKey)
+
+	for _, f := range failures {
+		report.AddRun(failureRun(f))
 	}
 	return report, nil
+}
+
+// applyPhysicalLocations stamps every result whose package matches a key in
+// locByKey with the manifest-file/line where the dep was declared. Results
+// for the local source (logical location kind "package" but name empty or
+// missing) are left untouched.
+func applyPhysicalLocations(run *sarif.Run, locByKey map[string]*models.LocationInfo) {
+	if run == nil || len(locByKey) == 0 {
+		return
+	}
+	for _, res := range run.Results {
+		key := packageKeyFromResult(res)
+		if key == "" {
+			continue
+		}
+		loc, ok := locByKey[key]
+		if !ok || loc == nil || loc.File == nil {
+			continue
+		}
+		if len(res.Locations) == 0 {
+			res.Locations = []*sarif.Location{sarif.NewLocation()}
+		}
+		phys := sarif.NewPhysicalLocation().
+			WithArtifactLocation(sarif.NewSimpleArtifactLocation(*loc.File))
+		if loc.LineNumber != nil {
+			phys = phys.WithRegion(sarif.NewSimpleRegion(*loc.LineNumber, *loc.LineNumber))
+		}
+		res.Locations[0].WithPhysicalLocation(phys)
+	}
+}
+
+func packageKeyFromResult(res *sarif.Result) string {
+	for _, loc := range res.Locations {
+		if loc == nil {
+			continue
+		}
+		for _, ll := range loc.LogicalLocations {
+			if ll == nil || ll.Name == nil {
+				continue
+			}
+			return *ll.Name
+		}
+	}
+	return ""
+}
+
+// failureRun synthesizes a SARIF Run for a single audit-time failure so the
+// user sees the package in the merged report. Always level=error so the run
+// drives exit code under workflow.mode=active.
+func failureRun(f packageError) *sarif.Run {
+	run := sarif.NewRunWithInformationURI("risk-guard", commonsarif.InformationURI)
+	run.AddRule("AUDIT_ERROR").
+		WithShortDescription(sarif.NewMultiformatMessageString("Failed to score package during audit"))
+
+	res := run.CreateResultForRule("AUDIT_ERROR").
+		WithLevel("error").
+		WithMessage(sarif.NewTextMessage(fmt.Sprintf("failed to score %s: %v", f.Key, f.Err)))
+
+	name := f.Name
+	kind := "package"
+	res.WithLocations([]*sarif.Location{
+		sarif.NewLocation().WithLogicalLocations([]*sarif.LogicalLocation{{
+			Name: &name,
+			Kind: &kind,
+		}}),
+	})
+	return run
+}
+
+// softFailLocalOnly handles the runAll continue-on-error branches that occur
+// after the local-source scan succeeded but before audit could proceed. When
+// runAllContinueOnError is false, returns a wrapped fatal error; otherwise
+// logs the failure, prints a yellow stderr line, and emits a local-only
+// graded report.
+func softFailLocalOnly(ctx context.Context, outPath, sourceID string, local *violations.AnalysisViolations, step string, cause error, logger *zap.Logger) error {
+	if !runAllContinueOnError {
+		return fmt.Errorf("%s: %w", step, cause)
+	}
+	logger.Warn(step+" failed; continuing with local-only report", zap.Error(cause))
+	fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("%s failed: %v", step, cause))
+	report, err := assembleReport(ctx, sourceID, local, nil, nil, nil)
+	if err != nil {
+		return err
+	}
+	return writeReport(report, outPath)
 }
 
 // writeReport persists report to outPath (mkdir-p of parent dir) and prints
@@ -140,23 +253,6 @@ func writeReport(report *sarif.Report, outPath string) error {
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "\nWrote %d runs to %s\n", len(report.Runs), outPath)
 	return nil
-}
-
-// softFailLocalOnly handles the runAll continue-on-error branches that occur
-// after the local-source Run has been built but before audit can proceed.
-// When runAllContinueOnError is false, returns a wrapped fatal error; otherwise
-// logs the failure, prints a yellow stderr line, and emits a local-only report.
-func softFailLocalOnly(outPath string, localRun *sarif.Run, step string, cause error, logger *zap.Logger) error {
-	if !runAllContinueOnError {
-		return fmt.Errorf("%s: %w", step, cause)
-	}
-	logger.Warn(step+" failed; continuing with local-only report", zap.Error(cause))
-	fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("%s failed: %v", step, cause))
-	report, err := assembleReport(localRun, nil)
-	if err != nil {
-		return err
-	}
-	return writeReport(report, outPath)
 }
 
 // persistSBOM writes a generated SBOM payload to disk when --sbom-out is set.
@@ -174,38 +270,14 @@ func persistSBOM(path string, sbomBytes []byte, logger *zap.Logger) error {
 	return nil
 }
 
-// scoreLocalSourceRun runs the source DAG + policy evaluation + SARIF
-// conversion and returns the single sarif.Run for the local repo. The Run is
-// stamped with AutomationDetails.ID = "local-source" if not already set so it
-// is identifiable when merged into a report alongside per-package Runs.
-func scoreLocalSourceRun(ctx context.Context, repoPath, overridesHash string) (*sarif.Run, error) {
+// scoreLocalSource runs the source DAG and extracts the raw violations for
+// the user's repository. Grading happens later at merge time, alongside
+// every per-package audit.
+func scoreLocalSource(ctx context.Context, repoPath, overridesHash string) (*violations.AnalysisViolations, dag_impl.Input, error) {
 	input := dag_impl.NewSourceInputWithOverrides(repoPath, nil, false, overridesHash)
-
 	dagResponse, err := dagcmd.BuildAndRunDAG(ctx, input, localdag.Builder)
 	if err != nil {
-		return nil, fmt.Errorf("DAG execution: %w", err)
+		return nil, input, fmt.Errorf("DAG execution: %w", err)
 	}
-
-	po := policyOverride
-	if po == "" {
-		po = policyFile
-	}
-	result, err := evaluate(ctx, input, dagResponse.Checks, po, policyDefault)
-	if err != nil {
-		return nil, fmt.Errorf("evaluation: %w", err)
-	}
-
-	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.Builder)
-	report, err := commonsarif.FromEvaluationResult(result, checkMetadata)
-	if err != nil {
-		return nil, fmt.Errorf("sarif conversion: %w", err)
-	}
-	if len(report.Runs) == 0 {
-		return nil, fmt.Errorf("sarif conversion produced no runs")
-	}
-	run := report.Runs[0]
-	if run.AutomationDetails == nil {
-		run.WithAutomationDetails(sarif.NewRunAutomationDetails().WithID("local-source"))
-	}
-	return run, nil
+	return extractAnalysisViolations(input, dagResponse.Checks), input, nil
 }

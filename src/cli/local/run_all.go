@@ -38,7 +38,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
 
-	ctx, overridesHash, err := setupAuditContext(cmd)
+	ctx, overridesHash, err := setupAuditContext(cmd, repoPath)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "Scoring local source: %s\n", repoPath)
-	localRun, err := scoreLocalSourceRun(ctx, repoPath, overridesHash)
+	localViolations, sourceInput, err := scoreLocalSource(ctx, repoPath, overridesHash)
 	if err != nil {
 		return fmt.Errorf("scoring local source: %w", err)
 	}
@@ -73,7 +73,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 	bold(os.Stderr, "Building SBOM (%s)…\n", runAllSBOMFormat)
 	sbomBytes, err := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
 	if err != nil {
-		return softFailLocalOnly(outPath, localRun, "building SBOM", err, logger)
+		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "building SBOM", err, logger)
 	}
 	if runAllSBOMOut != "" {
 		if err := persistSBOM(runAllSBOMOut, sbomBytes, logger); err != nil {
@@ -83,11 +83,11 @@ func runAll(cmd *cobra.Command, args []string) error {
 
 	deps, err := sbom.ReadDirectDepsWithLocations(sbomBytes)
 	if err != nil {
-		return softFailLocalOnly(outPath, localRun, "parsing SBOM direct deps", err, logger)
+		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "parsing SBOM direct deps", err, logger)
 	}
 	keys, locByKey := keysAndLocations(deps)
 
-	auditRuns, err := runPackageAudits(ctx, keys, locByKey, overridesHash)
+	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
 	if err != nil {
 		if !runAllContinueOnError {
 			return err
@@ -96,7 +96,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("audit failed: %v", err))
 	}
 
-	report, err := assembleReport(localRun, auditRuns)
+	report, err := assembleReport(ctx, sourceInput.AnalysisIdentifier, localViolations, depViolations, failures, locByKey)
 	if err != nil {
 		return err
 	}

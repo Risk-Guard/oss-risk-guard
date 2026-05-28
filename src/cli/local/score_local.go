@@ -60,7 +60,7 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid git repository: %w", err)
 	}
 
-	ctx, overridesHash, err := setupAuditContext(command)
+	ctx, overridesHash, err := setupAuditContext(command, repoPath)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,8 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		if po == "" {
 			po = policyFile
 		}
-		result, err := evaluate(ctx, input, dagResponse.Checks, po, policyDefault)
+		analysis := extractAnalysisViolations(input, dagResponse.Checks)
+		result, err := gradeViolations(ctx, input.AnalysisIdentifier, analysis, nil, po, policyDefault)
 		if err != nil {
 			return fmt.Errorf("evaluation failed: %w", err)
 		}

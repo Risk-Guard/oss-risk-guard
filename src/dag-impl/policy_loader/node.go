@@ -38,12 +38,19 @@ func (n *Node) GetDependencies() []any {
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
-	// Untrusted inputs (package audits cloned from upstream) must not be allowed
-	// to ship their own .risk-guard.yml — a hostile package could whitelist its
-	// own findings via expected_failures. Only the user's own repo (Trusted) gets
-	// to set policy from disk.
+	// Caller-supplied policy wins for every DAG in the run. This is how the
+	// user's .risk-guard.yml reaches per-package audits: the CLI loads it once,
+	// stashes it in context, and every audit DAG reads it from here.
+	if rootPol, rawYAML, overrides, ok := policy.GetRootPolicy(ctx); ok {
+		return NewOutput(executiondag.StatusSuccess, "", rootPol, rawYAML, overrides, input), nil
+	}
+
+	// No caller override and the input is untrusted (a cloned upstream
+	// dependency). Never read .risk-guard.yml off that disk — a hostile package
+	// could ship one whitelisting its own findings via expected_failures. Fall
+	// back to the embedded default.
 	if !input.Trusted {
-		log.Debug("untrusted input; using default policy", zap.String("analysis_id", input.AnalysisID))
+		log.Debug("untrusted input; using default policy")
 		return NewOutput(executiondag.StatusSuccess, "", policy.DefaultPolicy(), policy.DefaultPolicyYAML(), nil, input), nil
 	}
 

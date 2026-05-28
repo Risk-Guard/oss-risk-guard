@@ -1,15 +1,22 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
-	"github.com/owenrumney/go-sarif/v2/sarif"
+	"go.uber.org/zap"
 )
+
+func testCtx() context.Context {
+	return ctxutil.SetLogger(context.Background(), zap.NewNop())
+}
 
 func TestKeysAndLocations_PreservesOrderAndSkipsNilLocations(t *testing.T) {
 	pkgJSON := "package.json"
@@ -54,50 +61,34 @@ func TestKeysAndLocations_EmptyInput(t *testing.T) {
 	}
 }
 
-func TestAssembleReport_LocalAndAuditRuns(t *testing.T) {
-	local := sarif.NewRunWithInformationURI("risk-guard", "https://example.invalid")
-	a := sarif.NewRunWithInformationURI("risk-guard", "https://example.invalid")
-	b := sarif.NewRunWithInformationURI("risk-guard", "https://example.invalid")
-
-	report, err := assembleReport(local, []*sarif.Run{a, b})
+func TestAssembleReport_NoViolationsProducesGradedReport(t *testing.T) {
+	ctx := testCtx()
+	local := &violations.AnalysisViolations{AnalysisID: "source/test"}
+	report, err := assembleReport(ctx, "source/test", local, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("assembleReport: %v", err)
 	}
-	if len(report.Runs) != 3 {
-		t.Fatalf("expected 3 runs (local + 2 audit), got %d", len(report.Runs))
-	}
-	if report.Runs[0] != local {
-		t.Error("local run should be first")
-	}
-	if report.Runs[1] != a || report.Runs[2] != b {
-		t.Error("audit runs should follow in given order")
+	if len(report.Runs) != 1 {
+		t.Fatalf("expected 1 graded run, got %d", len(report.Runs))
 	}
 }
 
-func TestAssembleReport_NilLocalRun(t *testing.T) {
-	a := sarif.NewRunWithInformationURI("risk-guard", "https://example.invalid")
-	report, err := assembleReport(nil, []*sarif.Run{a})
+func TestAssembleReport_FailuresAppendErrorRuns(t *testing.T) {
+	ctx := testCtx()
+	report, err := assembleReport(ctx, "source/test", nil, nil, []packageError{
+		{Key: "package/npm/x", Name: "x", Err: os.ErrNotExist},
+	}, nil)
 	if err != nil {
 		t.Fatalf("assembleReport: %v", err)
 	}
-	if len(report.Runs) != 1 || report.Runs[0] != a {
-		t.Errorf("expected single audit run, got %+v", report.Runs)
-	}
-}
-
-func TestAssembleReport_EmptyEverything(t *testing.T) {
-	report, err := assembleReport(nil, nil)
-	if err != nil {
-		t.Fatalf("assembleReport: %v", err)
-	}
-	if len(report.Runs) != 0 {
-		t.Errorf("expected zero runs, got %d", len(report.Runs))
+	if len(report.Runs) != 2 {
+		t.Fatalf("expected graded run + 1 failure run, got %d", len(report.Runs))
 	}
 }
 
 func TestWriteReport_CreatesParentDirAndFile(t *testing.T) {
-	a := sarif.NewRunWithInformationURI("risk-guard", "https://example.invalid")
-	report, err := assembleReport(nil, []*sarif.Run{a})
+	ctx := testCtx()
+	report, err := assembleReport(ctx, "source/test", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("assembleReport: %v", err)
 	}

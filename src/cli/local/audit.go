@@ -72,17 +72,17 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
 
-	ctx, overridesHash, err := setupAuditContext(cmd)
+	ctx, overridesHash, err := setupAuditContext(cmd, "")
 	if err != nil {
 		return err
 	}
 
-	auditRuns, err := runPackageAudits(ctx, keys, locByKey, overridesHash)
+	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
 	if err != nil {
 		return err
 	}
 
-	report, err := assembleReport(nil, auditRuns)
+	report, err := assembleReport(ctx, "audit", nil, depViolations, failures, locByKey)
 	if err != nil {
 		return err
 	}
