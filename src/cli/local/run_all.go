@@ -99,7 +99,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolving workflow mode: %w", err)
 	}
 	if effectiveMode == policy.WorkflowModeDisabled {
-		return fmt.Errorf("workflow disabled by --mode flag")
+		return fmt.Errorf("workflow disabled by configuration")
 	}
 	if effectiveMode == policy.WorkflowModeActive && reportHasErrorLevel(report) {
 		return errBlockingFindings
