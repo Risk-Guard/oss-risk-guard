@@ -11,7 +11,30 @@ Supported ecosystems: `npm`, `pypi`, `rubygems`.
 
 ## Install
 
-Pick whichever fits your machine. All three give you a `risk-guard` binary.
+Pick whichever fits your machine. Each gives you a `risk-guard` binary.
+
+### Install script (Linux / macOS)
+
+Download the latest prebuilt binary in one command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh
+```
+
+It detects your OS/arch, downloads the matching release archive, verifies its
+checksum, and installs to `/usr/local/bin` (or `~/.local/bin` if that isn't
+writable). Customize with:
+
+```bash
+# Pin a version
+curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh -s -- v0.0.2
+
+# Install somewhere else
+curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | RISK_GUARD_INSTALL_DIR="$HOME/bin" sh
+```
+
+On an architecture without a prebuilt binary, the script points you at the
+`go install` method below.
 
 ### Prebuilt binary
 
