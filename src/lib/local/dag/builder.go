@@ -37,7 +37,7 @@ import (
 	localfetcher "github.com/Risk-Guard/oss-risk-guard/src/lib/local/artifact/fetcher"
 )
 
-// Builder is the DAG builder used by the local CLI (risk-guard-local <path>).
+// Builder is the DAG builder used by the local CLI (risk-guard <path>).
 // Its node list is independent of the server Builder — edit one without
 // touching the other. The local profile carries no upstream vulnerability
 // data sources.

@@ -1,41 +1,41 @@
 package auditcache
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/owenrumney/go-sarif/v2/sarif"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 )
 
-func newRun(t *testing.T) *sarif.Run {
+func newAnalysis(t *testing.T, id string) *violations.AnalysisViolations {
 	t.Helper()
-	return sarif.NewRunWithInformationURI("test", "https://example.invalid")
+	return &violations.AnalysisViolations{
+		AnalysisID: id,
+		Violations: []violations.Violation{{CheckCode: "TEST_CHECK", Rationale: "test"}},
+	}
 }
 
 func TestKeyDeterministic(t *testing.T) {
-	a := Key("package/npm/lodash?version=1", "ph", "bh")
-	b := Key("package/npm/lodash?version=1", "ph", "bh")
+	a := Key("package/npm/lodash?version=1")
+	b := Key("package/npm/lodash?version=1")
 	if a != b {
 		t.Errorf("Key not deterministic: %q vs %q", a, b)
 	}
 }
 
 func TestKeyDifferentiates(t *testing.T) {
-	a := Key("package/npm/lodash?version=1", "ph", "bh")
-	b := Key("package/npm/lodash?version=2", "ph", "bh")
-	c := Key("package/npm/lodash?version=1", "ph2", "bh")
-	d := Key("package/npm/lodash?version=1", "ph", "bh2")
-	if a == b || a == c || a == d {
-		t.Errorf("Key collisions: a=%s b=%s c=%s d=%s", a, b, c, d)
+	a := Key("package/npm/lodash?version=1")
+	b := Key("package/npm/lodash?version=2")
+	if a == b {
+		t.Errorf("Key collisions: a=%s b=%s", a, b)
 	}
 }
 
 func TestPutGetRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	key := Key("package/npm/lodash?version=4.17.20", "", "")
-	if err := Put(dir, key, newRun(t)); err != nil {
+	id := "package/npm/lodash?version=4.17.20"
+	key := Key(id)
+	if err := Put(dir, key, newAnalysis(t, id)); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	got, savedAt, hit, err := Get(dir, key, time.Hour)
@@ -45,8 +45,11 @@ func TestPutGetRoundTrip(t *testing.T) {
 	if !hit {
 		t.Fatalf("expected hit")
 	}
-	if got == nil {
-		t.Fatalf("expected non-nil run")
+	if got == nil || got.AnalysisID != id {
+		t.Fatalf("got %+v, want AnalysisID=%q", got, id)
+	}
+	if len(got.Violations) != 1 || got.Violations[0].CheckCode != "TEST_CHECK" {
+		t.Errorf("violations did not survive round trip: %+v", got.Violations)
 	}
 	if time.Since(savedAt) > time.Minute {
 		t.Errorf("savedAt seems off: %v", savedAt)
@@ -66,8 +69,9 @@ func TestGetMiss(t *testing.T) {
 
 func TestGetExpired(t *testing.T) {
 	dir := t.TempDir()
-	key := Key("package/npm/lodash", "", "")
-	if err := Put(dir, key, newRun(t)); err != nil {
+	id := "package/npm/lodash"
+	key := Key(id)
+	if err := Put(dir, key, newAnalysis(t, id)); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	_, _, hit, err := Get(dir, key, time.Nanosecond)
@@ -81,8 +85,9 @@ func TestGetExpired(t *testing.T) {
 
 func TestGetMaxAgeZeroDisablesTTL(t *testing.T) {
 	dir := t.TempDir()
-	key := Key("package/npm/lodash", "", "")
-	if err := Put(dir, key, newRun(t)); err != nil {
+	id := "package/npm/lodash"
+	key := Key(id)
+	if err := Put(dir, key, newAnalysis(t, id)); err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	_, _, hit, err := Get(dir, key, 0)
@@ -125,54 +130,5 @@ func TestParseMaxAge(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("ParseMaxAge(%q) = %v, want %v", tt.in, got, tt.want)
 		}
-	}
-}
-
-func TestPolicyHashStableOnEmpty(t *testing.T) {
-	a, err := PolicyHash("", "")
-	if err != nil {
-		t.Fatalf("PolicyHash empty: %v", err)
-	}
-	b, err := PolicyHash("", "")
-	if err != nil {
-		t.Fatalf("PolicyHash empty 2nd: %v", err)
-	}
-	if a != b {
-		t.Errorf("PolicyHash empty should be deterministic")
-	}
-}
-
-func TestPolicyHashSensitiveToOrder(t *testing.T) {
-	dir := t.TempDir()
-	p1 := filepath.Join(dir, "p1.yaml")
-	p2 := filepath.Join(dir, "p2.yaml")
-	if err := os.WriteFile(p1, []byte("policy: a\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p2, []byte("policy: b\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	a, err := PolicyHash(p1, p2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := PolicyHash(p2, p1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a == b {
-		t.Errorf("PolicyHash should differ when override/default swap")
-	}
-}
-
-func TestBuilderHashStable(t *testing.T) {
-	a := BuilderHash([]string{"CODE_A", "CODE_B"})
-	b := BuilderHash([]string{"CODE_A", "CODE_B"})
-	c := BuilderHash([]string{"CODE_B", "CODE_A"})
-	if a != b {
-		t.Errorf("BuilderHash not deterministic")
-	}
-	if a == c {
-		t.Errorf("BuilderHash should depend on order (order represents registration order)")
 	}
 }

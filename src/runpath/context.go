@@ -38,9 +38,12 @@ func GetCloneCacheDir(ctx context.Context) string {
 	return filepath.Join(GetCacheDir(ctx), "clones")
 }
 
-// GetAuditCacheDir is where the audit-cache stores per-package SARIF results.
+// GetAuditCacheDir is where the audit-cache stores per-package raw violations.
+// The "audit-v2" subdir is a deliberate break from the legacy "audit" subdir
+// (which held graded SARIF runs) so old entries are silently orphaned rather
+// than mis-decoded.
 func GetAuditCacheDir(ctx context.Context) string {
-	return filepath.Join(GetCacheDir(ctx), "audit")
+	return filepath.Join(GetCacheDir(ctx), "audit-v2")
 }
 
 // GetNetworkCacheDir is the root for the cache backend's filesystem storage:

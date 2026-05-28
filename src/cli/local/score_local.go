@@ -36,9 +36,9 @@ without auditing its dependencies. Outputs are written only when the relevant
 output flag is set (--sarif, --evaluation, --checks).
 
 Examples:
-  risk-guard-local scan .
-  risk-guard-local scan . --sarif out.sarif
-  risk-guard-local scan /abs/path/to/repo --evaluation eval.yaml --checks checks.yaml`,
+  risk-guard scan .
+  risk-guard scan . --sarif out.sarif
+  risk-guard scan /abs/path/to/repo --evaluation eval.yaml --checks checks.yaml`,
 	Args: cobra.ExactArgs(1),
 	RunE: runScoreLocal,
 }
@@ -60,7 +60,7 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid git repository: %w", err)
 	}
 
-	ctx, overridesHash, err := setupAuditContext(command)
+	ctx, overridesHash, err := setupAuditContext(command, repoPath)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,8 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		if po == "" {
 			po = policyFile
 		}
-		result, err := evaluate(ctx, input, dagResponse.Checks, po, policyDefault)
+		analysis := extractAnalysisViolations(input, dagResponse.Checks)
+		result, err := gradeViolations(ctx, input.AnalysisIdentifier, analysis, nil, po, policyDefault)
 		if err != nil {
 			return fmt.Errorf("evaluation failed: %w", err)
 		}

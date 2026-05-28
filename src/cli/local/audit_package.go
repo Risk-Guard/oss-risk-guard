@@ -8,6 +8,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
 
@@ -26,8 +27,8 @@ commands, e.g. "package/npm/express" or "package/npm/lodash?version=4.17.20".
 No cache backend is used; every invocation runs the DAG fresh.
 
 Examples:
-  risk-guard-local audit-package 'package/npm/express' --sarif out.sarif
-  risk-guard-local audit-package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
+  risk-guard audit-package 'package/npm/express' --sarif out.sarif
+  risk-guard audit-package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAuditPackage,
 }
@@ -81,7 +82,8 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scoring package: %w", err)
 	}
 
-	result, err := evaluate(ctx, input, resp.Checks, policyOverride, policyDefault)
+	analysis := extractAnalysisViolations(input, resp.Checks)
+	result, err := gradeViolations(ctx, input.AnalysisIdentifier, nil, []*violations.AnalysisViolations{analysis}, policyOverride, policyDefault)
 	if err != nil {
 		return fmt.Errorf("evaluation failed: %w", err)
 	}

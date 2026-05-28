@@ -48,8 +48,8 @@ bundler) get full transitives; ecosystems without one (poetry, pipenv, pdm)
 get manifest-declared direct deps only.
 
 Examples:
-  risk-guard-local sbom . --format spdx
-  risk-guard-local sbom . --format cyclonedx --output sbom.cdx.json`,
+  risk-guard sbom . --format spdx
+  risk-guard sbom . --format cyclonedx --output sbom.cdx.json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runSBOM,
 }

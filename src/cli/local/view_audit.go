@@ -30,10 +30,10 @@ annotation points at the manifest file + line (relative to --repo-root or
 $GITHUB_WORKSPACE, defaulting to the current directory).
 
 Examples:
-  risk-guard-local view-audit audit.sarif
-  risk-guard-local view-audit audit.sarif --level error
-  risk-guard-local view-audit audit.sarif --package lodash --package express
-  risk-guard-local view-audit audit.sarif --github`,
+  risk-guard view-audit audit.sarif
+  risk-guard view-audit audit.sarif --level error
+  risk-guard view-audit audit.sarif --package lodash --package express
+  risk-guard view-audit audit.sarif --github`,
 	Args: cobra.ExactArgs(1),
 	RunE: runViewAudit,
 }

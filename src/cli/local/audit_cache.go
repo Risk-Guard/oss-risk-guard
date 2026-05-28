@@ -2,29 +2,25 @@ package main
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/local/auditcache"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
-	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
-	"github.com/owenrumney/go-sarif/v2/sarif"
 	"go.uber.org/zap"
 )
 
 type cacheConfig struct {
-	enabled     bool
-	dir         string
-	maxAge      time.Duration
-	policyHash  string
-	builderHash string
+	enabled bool
+	dir     string
+	maxAge  time.Duration
 }
 
-func buildCacheConfig(ctx context.Context, checkMetadata []dag_builder.CheckInfo) (cacheConfig, error) {
+func buildCacheConfig(ctx context.Context) (cacheConfig, error) {
 	if auditNoCache {
 		return cacheConfig{enabled: false}, nil
 	}
@@ -35,57 +31,45 @@ func buildCacheConfig(ctx context.Context, checkMetadata []dag_builder.CheckInfo
 	if maxAge == 0 {
 		return cacheConfig{enabled: false}, nil
 	}
-	dir := runpath.GetAuditCacheDir(ctx)
-	policyHash, err := auditcache.PolicyHash(policyOverride, policyDefault)
-	if err != nil {
-		return cacheConfig{}, err
-	}
-	// GetAllCheckMetadata iterates a Go map, so order is non-deterministic.
-	// Sort the codes so BuilderHash is stable across runs and the cache hits.
-	codes := make([]string, 0, len(checkMetadata))
-	for _, c := range checkMetadata {
-		codes = append(codes, c.Code)
-	}
-	sort.Strings(codes)
 	return cacheConfig{
-		enabled:     true,
-		dir:         dir,
-		maxAge:      maxAge,
-		policyHash:  policyHash,
-		builderHash: auditcache.BuilderHash(codes),
+		enabled: true,
+		dir:     runpath.GetAuditCacheDir(ctx),
+		maxAge:  maxAge,
 	}, nil
 }
 
 // scoreOneCached wraps scoreOne with a filesystem cache lookup. Returns
-// (run, age) where age >= 0 indicates a cache hit (with that age). Cache miss
-// (or cache disabled) returns age = -1.
-func scoreOneCached(ctx context.Context, key, overridesHash string, checkMetadata []dag_builder.CheckInfo, cc cacheConfig) (*sarif.Run, time.Duration) {
+// (analysis, age, err) where age >= 0 indicates a cache hit. Cache miss
+// (or cache disabled) returns age = -1. err is non-nil only on a hard
+// scoring failure that should be surfaced as an audit error.
+func scoreOneCached(ctx context.Context, key, overridesHash string, cc cacheConfig) (*violations.AnalysisViolations, time.Duration, error) {
 	logger := ctxutil.GetLogger(ctx)
 
 	if !cc.enabled {
-		return scoreOne(ctx, key, overridesHash, checkMetadata), -1
+		analysis, err := scoreOne(ctx, key, overridesHash)
+		return analysis, -1, err
 	}
 
 	eco, name, version, err := parsePackageKey(key)
 	if err != nil {
-		return errorRun(name, key, err), -1
+		return nil, -1, err
 	}
 	input := dag_impl.NewPackageInputWithVersion(eco, name, version, overridesHash)
-	cacheKey := auditcache.Key(input.AnalysisIdentifier, cc.policyHash, cc.builderHash)
+	cacheKey := auditcache.Key(input.AnalysisIdentifier)
 
-	if run, savedAt, hit, getErr := auditcache.Get(cc.dir, cacheKey, cc.maxAge); getErr != nil {
+	if analysis, savedAt, hit, getErr := auditcache.Get(cc.dir, cacheKey, cc.maxAge); getErr != nil {
 		logger.Warn("audit cache read failed; will rescore", zap.String("key", key), zap.Error(getErr))
-	} else if hit {
-		return run, time.Since(savedAt)
+	} else if hit && analysis != nil {
+		return analysis, time.Since(savedAt), nil
 	}
 
-	run := scoreOneWithInput(ctx, key, name, input, checkMetadata)
-	if _, isAuditErr := summarizeRun(run); !isAuditErr {
-		if err := auditcache.Put(cc.dir, cacheKey, run); err != nil {
+	analysis, scoreErr := scoreOneWithInput(ctx, key, name, input)
+	if scoreErr == nil && analysis != nil {
+		if err := auditcache.Put(cc.dir, cacheKey, analysis); err != nil {
 			logger.Warn("audit cache write failed", zap.String("key", key), zap.Error(err))
 		}
 	}
-	return run, -1
+	return analysis, -1, scoreErr
 }
 
 // roundDuration rounds a duration to a unit that reads naturally in CLI output.

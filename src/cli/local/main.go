@@ -19,7 +19,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "risk-guard-local <path>",
+	Use:   "risk-guard <path>",
 	Short: "Run the full pipeline: source scoring + SBOM + dep audit → one SARIF",
 	Long: `Run the complete risk-guard pipeline against an on-disk git repository:
 score the local source, build an SBOM in memory, audit each direct dependency,
@@ -37,10 +37,10 @@ under a single cache root, resolved in this order:
   3. os.UserCacheDir()/risk-guard (platform default)
 
 Examples:
-  risk-guard-local .
-  risk-guard-local /abs/path/to/repo --sarif report.sarif
-  risk-guard-local . --sbom-format cyclonedx --sbom-out sbom.cdx.json
-  risk-guard-local . --continue-on-error=false`,
+  risk-guard .
+  risk-guard /abs/path/to/repo --sarif report.sarif
+  risk-guard . --sbom-format cyclonedx --sbom-out sbom.cdx.json
+  risk-guard . --continue-on-error=false`,
 	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -142,7 +142,7 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		showVersion, _ := cmd.Flags().GetBool("version")
 		if showVersion {
-			fmt.Printf("risk-guard-local version:\n")
+			fmt.Printf("risk-guard version:\n")
 			fmt.Printf("  Git Hash: %s\n", version.GetBuildGitHash())
 			fmt.Printf("  Build Time: %s\n", version.GetBuildTime())
 			return nil

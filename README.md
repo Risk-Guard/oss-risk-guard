@@ -1,60 +1,40 @@
 # Risk Guard
 
-Open source risk analysis and scoring for software dependencies. Runs a scoring DAG against a local git repository and emits SARIF results.
+Open source risk analysis and scoring for software dependencies.
 
-## Quick Start
+Risk Guard walks a local git repository, builds an SBOM, runs a graph of scoring checks against the source and its direct dependencies, and emits a single SARIF report. Use it locally to spot risky dependencies before you adopt them, or in CI to gate pull requests.
+
+Supported ecosystems: `npm`, `pypi`, `rubygems`.
+
+## Install
+
+Download a prebuilt binary from the [GitHub Releases page](https://github.com/Risk-Guard/oss-risk-guard/releases), or build from source (requires Go 1.25.1+):
 
 ```bash
-# Full pipeline: score the local source, build an SBOM, audit direct deps
-# Emits one merged SARIF (default ./risk-guard-report.sarif)
-go run src/cli/local .
-
-# Source-only scoring (no dependency audit)
-go run src/cli/local scan .
-
-# Generate an SBOM (SPDX or CycloneDX) for a local repository
-go run src/cli/local sbom .
-
-# Audit direct dependencies from an existing SBOM
-go run src/cli/local audit --sbom sbom.spdx --sarif audit.sarif
-
-# Score a single package by its analysis-identifier key
-go run src/cli/local audit-package 'package/npm/express' --sarif out.sarif
-
-# Render a human-readable summary of a SARIF report
-go run src/cli/local view-audit risk-guard-report.sarif
+git clone https://github.com/Risk-Guard/oss-risk-guard.git
+cd oss-risk-guard
+go build -o risk-guard ./src/cli/local
 ```
 
-Cache outputs (DAG results, clones, audit cache, network cache) resolve in this
-order: `--cache-dir` flag → `RISK_GUARD_CACHE_DIR` env → `os.UserCacheDir()/risk-guard`.
+## Usage
 
-## Supported Ecosystems
+Score the current repository and emit a SARIF report:
 
-- `npm` - JavaScript / Node.js
-- `pypi` - Python
-- `rubygems` - Ruby
+```bash
+risk-guard .
+```
 
-## Flags
+Run `risk-guard --help` to see all subcommands and flags.
 
-Persistent (all commands):
+## Configuration
 
-- `--cache-dir` - cache root for DAG results, clones, audit cache, network cache
-- `--log-level` - `debug`, `info`, `warn` (default), `error`
-- `--logfile` - write debug logs to a file in addition to console
-- `--secure-git` - isolate git from local config/credentials (blocks SSH keys, credential helpers)
-- `--no-color` - disable colored output (also honors `NO_COLOR`)
+Risk Guard reads two optional files from the repository root:
 
-Root pipeline (`risk-guard-local <path>`):
+- **`.risk-guard.yml`** — workflow config (scoring mode, policy, overrides).
+- **`.riskguardignore`** — gitignore-style patterns excluding paths from scanning.
 
-- `--sarif` - merged SARIF output path (default `./risk-guard-report.sarif`)
-- `--sbom-format` - `spdx` (default) or `cyclonedx`
-- `--sbom-out` - also persist the in-memory SBOM to this path
-- `--jobs` - parallel audit workers (default 4)
-- `--max-age` - audit cache max age, e.g. `48h` (default); `0` disables caching
-- `--no-cache` - force fresh audit scoring
-- `--continue-on-error` - emit a partial SARIF when SBOM/audit steps fail (default true)
-- `--overrides`, `--policy-override`, `--policy-default`
+See [docs/configuration.md](docs/configuration.md) for an annotated example.
 
 ## License
 
-MIT - see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
