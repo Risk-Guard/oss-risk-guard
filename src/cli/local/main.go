@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -179,6 +180,7 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh audit scoring; do not read or write the audit cache")
 	cmd.Flags().BoolVar(&runAllContinueOnError, "continue-on-error", true, "Continue and emit a partial SARIF when SBOM/audit steps fail")
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
+	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
 }
 
 // resolveCacheDir picks the cache root in precedence order:
@@ -205,7 +207,11 @@ func resolveCacheDir(flagValue string) (string, error) {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		// Blocking findings already explained themselves via SARIF/annotations;
+		// printing "Error: blocking findings detected" on top is noise.
+		if !errors.Is(err, errBlockingFindings) {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
 		os.Exit(1)
 	}
 }

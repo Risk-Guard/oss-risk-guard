@@ -159,9 +159,21 @@ func TestRenderAudit_HeaderOmitsZeroCounts(t *testing.T) {
 	}
 }
 
-func TestGithubEscapeMessage(t *testing.T) {
+func TestGithubEscapeData(t *testing.T) {
 	in := "line1\nline2\rwith, comma: colon 50% off"
-	got := githubEscapeMessage(in)
+	got := githubEscapeData(in)
+	// Message body: only %, CR, LF are encoded. `,` and `:` pass through —
+	// GitHub does not decode %2C/%3A there, so encoding them would render as
+	// literal `%2C`/`%3A` in the annotation card.
+	want := "line1%0Aline2%0Dwith, comma: colon 50%25 off"
+	if got != want {
+		t.Errorf("escape mismatch:\n  got:  %q\n  want: %q", got, want)
+	}
+}
+
+func TestGithubEscapeProperty(t *testing.T) {
+	in := "line1\nline2\rwith, comma: colon 50% off"
+	got := githubEscapeProperty(in)
 	want := "line1%0Aline2%0Dwith%2C comma%3A colon 50%25 off"
 	if got != want {
 		t.Errorf("escape mismatch:\n  got:  %q\n  want: %q", got, want)
@@ -274,8 +286,50 @@ func TestFormatGithubAnnotation_MessageEscaped(t *testing.T) {
 		auditFinding{Level: levelError, RuleID: "R", Title: "T", Message: "line1\nline2, with: colons"},
 		"",
 	)
-	if !strings.Contains(got, "line1%0Aline2%2C with%3A colons") {
-		t.Errorf("expected encoded message body: %s", got)
+	// Message body keeps `,` and `:` literal; only newlines are encoded.
+	if !strings.Contains(got, "line1%0Aline2, with: colons") {
+		t.Errorf("expected newline-encoded but punctuation-literal message body: %s", got)
+	}
+	if strings.Contains(got, "%2C") || strings.Contains(got, "%3A") {
+		t.Errorf("message body should not contain %%2C/%%3A: %s", got)
+	}
+}
+
+// Regression for the live PR #6 case where users saw `pypi/f-ask%3A …
+// https%3A//…  Evidence%3A` in the annotation card. Asserts: (a) message body
+// keeps colons and commas literal so GitHub renders them correctly, (b) the
+// title still has them encoded because property values are decoded by GitHub.
+func TestFormatGithubAnnotation_FAskRegression(t *testing.T) {
+	got := formatGithubAnnotation(
+		"package/pypi/f-ask", "package/pypi/f-ask",
+		auditFinding{
+			Level:   levelError,
+			RuleID:  "PACKAGE_NAME_MISMATCH",
+			Title:   "Published package has different name than source repository",
+			Message: "pypi/f-ask: Package not found among 1 packages in source code https://github.com/pallets/flask\n\nEvidence:\n- Package name: pypi/f-ask\n- Source Code: https://github.com/pallets/flask\n- Packages found in source (1 total): Flask (pyproject.toml)",
+			File:    "requirements.txt",
+			Line:    6,
+		},
+		"",
+	)
+	parts := strings.SplitN(got, "::", 3)
+	if len(parts) != 3 {
+		t.Fatalf("expected `::level props::message` framing, got: %s", got)
+	}
+	props, message := parts[1], parts[2]
+	for _, bad := range []string{"%3A", "%2C"} {
+		if strings.Contains(message, bad) {
+			t.Errorf("message body must not contain %s: %s", bad, message)
+		}
+	}
+	for _, want := range []string{"pypi/f-ask:", "https://github.com/pallets/flask", "Evidence:"} {
+		if !strings.Contains(message, want) {
+			t.Errorf("message body missing literal %q: %s", want, message)
+		}
+	}
+	// Title is a property value; `:` must be encoded so GitHub decodes it back.
+	if !strings.Contains(props, "title=[package/pypi/f-ask] Published package has different name than source repository") {
+		t.Errorf("unexpected title rendering: %s", props)
 	}
 }
 

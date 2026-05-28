@@ -7,6 +7,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
+	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -20,6 +21,7 @@ var (
 	runAllSBOMOut         string
 	runAllContinueOnError bool
 	runAllGitHub          bool
+	runAllModeOverride    string
 )
 
 // runAll is the unified pipeline: score the local source repo, build an SBOM
@@ -88,7 +90,21 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(), "all", nil, "")
+	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(), "all", nil, ""); err != nil {
+		return err
+	}
+
+	effectiveMode, err := resolveWorkflowMode(runAllModeOverride, repoPath)
+	if err != nil {
+		return fmt.Errorf("resolving workflow mode: %w", err)
+	}
+	if effectiveMode == policy.WorkflowModeDisabled {
+		return fmt.Errorf("workflow disabled by --mode flag")
+	}
+	if effectiveMode == policy.WorkflowModeActive && reportHasErrorLevel(report) {
+		return errBlockingFindings
+	}
+	return nil
 }
 
 // runAllDisplayMode maps the --github flag to a DisplayMode. Default is
