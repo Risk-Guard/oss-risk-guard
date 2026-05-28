@@ -199,23 +199,32 @@ func packageKeyFromResult(res *sarif.Result) string {
 	return ""
 }
 
+// auditErrorRuleID is the synthetic rule ID used for audit-time scoring
+// failures (see failureRun). It is an operational error, not a policy check,
+// so init triage skips it (see collectInitFindings).
+const auditErrorRuleID = "AUDIT_ERROR"
+
 // failureRun synthesizes a SARIF Run for a single audit-time failure so the
 // user sees the package in the merged report. Always level=error so the run
 // drives exit code under workflow.mode=active.
 func failureRun(f packageError) *sarif.Run {
 	run := sarif.NewRunWithInformationURI("risk-guard", commonsarif.InformationURI)
-	run.AddRule("AUDIT_ERROR").
+	run.AddRule(auditErrorRuleID).
 		WithShortDescription(sarif.NewMultiformatMessageString("Failed to score package during audit"))
 
-	res := run.CreateResultForRule("AUDIT_ERROR").
+	res := run.CreateResultForRule(auditErrorRuleID).
 		WithLevel("error").
-		WithMessage(sarif.NewTextMessage(fmt.Sprintf("failed to score %s: %v", f.Key, f.Err)))
+		WithMessage(sarif.NewTextMessage(fmt.Sprintf("failed to score %s: %v", f.Name, f.Err)))
 
-	name := f.Name
+	// Match graded results, whose logical location name is the package key
+	// (see commonsarif convert: Finding.Package == analysis identifier), so
+	// downstream key matching (physical-location stamping, init triage) lines
+	// up. The human-friendly name lives in the message above.
+	key := f.Key
 	kind := "package"
 	res.WithLocations([]*sarif.Location{
 		sarif.NewLocation().WithLogicalLocations([]*sarif.LogicalLocation{{
-			Name: &name,
+			Name: &key,
 			Kind: &kind,
 		}}),
 	})
