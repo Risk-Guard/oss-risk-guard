@@ -25,12 +25,10 @@ var errBlockingFindings = errors.New("blocking findings detected")
 func resolveWorkflowMode(modeOverride, repoPath string) (policy.WorkflowMode, error) {
 	if modeOverride != "" {
 		m := policy.WorkflowMode(modeOverride)
-		switch m {
-		case policy.WorkflowModeActive, policy.WorkflowModeSilent, policy.WorkflowModeDisabled:
-			return m, nil
-		default:
-			return "", fmt.Errorf("invalid --mode %q: want active, silent, or disabled", modeOverride)
+		if !policy.IsValidWorkflowMode(m) {
+			return "", fmt.Errorf("invalid --mode %q: want active, no-fail, silent, or disabled", modeOverride)
 		}
+		return m, nil
 	}
 	if repoPath == "" {
 		return policy.WorkflowModeActive, nil
@@ -46,10 +44,31 @@ func resolveWorkflowMode(modeOverride, repoPath string) (policy.WorkflowMode, er
 	if err != nil {
 		return "", err
 	}
-	if res.Policy != nil && res.Policy.Workflow != nil && res.Policy.Workflow.Mode != "" {
-		return res.Policy.Workflow.Mode, nil
+	if res.Policy == nil || res.Policy.Workflow == nil || res.Policy.Workflow.Mode == "" {
+		return policy.WorkflowModeActive, nil
 	}
-	return policy.WorkflowModeActive, nil
+	m := res.Policy.Workflow.Mode
+	if !policy.IsValidWorkflowMode(m) {
+		// LoadFullFromBytes accepts any string for workflow.mode; reject typos
+		// here so blocking findings still fail the build instead of silently
+		// being treated as an unknown (effectively no-fail) mode.
+		return "", fmt.Errorf("%s: invalid workflow.mode %q: want active, no-fail, silent, or disabled", policy.PolicyFileName, m)
+	}
+	return m, nil
+}
+
+// emitsAnnotations reports whether the effective mode should render GitHub
+// Actions annotations to stdout. silent and disabled suppress annotations even
+// when --github is set; active and no-fail emit them.
+func emitsAnnotations(m policy.WorkflowMode) bool {
+	return m == policy.WorkflowModeActive || m == policy.WorkflowModeNoFail
+}
+
+// failsOnBlocking reports whether the effective mode causes the CLI to exit
+// non-zero when any SARIF result has level=error. Only active fails; no-fail,
+// silent, and disabled never do.
+func failsOnBlocking(m policy.WorkflowMode) bool {
+	return m == policy.WorkflowModeActive
 }
 
 // reportHasErrorLevel returns true if any SARIF result is error-level. The

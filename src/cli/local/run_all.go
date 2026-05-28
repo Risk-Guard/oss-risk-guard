@@ -44,6 +44,20 @@ func runAll(cmd *cobra.Command, args []string) error {
 	}
 	logger := ctxutil.GetLogger(ctx)
 
+	// Resolve workflow.mode upfront so we (a) fail fast on invalid config
+	// instead of after a full scan, and (b) can plumb a CLI override into the
+	// in-DAG policy_loader via context — the documented precedence is
+	// CLI > .risk-guard.yml > default, but the loader would otherwise read the
+	// file unconditionally and decide on its own.
+	effectiveMode, err := resolveWorkflowMode(runAllModeOverride, repoPath)
+	if err != nil {
+		return fmt.Errorf("resolving workflow mode: %w", err)
+	}
+	if runAllModeOverride != "" {
+		ctx = policy.SetWorkflowModeOverride(ctx, effectiveMode)
+		cmd.SetContext(ctx)
+	}
+
 	outPath := sarifOutFile
 	if outPath == "" {
 		outPath = defaultUnifiedSARIF
@@ -90,27 +104,22 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(), "all", nil, ""); err != nil {
+	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(effectiveMode), "all", nil, ""); err != nil {
 		return err
 	}
 
-	effectiveMode, err := resolveWorkflowMode(runAllModeOverride, repoPath)
-	if err != nil {
-		return fmt.Errorf("resolving workflow mode: %w", err)
-	}
-	if effectiveMode == policy.WorkflowModeDisabled {
-		return fmt.Errorf("workflow disabled by --mode flag")
-	}
-	if effectiveMode == policy.WorkflowModeActive && reportHasErrorLevel(report) {
+	if failsOnBlocking(effectiveMode) && reportHasErrorLevel(report) {
 		return errBlockingFindings
 	}
 	return nil
 }
 
-// runAllDisplayMode maps the --github flag to a DisplayMode. Default is
-// DisplayNone: runAll's CI-friendly behavior is "write SARIF only".
-func runAllDisplayMode() DisplayMode {
-	if runAllGitHub {
+// runAllDisplayMode maps --github + effective workflow mode to a DisplayMode.
+// silent and disabled suppress annotations even when --github is set; the user
+// asked for the scan to run and SARIF to be written but explicitly opted out
+// of GH annotations.
+func runAllDisplayMode(mode policy.WorkflowMode) DisplayMode {
+	if runAllGitHub && emitsAnnotations(mode) {
 		return DisplayGitHub
 	}
 	return DisplayNone
