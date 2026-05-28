@@ -20,14 +20,14 @@ var (
 var auditCmd = &cobra.Command{
 	Use:   "audit",
 	Short: "Audit direct dependencies from an SBOM",
-	Long: `Audit reads an SBOM produced by 'risk-guard-local sbom' and scores its
+	Long: `Audit reads an SBOM produced by 'risk-guard sbom' and scores its
 direct dependencies (depth=1 from the root component), emitting a merged SARIF
 report with one Run per dependency.
 
 Examples:
-  risk-guard-local audit --sbom sbom.spdx --list
-  risk-guard-local audit --sbom sbom.spdx --sarif audit.sarif
-  risk-guard-local audit --sbom sbom.cdx.json --sarif audit.sarif --jobs 8`,
+  risk-guard audit --sbom sbom.spdx --list
+  risk-guard audit --sbom sbom.spdx --sarif audit.sarif
+  risk-guard audit --sbom sbom.cdx.json --sarif audit.sarif --jobs 8`,
 	Args: cobra.NoArgs,
 	RunE: runAudit,
 }

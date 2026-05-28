@@ -26,8 +26,8 @@ commands, e.g. "package/npm/express" or "package/npm/lodash?version=4.17.20".
 No cache backend is used; every invocation runs the DAG fresh.
 
 Examples:
-  risk-guard-local audit-package 'package/npm/express' --sarif out.sarif
-  risk-guard-local audit-package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
+  risk-guard audit-package 'package/npm/express' --sarif out.sarif
+  risk-guard audit-package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAuditPackage,
 }

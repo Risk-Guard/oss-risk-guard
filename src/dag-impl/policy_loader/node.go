@@ -38,6 +38,15 @@ func (n *Node) GetDependencies() []any {
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
+	// Untrusted inputs (package audits cloned from upstream) must not be allowed
+	// to ship their own .risk-guard.yml — a hostile package could whitelist its
+	// own findings via expected_failures. Only the user's own repo (Trusted) gets
+	// to set policy from disk.
+	if !input.Trusted {
+		log.Debug("untrusted input; using default policy", zap.String("analysis_id", input.AnalysisID))
+		return NewOutput(executiondag.StatusSuccess, "", policy.DefaultPolicy(), policy.DefaultPolicyYAML(), nil, input), nil
+	}
+
 	// Get git_clone_content output to find repo path
 	gitCloneOut := executiondag.GetOutput[*git_clone_content.Node](ctx).(*git_clone_content.Output)
 
