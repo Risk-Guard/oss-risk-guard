@@ -85,15 +85,22 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return NewOutputWithError(errMsg, input), nil
 	}
 
-	if result.Policy.Workflow != nil && result.Policy.Workflow.Mode == policy.WorkflowModeDisabled {
-		log.Debug("workflow disabled by policy",
-			zap.String("repo", repoPath))
-		return nil, fmt.Errorf("workflow disabled by policy")
-	}
-
+	// workflow.mode is enforced post-scan now: every mode runs the DAG so
+	// callers always get SARIF. The CLI (run_all) and the prod server decide
+	// downstream whether to emit annotations, post checks, or fail the build.
+	// CLI override (set by `--mode`) wins over the file's value — the
+	// documented precedence is CLI > .risk-guard.yml > default. We also splice
+	// the override into the returned policy so downstream evaluation sees it.
 	workflowMode := policy.WorkflowModeActive
 	if result.Policy.Workflow != nil && result.Policy.Workflow.Mode != "" {
 		workflowMode = result.Policy.Workflow.Mode
+	}
+	if override, ok := policy.GetWorkflowModeOverride(ctx); ok {
+		workflowMode = override
+		if result.Policy.Workflow == nil {
+			result.Policy.Workflow = &policy.WorkflowConfig{}
+		}
+		result.Policy.Workflow.Mode = override
 	}
 
 	log.Debug("policy loaded successfully",

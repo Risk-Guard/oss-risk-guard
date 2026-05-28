@@ -105,14 +105,14 @@ func formatGithubAnnotation(runID, pkgKey string, f auditFinding, root string) s
 
 	var fields []string
 	if relFile := relativizePath(f.File, root); relFile != "" {
-		fields = append(fields, "file="+relFile)
+		fields = append(fields, "file="+githubEscapeProperty(relFile))
 		if f.Line > 0 {
 			fields = append(fields, fmt.Sprintf("line=%d", f.Line))
 		}
 	}
 	fields = append(fields, "title="+title)
 
-	message := githubEscapeMessage(f.Message)
+	message := githubEscapeData(f.Message)
 	return fmt.Sprintf("::%s %s::%s", ghLevel, strings.Join(fields, ","), message)
 }
 
@@ -127,25 +127,34 @@ func githubLevel(viewLevel string) string {
 	}
 }
 
-// githubEscapeMessage encodes characters that have meaning in workflow commands.
-// Per GitHub docs: %r→%25, then CR/LF/comma/colon. %r ordering matters so we
-// don't double-encode our own escapes.
-func githubEscapeMessage(s string) string {
+// githubEscapeData encodes the message body of a workflow command. Per
+// @actions/toolkit's escapeData: only %, CR, LF need encoding — `,` and `:`
+// have no special meaning after the framing `::` and GitHub does not decode
+// %2C/%3A there. % must be replaced first so our own escapes aren't re-encoded.
+func githubEscapeData(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
 	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
+}
+
+// githubEscapeProperty encodes a key=value property value. Mirrors
+// @actions/toolkit's escapeProperty: escapeData plus `,` (param separator) and
+// `:` (terminates the property list before the message body).
+func githubEscapeProperty(s string) string {
+	s = githubEscapeData(s)
 	s = strings.ReplaceAll(s, ",", "%2C")
 	s = strings.ReplaceAll(s, ":", "%3A")
 	return s
 }
 
-// githubEscapeTitle is the message escaper minus newlines: titles must be
-// single-line, so we collapse any newlines to spaces first.
+// githubEscapeTitle collapses newlines (titles must be single-line) then
+// encodes as a property value.
 func githubEscapeTitle(s string) string {
 	s = strings.ReplaceAll(s, "\r\n", " ")
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
-	return githubEscapeMessage(s)
+	return githubEscapeProperty(s)
 }
 
 // resolveRepoRoot returns the effective root for relativizing file paths.

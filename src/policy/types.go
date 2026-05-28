@@ -29,12 +29,13 @@ type WorkflowMode string
 
 const (
 	WorkflowModeActive   WorkflowMode = "active"
+	WorkflowModeNoFail   WorkflowMode = "no-fail"
 	WorkflowModeSilent   WorkflowMode = "silent"
 	WorkflowModeDisabled WorkflowMode = "disabled"
 )
 
 type WorkflowConfig struct {
-	Mode WorkflowMode `json:"mode" jsonschema:"enum=active,enum=silent,enum=disabled,default=active,description=Workflow mode: active (default) runs scan and posts GitHub checks; silent runs scan but skips GitHub check posting; disabled skips workflow entirely on push"`
+	Mode WorkflowMode `json:"mode" jsonschema:"enum=active,enum=no-fail,enum=silent,enum=disabled,default=active,description=Workflow mode: active (default) runs the scan and fails the build on blocking findings; no-fail runs the scan and emits annotations but never fails; silent and disabled run the scan but skip annotations and never fail the build (they differ only on the prod server's check-posting and push handling)"`
 }
 
 type Policy struct {
