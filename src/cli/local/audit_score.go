@@ -11,7 +11,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
-	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
 	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
@@ -39,7 +38,7 @@ type auditTotals struct {
 // scoreAll scores keys in bounded parallel (limit=jobs). Returns one
 // AnalysisViolations per successfully scored key (ordered by key) plus a
 // separate slice of per-key failures. A failure does not abort siblings.
-func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMetadata []dag_builder.CheckInfo, jobs int, cc cacheConfig) ([]*violations.AnalysisViolations, []packageError, auditTotals, error) {
+func scoreAll(ctx context.Context, keys []string, overridesHash string, jobs int, cc cacheConfig) ([]*violations.AnalysisViolations, []packageError, auditTotals, error) {
 	type indexedResult struct {
 		key      string
 		analysis *violations.AnalysisViolations
@@ -56,7 +55,7 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 
 	for _, key := range keys {
 		g.Go(func() error {
-			analysis, cachedAge, scoreErr := scoreOneCached(gctx, key, overridesHash, checkMetadata, cc)
+			analysis, cachedAge, scoreErr := scoreOneCached(gctx, key, overridesHash, cc)
 
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
@@ -119,20 +118,20 @@ func printProgress(done, total int, key string, findingCount int, scoreErr error
 	}
 }
 
-func scoreOne(ctx context.Context, key, overridesHash string, checkMetadata []dag_builder.CheckInfo) (*violations.AnalysisViolations, error) {
+func scoreOne(ctx context.Context, key, overridesHash string) (*violations.AnalysisViolations, error) {
 	eco, name, version, err := parsePackageKey(key)
 	if err != nil {
 		return nil, err
 	}
 	input := dag_impl.NewPackageInputWithVersion(eco, name, version, overridesHash)
-	return scoreOneWithInput(ctx, key, name, input, checkMetadata)
+	return scoreOneWithInput(ctx, key, name, input)
 }
 
 // scoreOneWithInput runs the DAG and extracts the raw violations for a
 // prebuilt Input. No grading or SARIF conversion happens here — that is the
 // job of the merge step, which applies the rulebook once across every
 // dep's violations.
-func scoreOneWithInput(ctx context.Context, key, _ string, input dag_impl.Input, _ []dag_builder.CheckInfo) (*violations.AnalysisViolations, error) {
+func scoreOneWithInput(ctx context.Context, key, _ string, input dag_impl.Input) (*violations.AnalysisViolations, error) {
 	logger := ctxutil.GetLogger(ctx)
 
 	resp, err := dagcmd.BuildAndRunDAG(ctx, input, localdag.PackageBuilder)

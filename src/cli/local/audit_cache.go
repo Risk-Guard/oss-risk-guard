@@ -9,7 +9,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
-	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
 	"go.uber.org/zap"
@@ -43,11 +42,11 @@ func buildCacheConfig(ctx context.Context) (cacheConfig, error) {
 // (analysis, age, err) where age >= 0 indicates a cache hit. Cache miss
 // (or cache disabled) returns age = -1. err is non-nil only on a hard
 // scoring failure that should be surfaced as an audit error.
-func scoreOneCached(ctx context.Context, key, overridesHash string, checkMetadata []dag_builder.CheckInfo, cc cacheConfig) (*violations.AnalysisViolations, time.Duration, error) {
+func scoreOneCached(ctx context.Context, key, overridesHash string, cc cacheConfig) (*violations.AnalysisViolations, time.Duration, error) {
 	logger := ctxutil.GetLogger(ctx)
 
 	if !cc.enabled {
-		analysis, err := scoreOne(ctx, key, overridesHash, checkMetadata)
+		analysis, err := scoreOne(ctx, key, overridesHash)
 		return analysis, -1, err
 	}
 
@@ -64,7 +63,7 @@ func scoreOneCached(ctx context.Context, key, overridesHash string, checkMetadat
 		return analysis, time.Since(savedAt), nil
 	}
 
-	analysis, scoreErr := scoreOneWithInput(ctx, key, name, input, checkMetadata)
+	analysis, scoreErr := scoreOneWithInput(ctx, key, name, input)
 	if scoreErr == nil && analysis != nil {
 		if err := auditcache.Put(cc.dir, cacheKey, analysis); err != nil {
 			logger.Warn("audit cache write failed", zap.String("key", key), zap.Error(err))
