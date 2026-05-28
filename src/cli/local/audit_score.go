@@ -33,7 +33,7 @@ type packageError struct {
 
 type auditTotals struct {
 	scored, failed, cached int
-	violations             int
+	findings               int
 }
 
 // scoreAll scores keys in bounded parallel (limit=jobs). Returns one
@@ -61,20 +61,20 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
 			done++
-			vcount := 0
+			fcount := 0
 			if analysis != nil {
-				vcount = len(analysis.Violations)
+				fcount = len(analysis.Violations)
 			}
 			if scoreErr != nil {
 				totals.failed++
 			} else {
 				totals.scored++
-				totals.violations += vcount
+				totals.findings += fcount
 			}
 			if cachedAge >= 0 {
 				totals.cached++
 			}
-			printProgress(done, len(keys), key, vcount, scoreErr, cachedAge)
+			printProgress(done, len(keys), key, fcount, scoreErr, cachedAge)
 			mu.Unlock()
 			return nil
 		})
@@ -102,7 +102,7 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 	return analyses, failures, totals, nil
 }
 
-func printProgress(done, total int, key string, violationCount int, scoreErr error, cachedAge time.Duration) {
+func printProgress(done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration) {
 	prefix := color.HiBlackString("[%d/%d]", done, total)
 	var suffix string
 	if cachedAge >= 0 {
@@ -111,9 +111,9 @@ func printProgress(done, total int, key string, violationCount int, scoreErr err
 	switch {
 	case scoreErr != nil:
 		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key, color.RedString("FAILED"), suffix)
-	case violationCount > 0:
+	case findingCount > 0:
 		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key,
-			color.YellowString("%d violations", violationCount), suffix)
+			color.YellowString("%d findings", findingCount), suffix)
 	default:
 		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key, color.GreenString("ok"), suffix)
 	}

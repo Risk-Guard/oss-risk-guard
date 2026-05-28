@@ -111,8 +111,8 @@ func runPackageAudits(ctx context.Context, keys []string, overridesHash string) 
 	}
 
 	fmt.Fprintf(os.Stderr, "  %s  %s\n",
-		color.YellowString("%d violations across %d packages", totals.violations, totals.scored),
-		color.HiBlackString("(graded at merge)"))
+		color.YellowString("%d findings across %d packages", totals.findings, totals.scored),
+		color.HiBlackString("(severity applied at merge)"))
 	if totals.failed > 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%d packages failed to score", totals.failed))
 	}
@@ -239,6 +239,39 @@ func softFailLocalOnly(ctx context.Context, outPath, sourceID string, local *vio
 		return err
 	}
 	return writeReport(report, outPath)
+}
+
+// printPolicySummary prints a post-grading tally to stderr: how many SARIF
+// results landed at each level after the rulebook was applied. This is the
+// "policy violations" view, distinct from the pre-grade "findings" total
+// printed by runPackageAudits.
+func printPolicySummary(report *sarif.Report) {
+	var blocking, warning, ack, ignored int
+	for _, run := range report.Runs {
+		for _, res := range run.Results {
+			lvl := ""
+			if res.Level != nil {
+				lvl = *res.Level
+			}
+			switch lvl {
+			case "error":
+				blocking++
+			case "warning", "":
+				warning++
+			case "note":
+				ack++
+			case "none":
+				ignored++
+			}
+		}
+	}
+	bold := color.New(color.Bold).FprintfFunc()
+	bold(os.Stderr, "\nPolicy result:\n")
+	fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s\n",
+		color.RedString("%d blocking", blocking),
+		color.YellowString("%d warning", warning),
+		color.CyanString("%d acknowledged", ack),
+		color.HiBlackString("%d ignored", ignored))
 }
 
 // writeReport persists report to outPath (mkdir-p of parent dir) and prints

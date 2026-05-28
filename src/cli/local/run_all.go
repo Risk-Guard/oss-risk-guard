@@ -104,6 +104,8 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	printPolicySummary(report)
+
 	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(effectiveMode), "all", nil, ""); err != nil {
 		return err
 	}

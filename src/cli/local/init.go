@@ -88,7 +88,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "\nnon-interactive; leaving %d finding(s) at default severity\n", len(findings))
 	} else {
 		fmt.Fprintln(os.Stderr)
-		if err := renderReport(os.Stderr, os.Stderr, report, DisplayText, "all", nil, ""); err != nil {
+		if err := renderReport(os.Stderr, os.Stderr, report, DisplayText, "error", nil, ""); err != nil {
 			return fmt.Errorf("rendering findings: %w", err)
 		}
 		fmt.Fprintln(os.Stderr)

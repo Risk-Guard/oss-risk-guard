@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
@@ -23,14 +24,16 @@ type finding struct {
 func collectInitFindings(report *sarif.Report) []finding {
 	var out []finding
 	for _, run := range report.Runs {
-		entity := entityKeyForRun(run)
 		for _, res := range run.Results {
 			lvl := ""
 			if res.Level != nil {
 				lvl = *res.Level
 			}
-			// Only error/warning findings need user action; note/none are informational.
-			if lvl != "error" && lvl != "warning" {
+			// Init triage only surfaces blocking (error) findings. Warnings,
+			// notes, and info don't fail the build and just add noise to the
+			// prompt; users who want to acknowledge them can edit
+			// .risk-guard.yml by hand.
+			if lvl != "error" {
 				continue
 			}
 			code := ""
@@ -45,7 +48,7 @@ func collectInitFindings(report *sarif.Report) []finding {
 				msg = *res.Message.Text
 			}
 			out = append(out, finding{
-				EntityKey: entity,
+				EntityKey: entityKeyForResult(res),
 				CheckCode: code,
 				Level:     lvl,
 				Message:   msg,
@@ -61,18 +64,27 @@ func collectInitFindings(report *sarif.Report) []finding {
 	return out
 }
 
-// entityKeyForRun maps a SARIF Run to the policy key used in expected_failures:
-// "root" for the local-source run, otherwise the run's AutomationDetails.ID
-// (which is the package key, e.g. "package/npm/lodash").
-func entityKeyForRun(run *sarif.Run) string {
-	if run.AutomationDetails == nil || run.AutomationDetails.ID == nil {
-		return "root"
+// entityKeyForResult maps a SARIF Result's logical location back to the
+// policy key used in expected_failures: "root" for the local-source analysis
+// (whose AnalysisID has a "source/" prefix) and the package key otherwise.
+// Falls back to "root" when no logical location is attached.
+func entityKeyForResult(res *sarif.Result) string {
+	for _, loc := range res.Locations {
+		if loc == nil {
+			continue
+		}
+		for _, ll := range loc.LogicalLocations {
+			if ll == nil || ll.Name == nil {
+				continue
+			}
+			name := *ll.Name
+			if strings.HasPrefix(name, "source/") {
+				return "root"
+			}
+			return name
+		}
 	}
-	id := *run.AutomationDetails.ID
-	if id == "local-source" {
-		return "root"
-	}
-	return id
+	return "root"
 }
 
 type triageDecision int
