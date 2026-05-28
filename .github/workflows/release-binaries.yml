@@ -110,7 +110,7 @@ jobs:
           go build -v \
             -ldflags="-s -w -X github.com/Risk-Guard/oss-risk-guard/src/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X github.com/Risk-Guard/oss-risk-guard/src/version.BuildGitHash=${GITHUB_SHA} -X github.com/Risk-Guard/oss-risk-guard/src/version.Version=${VERSION}" \
             -o "dist/${BINARY_NAME}" \
-            ./src/cli/local
+            ./cmd/risk-guard
 
           # Create archive
           cd dist
