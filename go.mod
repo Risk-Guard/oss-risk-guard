@@ -11,6 +11,7 @@ require (
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/caarlos0/env/v11 v11.4.1
+	github.com/charmbracelet/huh v1.0.0
 	github.com/fatih/color v1.19.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
@@ -21,6 +22,7 @@ require (
 	github.com/thessem/zap-prettyconsole v0.6.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.20.0
+	golang.org/x/term v0.43.0
 	gopkg.in/ini.v1 v1.67.2
 	sigs.k8s.io/yaml v1.6.0
 )
