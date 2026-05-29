@@ -10,6 +10,8 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+
+	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
 var testChecks = []dag_builder.CheckInfo{
@@ -214,6 +216,75 @@ func TestFromEvaluationResult_WithPhysicalLocation(t *testing.T) {
 		loc.PhysicalLocation.Region.StartLine == nil ||
 		*loc.PhysicalLocation.Region.StartLine != 42 {
 		t.Errorf("expected region startLine 42, got %v", loc.PhysicalLocation.Region)
+	}
+}
+
+func TestNormalizeLogicalName(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"local absolute path", "source//home/runner/work/public-test/public-test", "source/public-test"},
+		{"local absolute path with commit", "source//home/runner/work/public-test/public-test?commit=abc123", "source/public-test"},
+		{"remote source unchanged", "source/github.com/owner/repo", "source/github.com/owner/repo"},
+		{"package id unchanged", "package/pypi/pytest?version=9.0.2", "package/pypi/pytest?version=9.0.2"},
+		{"plain package name unchanged", "npm:lodash", "npm:lodash"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeLogicalName(tt.in); got != tt.want {
+				t.Errorf("normalizeLogicalName(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnsurePhysicalLocations(t *testing.T) {
+	run := sarif.NewRunWithInformationURI("risk-guard", InformationURI)
+
+	// (a) result that already has a physical location — must be left untouched.
+	withPhys := run.CreateResultForRule("WITH_PHYS")
+	withPhys.WithLocations([]*sarif.Location{
+		sarif.NewLocation().WithPhysicalLocation(
+			sarif.NewPhysicalLocation().WithArtifactLocation(sarif.NewSimpleArtifactLocation("package.json")),
+		),
+	})
+
+	// (b) result with only a logical location.
+	logicalOnly := run.CreateResultForRule("LOGICAL_ONLY")
+	logicalOnly.WithLocations([]*sarif.Location{
+		sarif.NewLocation().WithLogicalLocations([]*sarif.LogicalLocation{{Name: ptr("source/repo"), Kind: ptr("package")}}),
+	})
+
+	// (c) result with no locations at all.
+	noLoc := run.CreateResultForRule("NO_LOC")
+
+	report, err := sarif.New(sarif.Version210)
+	if err != nil {
+		t.Fatalf("sarif.New: %v", err)
+	}
+	report.AddRun(run)
+
+	EnsurePhysicalLocations(report)
+
+	for _, res := range run.Results {
+		if !hasPhysicalLocation(res) {
+			t.Errorf("rule %s: expected a physical location after EnsurePhysicalLocations", *res.RuleID)
+		}
+	}
+
+	// (a) preserved its original artifact URI.
+	if uri := withPhys.Locations[0].PhysicalLocation.ArtifactLocation.URI; uri == nil || *uri != "package.json" {
+		t.Errorf("expected existing physical location to be preserved (package.json), got %v", uri)
+	}
+
+	// (b) and (c) anchored at the repo root.
+	for _, res := range []*sarif.Result{logicalOnly, noLoc} {
+		uri := res.Locations[0].PhysicalLocation.ArtifactLocation.URI
+		if uri == nil || *uri != RepoRootURI {
+			t.Errorf("rule %s: expected anchor URI %q, got %v", *res.RuleID, RepoRootURI, uri)
+		}
 	}
 }
 

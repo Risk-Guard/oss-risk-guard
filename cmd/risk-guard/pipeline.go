@@ -153,6 +153,11 @@ func assembleReport(ctx context.Context, sourceID string, local *violations.Anal
 	for _, f := range failures {
 		report.AddRun(failureRun(f))
 	}
+
+	// GitHub Code Scanning rejects any result without a physicalLocation. Source
+	// findings, aggregate package checks, and failure runs have only a logical
+	// location at this point; anchor whatever is left at the repository root.
+	commonsarif.EnsurePhysicalLocations(report)
 	return report, nil
 }
 

@@ -1,6 +1,7 @@
 package sarif
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -13,6 +14,13 @@ import (
 )
 
 const InformationURI = "https://github.com/Risk-Guard/risk-guard"
+
+// RepoRootURI is the artifact URI used to anchor results that have no
+// file-specific location (repo-wide source findings, aggregate package checks,
+// synthetic audit-error results). GitHub Code Scanning rejects any result whose
+// location lacks a physicalLocation, so every result must resolve to at least
+// this.
+const RepoRootURI = "."
 
 func FromEvaluationResult(result *policy.EvaluationResult, checks []dag_builder.CheckInfo) (*sarif.Report, error) {
 	report, err := sarif.New(sarif.Version210, true)
@@ -65,8 +73,9 @@ func addResult(run *sarif.Run, f policy.Finding) {
 
 	loc := sarif.NewLocation()
 
+	name := normalizeLogicalName(f.Package)
 	logicalLoc := &sarif.LogicalLocation{
-		Name: &f.Package,
+		Name: &name,
 		Kind: ptr("package"),
 	}
 	if len(f.DependencyPath) > 0 {
@@ -130,4 +139,70 @@ func buildDependencyPathString(path []string) string {
 
 func ptr(s string) *string {
 	return &s
+}
+
+// normalizeLogicalName cleans up the logical-location name derived from an
+// analysis identifier. A local-source scan keys its analysis on the absolute
+// filesystem path it was given, producing names like
+// "source//home/runner/work/public-test/public-test" (the "source/" prefix glued
+// onto an absolute path). Those are collapsed to "source/<repo-dir>". Remote
+// source IDs ("source/github.com/owner/repo") and package IDs
+// ("package/pypi/pytest?version=9.0.2") are returned unchanged. The "source/"
+// prefix is always preserved because downstream key mapping
+// (entityKeyForResult) relies on it.
+func normalizeLogicalName(pkg string) string {
+	rest, ok := strings.CutPrefix(pkg, "source/")
+	if !ok {
+		return pkg
+	}
+	// Drop any query suffix (e.g. "?commit=abc") before inspecting the path.
+	if idx := strings.IndexByte(rest, '?'); idx >= 0 {
+		rest = rest[:idx]
+	}
+	// Only an absolute filesystem path needs collapsing; remote URLs don't
+	// start with "/".
+	if !strings.HasPrefix(rest, "/") {
+		return pkg
+	}
+	return "source/" + filepath.Base(rest)
+}
+
+// EnsurePhysicalLocations guarantees every result in every run has a
+// physicalLocation, as required by GitHub Code Scanning. Results that already
+// carry one (on any of their locations) are left untouched; bare results are
+// anchored at the repository root (RepoRootURI) with no region. This is the
+// single invariant enforcer for the whole report, so it also covers synthetic
+// runs (e.g. audit-error failure runs) and any future result emitter.
+func EnsurePhysicalLocations(report *sarif.Report) {
+	if report == nil {
+		return
+	}
+	for _, run := range report.Runs {
+		if run == nil {
+			continue
+		}
+		for _, res := range run.Results {
+			if res == nil || hasPhysicalLocation(res) {
+				continue
+			}
+			if len(res.Locations) == 0 {
+				res.Locations = []*sarif.Location{sarif.NewLocation()}
+			} else if res.Locations[0] == nil {
+				res.Locations[0] = sarif.NewLocation()
+			}
+			res.Locations[0].WithPhysicalLocation(
+				sarif.NewPhysicalLocation().
+					WithArtifactLocation(sarif.NewSimpleArtifactLocation(RepoRootURI)),
+			)
+		}
+	}
+}
+
+func hasPhysicalLocation(res *sarif.Result) bool {
+	for _, loc := range res.Locations {
+		if loc != nil && loc.PhysicalLocation != nil {
+			return true
+		}
+	}
+	return false
 }

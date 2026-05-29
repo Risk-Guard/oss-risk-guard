@@ -143,6 +143,10 @@ func writeSARIF(ctx context.Context, result *policy.EvaluationResult, outputFile
 		return fmt.Errorf("converting to SARIF: %w", err)
 	}
 
+	// Guarantee every result has a physicalLocation (GitHub Code Scanning rejects
+	// results that carry only a logical location, e.g. source findings).
+	sarif.EnsurePhysicalLocations(report)
+
 	if err := report.WriteFile(outputFile); err != nil {
 		return fmt.Errorf("writing SARIF report: %w", err)
 	}

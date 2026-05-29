@@ -13,8 +13,8 @@ import (
 
 // runIDByPkg builds an index from the package key (as appears in
 // result.locations[*].logicalLocations[*].name) back to its Run's
-// AutomationDetails.ID. Used so renderGitHub can prefix annotation titles with
-// the analysis identifier even though findings are keyed on package name.
+// AutomationDetails.ID. Used so renderGitHub can resolve a human subject for
+// each finding even though findings are keyed on package name.
 func runIDByPkg(report *sarif.Report) map[string]string {
 	out := map[string]string{}
 	for _, run := range report.Runs {
@@ -33,15 +33,48 @@ func runIDByPkg(report *sarif.Report) map[string]string {
 	return out
 }
 
-// renderGitHub writes one GitHub Actions workflow command per finding to w.
-// Skip-warnings and other non-annotation diagnostics go to warn so they don't
-// get parsed by the GH runner as annotations. Findings whose SARIF carries
-// physicalLocation produce annotations with file=…,line=…; the rest fall back
-// to repo-level annotations (no file= segment).
+// ghFinding is a finding paired with the resolved human subject it belongs to,
+// ready to be ordered and rendered into an annotation or summary row.
+type ghFinding struct {
+	subject string
+	runID   string
+	pkg     string
+	f       auditFinding
+}
+
+// collectGHFindings flattens the per-package grouping into a single slice and
+// resolves a display subject for each finding, so callers can order globally.
+func collectGHFindings(report *sarif.Report, pkgFilter map[string]bool, levelFilter string) ([]ghFinding, []string) {
+	grouped, skipped := collectFindings(report, pkgFilter, levelFilter)
+	runIDs := runIDByPkg(report)
+	out := make([]ghFinding, 0, len(grouped))
+	for pkg, findings := range grouped {
+		for _, f := range findings {
+			out = append(out, ghFinding{
+				subject: annotationSubject(runIDs[pkg], pkg),
+				runID:   runIDs[pkg],
+				pkg:     pkg,
+				f:       f,
+			})
+		}
+	}
+	return out, skipped
+}
+
+// renderGitHub writes one GitHub Actions workflow command per finding to w,
+// ordered least-to-most severe so blocking findings land last — next to the
+// step's failure line, where they are most visible (GitHub caps annotations at
+// 10 per severity per step, and each severity has its own bucket, so emission
+// order does not cost us any error annotations). Each command's message is
+// self-contained: subject first, then the finding, then de-duplicated detail,
+// so there is no ambiguity about which finding a line of detail belongs to.
 //
-// repoRoot resolution order: explicit arg, then $GITHUB_WORKSPACE, then CWD.
-// Paths not contained in the resolved root are emitted without file= rather
-// than as broken relative paths.
+// When $GITHUB_STEP_SUMMARY is set, a full findings table is also written there
+// (uncapped), giving the complete rollup the annotation cap can't.
+//
+// Skip-warnings and other non-annotation diagnostics go to warn so they don't
+// get parsed by the GH runner as annotations. repoRoot resolution order:
+// explicit arg, then $GITHUB_WORKSPACE, then CWD.
 func renderGitHub(w io.Writer, warn io.Writer, report *sarif.Report, level string, packages []string, repoRoot string) error {
 	pkgFilter := stringSet(packages)
 	levelFilter, err := normalizeLevelFilter(level)
@@ -49,58 +82,75 @@ func renderGitHub(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 		return err
 	}
 
-	grouped, skipped := collectFindings(report, pkgFilter, levelFilter)
+	findings, skipped := collectGHFindings(report, pkgFilter, levelFilter)
 	for _, rule := range skipped {
 		// Skip-warnings are diagnostic; a stderr write failure shouldn't abort
 		// annotation emission.
 		_, _ = fmt.Fprintf(warn, "warning: skipping result with no package logical-location (rule=%s)\n", rule)
 	}
 
-	root := resolveRepoRoot(repoRoot)
-	runIDs := runIDByPkg(report)
-
-	names := make([]string, 0, len(grouped))
-	for name := range grouped {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		findings := grouped[name]
-		sort.SliceStable(findings, func(i, j int) bool {
-			if findings[i].Level != findings[j].Level {
-				return levelRank(findings[i].Level) < levelRank(findings[j].Level)
-			}
-			return findings[i].RuleID < findings[j].RuleID
-		})
-		runID := runIDs[name]
-		for _, f := range findings {
-			line := formatGithubAnnotation(runID, name, f, root)
-			if _, err := fmt.Fprintln(w, line); err != nil {
-				return err
-			}
+	// Errors last: rank 0 (error) sorts after rank 3 (info). Within a severity,
+	// keep a subject's findings together, then order by rule for determinism.
+	sort.SliceStable(findings, func(i, j int) bool {
+		if ri, rj := levelRank(findings[i].f.Level), levelRank(findings[j].f.Level); ri != rj {
+			return ri > rj
 		}
+		if findings[i].subject != findings[j].subject {
+			return findings[i].subject < findings[j].subject
+		}
+		return findings[i].f.RuleID < findings[j].f.RuleID
+	})
+
+	root := resolveRepoRoot(repoRoot)
+	for _, gf := range findings {
+		if _, err := fmt.Fprintln(w, formatGithubAnnotation(gf.runID, gf.pkg, gf.f, root)); err != nil {
+			return err
+		}
+	}
+
+	if err := writeGitHubStepSummary(report, pkgFilter, levelFilter); err != nil {
+		// A summary-write failure (e.g. the 1 MiB cap) must not fail the run;
+		// the annotations already carried the findings.
+		_, _ = fmt.Fprintf(warn, "warning: writing job summary: %v\n", err)
 	}
 	return nil
 }
 
-// formatGithubAnnotation builds a single ::level workflow command. runID is the
-// owning Run's AutomationDetails.ID and prefixes the title (omitted for the
-// local-source Run). pkgKey is the package logical-location used as fallback.
-// root is the repo root used to relativize an absolute file path; paths outside
-// the root drop the file= segment.
+// formatGithubAnnotation builds a single ::level workflow command whose message
+// is self-contained and reads top-down: "<subject> — <finding>", then any
+// non-redundant detail as indented bullets, then an optional note. The subject
+// leads the message because GitHub shows only the message body inline in the
+// log — the title= property is visible only in the run-summary banner.
+//
+// runID is the owning Run's AutomationDetails.ID; pkgKey is the package
+// logical-location. root relativizes an absolute file path; paths outside the
+// root drop the file= segment.
 func formatGithubAnnotation(runID, pkgKey string, f auditFinding, root string) string {
-	ghLevel := githubLevel(f.Level)
+	subject := annotationSubject(runID, pkgKey)
 
-	titleSubject := runID
-	if titleSubject == "" {
-		titleSubject = pkgKey
+	rationale, evidence, note := splitMessageParts(f.Message)
+	rationale = stripSubjectPrefix(rationale, pkgKey)
+	evidence = dedupeEvidence(evidence, rationale, pkgKey)
+
+	var body strings.Builder
+	if subject != "" {
+		body.WriteString(subject)
+		body.WriteString(" — ")
 	}
-	var title string
-	if titleSubject == "" || titleSubject == "local-source" {
-		title = githubEscapeTitle(f.Title)
-	} else {
-		title = githubEscapeTitle("[" + titleSubject + "] " + f.Title)
+	body.WriteString(rationale)
+	for _, e := range evidence {
+		body.WriteString("\n  • ")
+		body.WriteString(e)
+	}
+	if note != "" {
+		body.WriteString("\n  Note: ")
+		body.WriteString(note)
+	}
+
+	// Title is banner-only; tag it with the subject so the banner is scannable.
+	title := f.Title
+	if subject != "" {
+		title = f.Title + " · " + subject
 	}
 
 	var fields []string
@@ -110,10 +160,85 @@ func formatGithubAnnotation(runID, pkgKey string, f auditFinding, root string) s
 			fields = append(fields, fmt.Sprintf("line=%d", f.Line))
 		}
 	}
-	fields = append(fields, "title="+title)
+	fields = append(fields, "title="+githubEscapeTitle(title))
 
-	message := githubEscapeData(f.Message)
-	return fmt.Sprintf("::%s %s::%s", ghLevel, strings.Join(fields, ","), message)
+	return fmt.Sprintf("::%s %s::%s", githubLevel(f.Level), strings.Join(fields, ","), githubEscapeData(body.String()))
+}
+
+// annotationSubject resolves the human-readable thing a finding is about: the
+// local repository for source findings, otherwise the package (name@version).
+func annotationSubject(runID, pkgKey string) string {
+	if runID == "local-source" || strings.HasPrefix(pkgKey, "source/") {
+		return "your repository"
+	}
+	if h := humanPackageName(pkgKey); h != pkgKey {
+		return h
+	}
+	if runID != "" && runID != "local-source" {
+		return runID
+	}
+	return pkgKey
+}
+
+// splitMessageParts reverses buildMessage (src/lib/common/sarif/convert.go),
+// peeling the trailing "Note:" and "Evidence:" blocks back out of the combined
+// SARIF message so each part can be rendered distinctly.
+func splitMessageParts(msg string) (rationale string, evidence []string, note string) {
+	rest := msg
+	if i := strings.LastIndex(rest, "\n\nNote: "); i >= 0 {
+		note = strings.TrimSpace(rest[i+len("\n\nNote: "):])
+		rest = rest[:i]
+	}
+	if i := strings.LastIndex(rest, "\n\nEvidence:"); i >= 0 {
+		block := rest[i+len("\n\nEvidence:"):]
+		rest = rest[:i]
+		for ln := range strings.SplitSeq(block, "\n") {
+			ln = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(ln), "- "))
+			if ln != "" {
+				evidence = append(evidence, ln)
+			}
+		}
+	}
+	return strings.TrimSpace(rest), evidence, note
+}
+
+// stripSubjectPrefix removes a leading "eco/name:" or "eco/name@version:" from
+// a line when it matches pkgKey, since the rendered subject already carries it.
+func stripSubjectPrefix(line, pkgKey string) string {
+	eco, name, version := parseKeyIdentity(pkgKey)
+	if eco == "" || name == "" {
+		return line
+	}
+	prefixes := []string{eco + "/" + name + ": "}
+	if version != "" {
+		prefixes = append(prefixes, eco+"/"+name+"@"+version+": ")
+	}
+	for _, p := range prefixes {
+		if len(line) >= len(p) && strings.EqualFold(line[:len(p)], p) {
+			return strings.TrimSpace(line[len(p):])
+		}
+	}
+	return line
+}
+
+// dedupeEvidence drops evidence items that merely restate the headline (the
+// common case: a one-item evidence list equal to the rationale) and collapses
+// exact duplicates. Each item is subject-prefix-stripped for a clean display
+// and for fair comparison against the (already stripped) rationale.
+func dedupeEvidence(evidence []string, rationale, pkgKey string) []string {
+	norm := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
+	seen := map[string]bool{norm(rationale): true}
+	var out []string
+	for _, e := range evidence {
+		stripped := stripSubjectPrefix(e, pkgKey)
+		n := norm(stripped)
+		if n == "" || seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, stripped)
+	}
+	return out
 }
 
 func githubLevel(viewLevel string) string {

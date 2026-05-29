@@ -108,3 +108,43 @@ func TestWriteReport_CreatesParentDirAndFile(t *testing.T) {
 		t.Errorf("output file is empty")
 	}
 }
+
+// GitHub Code Scanning rejects any result without a physicalLocation. A local
+// source violation produces a logical-only result and a failure adds an
+// AUDIT_ERROR run with another logical-only result; assembleReport must anchor
+// both so the report uploads cleanly.
+func TestAssembleReport_EveryResultHasPhysicalLocation(t *testing.T) {
+	ctx := testCtx()
+	local := &violations.AnalysisViolations{
+		AnalysisID: "source//abs/path/public-test",
+		Violations: []violations.Violation{
+			{CheckCode: "SOURCE_NO_LICENSE", Rationale: "No license file found in source repository"},
+		},
+	}
+	report, err := assembleReport(ctx, "source//abs/path/public-test", local, nil, []packageError{
+		{Key: "package/npm/x", Name: "x", Err: os.ErrNotExist},
+	}, nil)
+	if err != nil {
+		t.Fatalf("assembleReport: %v", err)
+	}
+
+	results := 0
+	for _, run := range report.Runs {
+		for _, res := range run.Results {
+			results++
+			hasPhys := false
+			for _, loc := range res.Locations {
+				if loc != nil && loc.PhysicalLocation != nil {
+					hasPhys = true
+					break
+				}
+			}
+			if !hasPhys {
+				t.Errorf("rule %s: result has no physical location", *res.RuleID)
+			}
+		}
+	}
+	if results == 0 {
+		t.Fatal("expected at least one result across all runs")
+	}
+}
