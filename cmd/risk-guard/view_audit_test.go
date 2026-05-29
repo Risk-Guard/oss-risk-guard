@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -210,105 +212,126 @@ func TestFormatGithubAnnotation_Levels(t *testing.T) {
 	}
 }
 
-func TestFormatGithubAnnotation_FileAndLine(t *testing.T) {
-	got := formatGithubAnnotation(
-		"package/npm/lodash", "package/npm/lodash",
-		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg", File: "package.json", Line: 42},
-		"",
-	)
-	if !strings.Contains(got, "file=package.json") {
-		t.Errorf("expected file= segment: %s", got)
+func TestSplitMessageParts(t *testing.T) {
+	rationale, evidence, note := splitMessageParts(
+		"headline\n\nEvidence:\n- one\n- two\n\nNote: heads up")
+	if rationale != "headline" {
+		t.Errorf("rationale = %q", rationale)
 	}
-	if !strings.Contains(got, "line=42") {
-		t.Errorf("expected line= segment: %s", got)
+	if len(evidence) != 2 || evidence[0] != "one" || evidence[1] != "two" {
+		t.Errorf("evidence = %#v", evidence)
 	}
-	if !strings.Contains(got, "title=[package/npm/lodash] Stale") {
-		t.Errorf("expected bracketed title with package key: %s", got)
+	if note != "heads up" {
+		t.Errorf("note = %q", note)
+	}
+
+	// No evidence/note blocks: the whole message is the rationale.
+	r2, e2, n2 := splitMessageParts("just a headline")
+	if r2 != "just a headline" || e2 != nil || n2 != "" {
+		t.Errorf("plain message parsed wrong: %q %#v %q", r2, e2, n2)
 	}
 }
 
-func TestFormatGithubAnnotation_NoFileOmitsBothSegments(t *testing.T) {
-	got := formatGithubAnnotation(
-		"package/npm/lodash", "package/npm/lodash",
-		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg"},
-		"",
-	)
-	if strings.Contains(got, "file=") {
-		t.Errorf("expected no file= segment when File empty: %s", got)
+func TestStripSubjectPrefix(t *testing.T) {
+	cases := []struct{ name, line, pkg, want string }{
+		{"strips eco/name", "rubygems/example: no license", "package/rubygems/example", "no license"},
+		{"strips eco/name@version", "npm/lodash@4.0.0: stale", "package/npm/lodash?version=4.0.0", "stale"},
+		{"leaves unrelated prefix", "Source Code: https://x", "package/npm/lodash", "Source Code: https://x"},
+		{"non-package key untouched", "source/x: y", "source/github.com/o/r", "source/x: y"},
 	}
-	if strings.Contains(got, "line=") {
-		t.Errorf("expected no line= segment when File empty: %s", got)
-	}
-}
-
-func TestFormatGithubAnnotation_FileOnlyNoLine(t *testing.T) {
-	got := formatGithubAnnotation(
-		"package/npm/lodash", "package/npm/lodash",
-		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg", File: "Gemfile"},
-		"",
-	)
-	if !strings.Contains(got, "file=Gemfile") {
-		t.Errorf("expected file= segment: %s", got)
-	}
-	if strings.Contains(got, "line=") {
-		t.Errorf("expected no line= segment when Line is zero: %s", got)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := stripSubjectPrefix(c.line, c.pkg); got != c.want {
+				t.Errorf("stripSubjectPrefix(%q,%q) = %q, want %q", c.line, c.pkg, got, c.want)
+			}
+		})
 	}
 }
 
-func TestFormatGithubAnnotation_LocalSourceDropsBracketedPrefix(t *testing.T) {
-	got := formatGithubAnnotation(
-		"local-source", "pypi/test",
-		auditFinding{Level: levelError, RuleID: "R", Title: "Bad", Message: "msg"},
-		"",
-	)
-	if strings.Contains(got, "[local-source]") {
-		t.Errorf("local-source runID should not produce a bracketed prefix: %s", got)
+func TestDedupeEvidence(t *testing.T) {
+	cases := []struct {
+		name           string
+		ev             []string
+		rationale, pkg string
+		want           []string
+	}{
+		{
+			name:      "drops item restating the headline",
+			ev:        []string{"rubygems/example: Package does not declare a license"},
+			rationale: "Package does not declare a license",
+			pkg:       "package/rubygems/example",
+			want:      nil,
+		},
+		{
+			name:      "keeps distinct detail",
+			ev:        []string{"Source Code: https://x"},
+			rationale: "no license",
+			pkg:       "package/npm/x",
+			want:      []string{"Source Code: https://x"},
+		},
+		{
+			name:      "collapses exact duplicates",
+			ev:        []string{"same", "same"},
+			rationale: "headline",
+			pkg:       "package/npm/x",
+			want:      []string{"same"},
+		},
 	}
-	if !strings.Contains(got, "title=Bad") {
-		t.Errorf("expected plain title: %s", got)
-	}
-}
-
-func TestFormatGithubAnnotation_TitleFallsBackToPkgKeyWhenNoRunID(t *testing.T) {
-	got := formatGithubAnnotation(
-		"", "package/npm/lodash",
-		auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg"},
-		"",
-	)
-	if !strings.Contains(got, "title=[package/npm/lodash] Stale") {
-		t.Errorf("expected package key fallback in title: %s", got)
-	}
-}
-
-func TestFormatGithubAnnotation_MessageEscaped(t *testing.T) {
-	got := formatGithubAnnotation(
-		"local-source", "local-source",
-		auditFinding{Level: levelError, RuleID: "R", Title: "T", Message: "line1\nline2, with: colons"},
-		"",
-	)
-	// Message body keeps `,` and `:` literal; only newlines are encoded.
-	if !strings.Contains(got, "line1%0Aline2, with: colons") {
-		t.Errorf("expected newline-encoded but punctuation-literal message body: %s", got)
-	}
-	if strings.Contains(got, "%2C") || strings.Contains(got, "%3A") {
-		t.Errorf("message body should not contain %%2C/%%3A: %s", got)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := dedupeEvidence(c.ev, c.rationale, c.pkg); !slices.Equal(got, c.want) {
+				t.Errorf("dedupeEvidence = %#v, want %#v", got, c.want)
+			}
+		})
 	}
 }
 
-// Regression for the live PR #6 case where users saw `pypi/f-ask%3A …
-// https%3A//…  Evidence%3A` in the annotation card. Asserts: (a) message body
-// keeps colons and commas literal so GitHub renders them correctly, (b) the
-// title still has them encoded because property values are decoded by GitHub.
-func TestFormatGithubAnnotation_FAskRegression(t *testing.T) {
+func TestAnnotationSubject(t *testing.T) {
+	cases := []struct{ name, runID, pkg, want string }{
+		{"local-source runID", "local-source", "source/github.com/o/r", "your repository"},
+		{"source key prefix", "", "source/github.com/o/r", "your repository"},
+		{"package humanized", "", "package/npm/lodash?version=4.0.0", "lodash@4.0.0 (npm)"},
+		{"package no version", "", "package/rubygems/example", "example (rubygems)"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := annotationSubject(c.runID, c.pkg); got != c.want {
+				t.Errorf("annotationSubject(%q,%q) = %q, want %q", c.runID, c.pkg, got, c.want)
+			}
+		})
+	}
+}
+
+// File/line segments are emitted only when present — the behavioral contract for
+// PR-diff placement, independent of message wording.
+func TestFormatGithubAnnotation_FileSegments(t *testing.T) {
+	mk := func(file string, line int) string {
+		return formatGithubAnnotation("package/npm/lodash", "package/npm/lodash",
+			auditFinding{Level: levelWarning, RuleID: "R", Title: "Stale", Message: "msg", File: file, Line: line}, "")
+	}
+	if got := mk("package.json", 42); !strings.Contains(got, "file=package.json") || !strings.Contains(got, "line=42") {
+		t.Errorf("file+line: expected both segments: %s", got)
+	}
+	if got := mk("Gemfile", 0); !strings.Contains(got, "file=Gemfile") || strings.Contains(got, "line=") {
+		t.Errorf("file-only: expected file= without line=: %s", got)
+	}
+	if got := mk("", 0); strings.Contains(got, "file=") || strings.Contains(got, "line=") {
+		t.Errorf("no-file: expected neither segment: %s", got)
+	}
+}
+
+// Regression (live PR #6, where users saw `%3A`/`%2C` in the annotation card):
+// the message body must use escapeData so `:`/`,` stay literal and GitHub
+// renders them correctly, while the title is a property value and must encode
+// them. Asserts the escaping contract, not a wording snapshot.
+func TestFormatGithubAnnotation_BodyKeepsPunctuationLiteral(t *testing.T) {
 	got := formatGithubAnnotation(
 		"package/pypi/f-ask", "package/pypi/f-ask",
 		auditFinding{
 			Level:   levelError,
-			RuleID:  "PACKAGE_NAME_MISMATCH",
-			Title:   "Published package has different name than source repository",
-			Message: "pypi/f-ask: Package not found among 1 packages in source code https://github.com/pallets/flask\n\nEvidence:\n- Package name: pypi/f-ask\n- Source Code: https://github.com/pallets/flask\n- Packages found in source (1 total): Flask (pyproject.toml)",
-			File:    "requirements.txt",
-			Line:    6,
+			RuleID:  "R",
+			Title:   "Name: mismatch, see source",
+			Message: "found at https://github.com/pallets/flask",
 		},
 		"",
 	)
@@ -317,19 +340,15 @@ func TestFormatGithubAnnotation_FAskRegression(t *testing.T) {
 		t.Fatalf("expected `::level props::message` framing, got: %s", got)
 	}
 	props, message := parts[1], parts[2]
-	for _, bad := range []string{"%3A", "%2C"} {
-		if strings.Contains(message, bad) {
-			t.Errorf("message body must not contain %s: %s", bad, message)
-		}
+	if strings.Contains(message, "%3A") || strings.Contains(message, "%2C") {
+		t.Errorf("message body must keep `:`/`,` literal: %s", message)
 	}
-	for _, want := range []string{"pypi/f-ask:", "https://github.com/pallets/flask", "Evidence:"} {
-		if !strings.Contains(message, want) {
-			t.Errorf("message body missing literal %q: %s", want, message)
-		}
+	if !strings.Contains(message, "https://github.com/pallets/flask") {
+		t.Errorf("expected literal URL in body: %s", message)
 	}
-	// Title is a property value; `:` must be encoded so GitHub decodes it back.
-	if !strings.Contains(props, "title=[package/pypi/f-ask] Published package has different name than source repository") {
-		t.Errorf("unexpected title rendering: %s", props)
+	// The title contains a `:` and `,`, which must be encoded as a property value.
+	if !strings.Contains(props, "%3A") || !strings.Contains(props, "%2C") {
+		t.Errorf("title property must encode `:`/`,`: %s", props)
 	}
 }
 
@@ -352,30 +371,6 @@ func TestRelativizePath(t *testing.T) {
 	}
 }
 
-func TestRenderGitHub_EndToEnd(t *testing.T) {
-	report := newTestReport(t, []testFinding{
-		{Package: "package/npm/lodash", RuleID: "R1", Level: "error", Message: "boom", ShortDescription: "Boom title"},
-		{Package: "package/npm/express", RuleID: "R2", Level: "warning", Message: "warn", ShortDescription: "Warn title"},
-	})
-
-	var out, errBuf bytes.Buffer
-	if err := renderGitHub(&out, &errBuf, report, "all", nil, ""); err != nil {
-		t.Fatalf("renderGitHub: %v", err)
-	}
-
-	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("expected 2 annotation lines, got %d:\n%s", len(lines), out.String())
-	}
-	// sorted by package key; express comes before lodash
-	if !strings.HasPrefix(lines[0], "::warning ") || !strings.Contains(lines[0], "package/npm/express") {
-		t.Errorf("line 0 unexpected: %s", lines[0])
-	}
-	if !strings.HasPrefix(lines[1], "::error ") || !strings.Contains(lines[1], "package/npm/lodash") {
-		t.Errorf("line 1 unexpected: %s", lines[1])
-	}
-}
-
 func TestRenderGitHub_LevelFilter(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "p1", RuleID: "R1", Level: "error", Message: "e"},
@@ -389,5 +384,67 @@ func TestRenderGitHub_LevelFilter(t *testing.T) {
 	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
 	if len(lines) != 1 || !strings.HasPrefix(lines[0], "::error ") {
 		t.Errorf("expected single ::error line, got: %v", lines)
+	}
+}
+
+// Findings are emitted least-to-most severe so blocking findings land last.
+func TestRenderGitHub_ErrorsLast(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/npm/a", RuleID: "R1", Level: "error", Message: "boom"},
+		{Package: "package/npm/b", RuleID: "R2", Level: "warning", Message: "warn"},
+		{Package: "package/npm/c", RuleID: "R3", Level: "note", Message: "ack"},
+	})
+	var out, errBuf bytes.Buffer
+	if err := renderGitHub(&out, &errBuf, report, "all", nil, ""); err != nil {
+		t.Fatalf("renderGitHub: %v", err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %s", len(lines), out.String())
+	}
+	if !strings.HasPrefix(lines[0], "::notice ") ||
+		!strings.HasPrefix(lines[1], "::warning ") ||
+		!strings.HasPrefix(lines[2], "::error ") {
+		t.Errorf("expected notice, warning, error order; got:\n%s", out.String())
+	}
+}
+
+func TestWriteGitHubStepSummary(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/npm/lodash", RuleID: "STALE", Level: "error", Message: "lodash: stale release", ShortDescription: "Stale"},
+		{Package: "package/npm/express", RuleID: "NO_LICENSE", Level: "warning", Message: "no license"},
+	})
+	path := t.TempDir() + "/summary.md"
+	t.Setenv("GITHUB_STEP_SUMMARY", path)
+
+	if err := writeGitHubStepSummary(report, nil, "all"); err != nil {
+		t.Fatalf("writeGitHubStepSummary: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading summary: %v", err)
+	}
+	got := string(data)
+
+	// Counts reflect the findings.
+	if !strings.Contains(got, "1 blocking") || !strings.Contains(got, "1 warning") {
+		t.Errorf("expected blocking + warning counts:\n%s", got)
+	}
+	// Both subjects appear, with the error sorted before the warning
+	// (the table is errors-first, the reverse of the annotation stream).
+	li, ei := strings.Index(got, "lodash (npm)"), strings.Index(got, "express (npm)")
+	if li < 0 || ei < 0 {
+		t.Fatalf("expected both subjects in summary:\n%s", got)
+	}
+	if li > ei {
+		t.Errorf("expected error row (lodash) before warning row (express):\n%s", got)
+	}
+}
+
+func TestWriteGitHubStepSummary_NoEnvIsNoop(t *testing.T) {
+	t.Setenv("GITHUB_STEP_SUMMARY", "")
+	report := newTestReport(t, []testFinding{{Package: "package/npm/x", RuleID: "R", Level: "error", Message: "m"}})
+	if err := writeGitHubStepSummary(report, nil, "all"); err != nil {
+		t.Errorf("expected no-op without env var, got: %v", err)
 	}
 }
