@@ -43,11 +43,6 @@ func collectInitFindings(report *sarif.Report) []finding {
 			if code == "" {
 				continue
 			}
-			// Synthetic audit-failure results (failureRun) are operational
-			// errors, not policy findings — never offer them as expected_failures.
-			if code == auditErrorRuleID {
-				continue
-			}
 			msg := ""
 			if res.Message.Text != nil {
 				msg = *res.Message.Text

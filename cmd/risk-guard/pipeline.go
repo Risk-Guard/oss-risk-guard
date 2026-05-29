@@ -87,6 +87,7 @@ func runPackageAudits(ctx context.Context, keys []string, overridesHash string) 
 	}
 
 	logger := ctxutil.GetLogger(ctx)
+	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.PackageBuilder)
 	cacheCfg, err := buildCacheConfig(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building audit cache config: %w", err)
@@ -104,7 +105,7 @@ func runPackageAudits(ctx context.Context, keys []string, overridesHash string) 
 		zap.Int("count", len(keys)),
 		zap.Int("jobs", auditJobs))
 
-	analyses, failures, totals, err := scoreAll(ctx, keys, overridesHash, auditJobs, cacheCfg)
+	analyses, failures, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg)
 	if err != nil {
 		return nil, nil, err
 	}

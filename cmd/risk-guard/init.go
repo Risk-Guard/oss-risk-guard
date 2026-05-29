@@ -83,7 +83,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	pol := minimalPolicy()
 	if len(findings) == 0 {
-		bold(os.Stderr, "\nNo blocking findings to triage.\n")
+		bold(os.Stderr, "\nNo blocking or warning findings to triage.\n")
 	} else if !isInteractive() {
 		fmt.Fprintf(os.Stderr, "\nnon-interactive; leaving %d finding(s) at default severity\n", len(findings))
 	} else {
