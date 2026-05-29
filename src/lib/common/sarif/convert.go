@@ -187,6 +187,8 @@ func EnsurePhysicalLocations(report *sarif.Report) {
 			}
 			if len(res.Locations) == 0 {
 				res.Locations = []*sarif.Location{sarif.NewLocation()}
+			} else if res.Locations[0] == nil {
+				res.Locations[0] = sarif.NewLocation()
 			}
 			res.Locations[0].WithPhysicalLocation(
 				sarif.NewPhysicalLocation().

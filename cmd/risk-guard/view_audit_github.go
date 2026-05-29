@@ -185,11 +185,11 @@ func annotationSubject(runID, pkgKey string) string {
 // SARIF message so each part can be rendered distinctly.
 func splitMessageParts(msg string) (rationale string, evidence []string, note string) {
 	rest := msg
-	if i := strings.Index(rest, "\n\nNote: "); i >= 0 {
+	if i := strings.LastIndex(rest, "\n\nNote: "); i >= 0 {
 		note = strings.TrimSpace(rest[i+len("\n\nNote: "):])
 		rest = rest[:i]
 	}
-	if i := strings.Index(rest, "\n\nEvidence:"); i >= 0 {
+	if i := strings.LastIndex(rest, "\n\nEvidence:"); i >= 0 {
 		block := rest[i+len("\n\nEvidence:"):]
 		rest = rest[:i]
 		for ln := range strings.SplitSeq(block, "\n") {
