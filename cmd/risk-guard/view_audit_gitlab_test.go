@@ -174,6 +174,20 @@ func TestRenderGitLab_SkipsPathlessFindingWithWarning(t *testing.T) {
 	}
 }
 
+func TestRenderGitLab_SkipsRepoRootAnchoredFinding(t *testing.T) {
+	report := newTestReportLoc(t, []testFindingLoc{
+		{Package: "package/npm/lodash", RuleID: "HASLOC", Level: "error", Message: "m", File: "package.json", Line: 5},
+		{Package: "package/npm/express", RuleID: "ROOTANCHOR", Level: "error", Message: "m", File: "."}, // RepoRootURI
+	})
+	issues, warnOut := renderGitLabIssues(t, report, "all", nil, "")
+	if len(issues) != 1 || issues[0].CheckName != "HASLOC" {
+		t.Fatalf("expected only the located finding, got %#v", issues)
+	}
+	if !strings.Contains(warnOut, "no file location") {
+		t.Errorf("expected warning about skipped root-anchored finding, got %q", warnOut)
+	}
+}
+
 func TestRenderGitLab_DefaultsBeginToOneWhenNoLine(t *testing.T) {
 	report := newTestReportLoc(t, []testFindingLoc{
 		{Package: "package/npm/lodash", RuleID: "R", Level: "warning", Message: "m", File: "Gemfile"},

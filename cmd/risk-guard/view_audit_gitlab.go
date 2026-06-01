@@ -57,9 +57,11 @@ func renderGitLab(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 	issues := make([]codeClimateIssue, 0, len(findings))
 	for _, gf := range findings {
 		relPath := relativizePath(gf.f.File, root)
-		if relPath == "" {
+		if relPath == "" || relPath == "." {
 			// CodeClimate has no way to represent a pathless issue; drop it
-			// rather than emit an invalid report GitLab would reject.
+			// rather than emit an invalid report GitLab would reject. "." is
+			// RepoRootURI — a directory anchor for results with no physical
+			// location (see EnsurePhysicalLocations), not a real file path.
 			_, _ = fmt.Fprintf(warn, "warning: skipping finding with no file location (subject=%s rule=%s)\n", gf.subject, gf.f.RuleID)
 			continue
 		}

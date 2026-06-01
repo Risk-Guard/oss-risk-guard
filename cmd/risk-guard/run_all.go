@@ -108,7 +108,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 
 	printPolicySummary(report)
 
-	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(effectiveMode), "all", nil, ""); err != nil {
+	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(effectiveMode), "all", nil, repoPath); err != nil {
 		return err
 	}
 
@@ -116,7 +116,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 	// stdout, --gitlab writes a Code Quality report file; both may be set. Gate
 	// on emitsAnnotations to match --github semantics (silent/disabled suppress).
 	if runAllGitLab != "" && emitsAnnotations(effectiveMode) {
-		if err := writeGitLabReport(runAllGitLab, report, "all", nil, ""); err != nil {
+		if err := writeGitLabReport(runAllGitLab, report, "all", nil, repoPath); err != nil {
 			return err
 		}
 	}
@@ -135,9 +135,14 @@ func writeGitLabReport(path string, report *sarif.Report, level string, packages
 	if err != nil {
 		return fmt.Errorf("creating GitLab report %s: %w", path, err)
 	}
-	defer func() { _ = f.Close() }()
+	defer func() { _ = f.Close() }() // backstop for the error return below
 	if err := renderGitLab(f, os.Stderr, report, level, packages, repoRoot); err != nil {
 		return fmt.Errorf("writing GitLab report %s: %w", path, err)
+	}
+	// Close explicitly so a deferred-write error (e.g. ENOSPC surfaced only at
+	// close on some filesystems) is reported rather than silently dropped.
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing GitLab report %s: %w", path, err)
 	}
 	return nil
 }
