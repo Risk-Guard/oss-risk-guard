@@ -121,6 +121,26 @@ func chooseTriageMode(n int) (triageDecision, error) {
 
 func reviewEach(findings []finding, pol *policy.Policy) error {
 	picked := map[string]map[string]struct{}{}
+	if err := reviewEachInto(findings, picked); err != nil {
+		return err
+	}
+	applyExpectedFailures(pol, picked)
+	return nil
+}
+
+// addPick records a (entity, check) pair into the picked set, creating the
+// per-entity inner map on first use.
+func addPick(picked map[string]map[string]struct{}, entity, check string) {
+	if picked[entity] == nil {
+		picked[entity] = map[string]struct{}{}
+	}
+	picked[entity][check] = struct{}{}
+}
+
+// reviewEachInto prompts the user per finding and records each "ignore" pick
+// into picked. Unlike reviewEach it does not touch a policy, so callers that
+// merge (rather than overwrite) expected_failures can reuse the prompt loop.
+func reviewEachInto(findings []finding, picked map[string]map[string]struct{}) error {
 	for _, f := range findings {
 		var pick string
 		err := huh.NewSelect[string]().
@@ -136,14 +156,43 @@ func reviewEach(findings []finding, pol *policy.Policy) error {
 			return err
 		}
 		if pick == "ignore" {
-			if picked[f.EntityKey] == nil {
-				picked[f.EntityKey] = map[string]struct{}{}
-			}
-			picked[f.EntityKey][f.CheckCode] = struct{}{}
+			addPick(picked, f.EntityKey, f.CheckCode)
 		}
 	}
-	applyExpectedFailures(pol, picked)
 	return nil
+}
+
+// mergeExpectedFailures unions picked entries onto pol.ExpectedFailures:
+// existing entries are preserved and their check codes deduped + re-sorted with
+// the new ones. reason is applied only to entities that don't already carry one,
+// so hand-written reasons survive a merge.
+func mergeExpectedFailures(pol *policy.Policy, picked map[string]map[string]struct{}, reason string) {
+	if len(picked) == 0 {
+		return
+	}
+	if pol.ExpectedFailures == nil {
+		pol.ExpectedFailures = make(map[string]policy.ExpectedFailureV2, len(picked))
+	}
+	for entity, codeSet := range picked {
+		ef := pol.ExpectedFailures[entity]
+		set := map[string]struct{}{}
+		for _, c := range ef.Checks {
+			set[c] = struct{}{}
+		}
+		for c := range codeSet {
+			set[c] = struct{}{}
+		}
+		codes := make([]string, 0, len(set))
+		for c := range set {
+			codes = append(codes, c)
+		}
+		sort.Strings(codes)
+		ef.Checks = codes
+		if ef.Reason == "" {
+			ef.Reason = reason
+		}
+		pol.ExpectedFailures[entity] = ef
+	}
 }
 
 func buildExpectedFailures(findings []finding) map[string]policy.ExpectedFailureV2 {
