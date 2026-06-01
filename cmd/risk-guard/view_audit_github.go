@@ -283,11 +283,17 @@ func githubEscapeTitle(s string) string {
 }
 
 // resolveRepoRoot returns the effective root for relativizing file paths.
+// Precedence: explicit arg, then the CI checkout dir (GitHub's
+// $GITHUB_WORKSPACE, then GitLab's $CI_PROJECT_DIR), then CWD. Both renderers
+// (GitHub annotations, GitLab Code Quality) share this resolution.
 func resolveRepoRoot(explicit string) string {
 	if explicit != "" {
 		return explicit
 	}
 	if ws := os.Getenv("GITHUB_WORKSPACE"); ws != "" {
+		return ws
+	}
+	if ws := os.Getenv("CI_PROJECT_DIR"); ws != "" {
 		return ws
 	}
 	wd, err := os.Getwd()

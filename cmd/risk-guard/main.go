@@ -180,6 +180,7 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh audit scoring; do not read or write the audit cache")
 	cmd.Flags().BoolVar(&runAllContinueOnError, "continue-on-error", true, "Continue and emit a partial SARIF when SBOM/audit steps fail")
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
+	cmd.Flags().StringVar(&runAllGitLab, "gitlab", "", "After writing SARIF, write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
 }
 
