@@ -49,12 +49,10 @@ func renderGitLab(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 	}
 
 	findings, skipped := collectGHFindings(report, pkgFilter, levelFilter)
-	for _, rule := range skipped {
-		_, _ = fmt.Fprintf(warn, "warning: skipping result with no package logical-location (rule=%s)\n", rule)
-	}
 
 	root := resolveRepoRoot(repoRoot)
 	issues := make([]codeClimateIssue, 0, len(findings))
+	var pathless []string
 	for _, gf := range findings {
 		relPath := relativizePath(gf.f.File, root)
 		if relPath == "" || relPath == "." {
@@ -62,7 +60,7 @@ func renderGitLab(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 			// rather than emit an invalid report GitLab would reject. "." is
 			// RepoRootURI — a directory anchor for results with no physical
 			// location (see EnsurePhysicalLocations), not a real file path.
-			_, _ = fmt.Fprintf(warn, "warning: skipping finding with no file location (subject=%s rule=%s)\n", gf.subject, gf.f.RuleID)
+			pathless = append(pathless, gf.f.RuleID)
 			continue
 		}
 		begin := gf.f.Line
@@ -76,6 +74,13 @@ func renderGitLab(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 			Severity:    gitlabSeverity(gf.f.Level),
 			Location:    ccLocation{Path: relPath, Lines: ccLines{Begin: begin}},
 		})
+	}
+
+	// Findings that can't be placed in the report are summarized in a single
+	// line — one warning per dropped finding is pure noise when there are many.
+	if dropped := append(skipped, pathless...); len(dropped) > 0 {
+		_, _ = fmt.Fprintf(warn, "warning: %d finding(s) omitted from the GitLab report (no file location): %s\n",
+			len(dropped), strings.Join(uniqueSorted(dropped), ", "))
 	}
 
 	// Deterministic order so re-runs produce byte-identical reports and GitLab's
@@ -151,4 +156,20 @@ func gitlabSeverity(viewLevel string) string {
 func codeClimateFingerprint(pkg, ruleID, relPath string, line int) string {
 	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%s\x00%d", pkg, ruleID, relPath, line))
 	return fmt.Sprintf("%x", sum)
+}
+
+// uniqueSorted returns the distinct values of in, sorted, for stable one-line
+// warning summaries.
+func uniqueSorted(in []string) []string {
+	seen := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	sort.Strings(out)
+	return out
 }
