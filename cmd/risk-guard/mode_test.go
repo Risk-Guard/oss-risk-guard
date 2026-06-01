@@ -159,3 +159,35 @@ func TestReportHasErrorLevel(t *testing.T) {
 		})
 	}
 }
+
+func TestCountErrorLevel(t *testing.T) {
+	mkLevel := func(s string) *string { return &s }
+	mkRun := func(levels ...string) *sarif.Run {
+		run := sarif.NewRun(*sarif.NewSimpleTool("t"))
+		for _, l := range levels {
+			run.Results = append(run.Results, &sarif.Result{Level: mkLevel(l)})
+		}
+		return run
+	}
+
+	cases := []struct {
+		name   string
+		report *sarif.Report
+		want   int
+	}{
+		{"nil report", nil, 0},
+		{"warnings only", &sarif.Report{Runs: []*sarif.Run{mkRun("warning", "note")}}, 0},
+		{"single error", &sarif.Report{Runs: []*sarif.Run{mkRun("error")}}, 1},
+		{"errors across runs", &sarif.Report{Runs: []*sarif.Run{
+			mkRun("error", "warning"),
+			mkRun("error", "error", "none"),
+		}}, 3},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := countErrorLevel(c.report); got != c.want {
+				t.Errorf("got %d, want %d", got, c.want)
+			}
+		})
+	}
+}

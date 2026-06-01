@@ -17,6 +17,10 @@ import (
 // "Error: …" — the GitHub annotations already explained what failed.
 var errBlockingFindings = errors.New("blocking findings detected")
 
+// errReported signals that the command already printed a complete, user-facing
+// explanation to stderr. main() exits 1 without prefixing "Error: …" on top.
+var errReported = errors.New("error already reported")
+
 // loadRepoPolicy reads and compiles .risk-guard.yml from the validated repo
 // root. Returns (nil, nil, nil) when the file does not exist — callers should
 // treat that as "use defaults" rather than an error. The raw bytes are returned
@@ -87,15 +91,22 @@ func failsOnBlocking(m policy.WorkflowMode) bool {
 // audit pipeline already maps policy severity "blocking" to SARIF level
 // "error", so this is the post-policy view of what should fail the run.
 func reportHasErrorLevel(report *sarif.Report) bool {
+	return countErrorLevel(report) > 0
+}
+
+// countErrorLevel returns the number of error-level (blocking) SARIF results
+// across all runs.
+func countErrorLevel(report *sarif.Report) int {
 	if report == nil {
-		return false
+		return 0
 	}
+	n := 0
 	for _, run := range report.Runs {
 		for _, res := range run.Results {
 			if res.Level != nil && *res.Level == "error" {
-				return true
+				n++
 			}
 		}
 	}
-	return false
+	return n
 }

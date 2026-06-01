@@ -79,12 +79,16 @@ Examples:
 		}
 		cfg.SecureGit = secureGit
 
+		colorMode, err := cmd.Flags().GetString("color")
+		if err != nil {
+			return fmt.Errorf("failed to get color flag: %w", err)
+		}
 		noColor, err := cmd.Flags().GetBool("no-color")
 		if err != nil {
 			return fmt.Errorf("failed to get no-color flag: %w", err)
 		}
-		if noColor {
-			color.NoColor = true
+		if err := resolveColor(colorMode, noColor); err != nil {
+			return err
 		}
 
 		ctx := environment.SetConfig(cmd.Context(), cfg)
@@ -159,7 +163,9 @@ func init() {
 	rootCmd.PersistentFlags().String("log-level", "warn", "Set logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("secure-git", false, "Isolate git from local config/credentials (blocks SSH keys, credential helpers)")
 	rootCmd.PersistentFlags().String("logfile", "", "Write debug logs to file (in addition to console)")
-	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (also honors NO_COLOR env var and non-TTY stderr)")
+	rootCmd.PersistentFlags().String("color", "auto", "Colored output: auto (default; honors TTY + NO_COLOR), always, never")
+	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (deprecated: use --color=never)")
+	_ = rootCmd.PersistentFlags().MarkDeprecated("no-color", "use --color=never")
 	rootCmd.PersistentFlags().String("cache-dir", "", "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR or os.UserCacheDir()/risk-guard).")
 
 	registerRunAllFlags(rootCmd)
@@ -182,6 +188,27 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
 	cmd.Flags().StringVar(&runAllGitLab, "gitlab", "", "After writing SARIF, write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
+}
+
+// resolveColor maps the --color value (with --no-color back-compat) onto the
+// fatih/color global. "always" forces color even when stderr is not a TTY,
+// overriding both auto-detection and NO_COLOR; "never" disables it; "auto"
+// leaves fatih's own TTY + NO_COLOR detection intact. An explicit
+// --color=always|never beats the deprecated --no-color.
+func resolveColor(colorMode string, noColor bool) error {
+	switch colorMode {
+	case "always":
+		color.NoColor = false
+	case "never":
+		color.NoColor = true
+	case "auto", "":
+		if noColor {
+			color.NoColor = true
+		}
+	default:
+		return fmt.Errorf("invalid --color %q: want auto, always, or never", colorMode)
+	}
+	return nil
 }
 
 // resolveCacheDir picks the cache root in precedence order:
@@ -210,7 +237,7 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		// Blocking findings already explained themselves via SARIF/annotations;
 		// printing "Error: blocking findings detected" on top is noise.
-		if !errors.Is(err, errBlockingFindings) {
+		if !errors.Is(err, errBlockingFindings) && !errors.Is(err, errReported) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		}
 		os.Exit(1)

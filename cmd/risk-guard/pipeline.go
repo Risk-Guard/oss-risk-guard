@@ -294,8 +294,19 @@ func writeReport(report *sarif.Report, outPath string) error {
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o750); err != nil {
 		return fmt.Errorf("creating SARIF output directory: %w", err)
 	}
-	if err := report.WriteFile(outPath); err != nil {
+	// go-sarif's report.WriteFile opens with O_CREATE|O_WRONLY but no O_TRUNC,
+	// so rewriting a shorter report over a longer existing file leaves stale
+	// trailing bytes and produces invalid JSON. os.Create truncates first.
+	f, err := os.Create(outPath) //nolint:gosec // outPath is an operator-supplied --sarif output file
+	if err != nil {
+		return fmt.Errorf("creating SARIF file: %w", err)
+	}
+	if err := report.PrettyWrite(f); err != nil {
+		_ = f.Close()
 		return fmt.Errorf("writing SARIF: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing SARIF file: %w", err)
 	}
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "\nWrote %d runs to %s\n", len(report.Runs), outPath)

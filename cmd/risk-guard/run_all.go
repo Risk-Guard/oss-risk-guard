@@ -121,10 +121,40 @@ func runAll(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if failsOnBlocking(effectiveMode) && reportHasErrorLevel(report) {
-		return errBlockingFindings
+	return printRunVerdict(effectiveMode, report, repoPath, outPath)
+}
+
+// printRunVerdict ends the run with an explicit verdict so the outcome (and
+// why) is never left implicit after the "Policy result:" tally. It returns
+// errBlockingFindings when the run should exit non-zero.
+func printRunVerdict(mode policy.WorkflowMode, report *sarif.Report, repoPath, outPath string) error {
+	blocking := countErrorLevel(report)
+	switch {
+	case blocking == 0:
+		fmt.Fprintf(os.Stderr, "%s\n", color.GreenString("Passing (exit 0): no blocking findings"))
+		return nil
+	case !failsOnBlocking(mode):
+		// Non-failing modes (no-fail/silent/disabled): explain the exit 0 so the
+		// user isn't surprised that blocking findings did not fail the run.
+		fmt.Fprintf(os.Stderr, "%s\n", color.YellowString(
+			"Not failing (exit 0) because mode is %s, though policy blocks %d finding(s)",
+			mode, blocking))
+		return nil
 	}
-	return nil
+
+	fmt.Fprintf(os.Stderr, "%s\n", color.RedString(
+		"Exit with status 1 because mode is %s and policy blocks %d finding(s)", mode, blocking))
+	// Only spell out -s when the report isn't at the default add reads from.
+	ack := "risk-guard policy add-expected-failures " + repoPath
+	if outPath != defaultUnifiedSARIF {
+		ack += " -s " + outPath
+	}
+	ack += " --all"
+	fmt.Fprintf(os.Stderr, "%s\n  %s\n  %s\n",
+		color.HiBlackString("To acknowledge these findings in %s, run:", policy.PolicyFileName),
+		color.CyanString("%s", ack),
+		color.HiBlackString("(drop --all to review each finding interactively)"))
+	return errBlockingFindings
 }
 
 // writeGitLabReport renders a GitLab Code Quality (CodeClimate) report for the
