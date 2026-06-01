@@ -15,6 +15,7 @@ var (
 	viewAuditLevel    string
 	viewAuditPackages []string
 	viewAuditGitHub   bool
+	viewAuditGitLab   string
 	viewAuditRepoRoot string
 )
 
@@ -29,11 +30,16 @@ summary, one line per finding. When the SARIF carries physicalLocation, the
 annotation points at the manifest file + line (relative to --repo-root or
 $GITHUB_WORKSPACE, defaulting to the current directory).
 
+With --gitlab <file>, also write a GitLab Code Quality (CodeClimate) report to
+that file. GitLab renders it inline on the merge request diff; it composes with
+the stdout summary or --github.
+
 Examples:
   risk-guard view-audit audit.sarif
   risk-guard view-audit audit.sarif --level error
   risk-guard view-audit audit.sarif --package lodash --package express
-  risk-guard view-audit audit.sarif --github`,
+  risk-guard view-audit audit.sarif --github
+  risk-guard view-audit audit.sarif --gitlab gl-code-quality-report.json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runViewAudit,
 }
@@ -42,7 +48,8 @@ func init() {
 	viewAuditCmd.Flags().StringVar(&viewAuditLevel, "level", "all", "Filter findings by level: error, warning, note, info, all")
 	viewAuditCmd.Flags().StringArrayVar(&viewAuditPackages, "package", nil, "Filter to specific package names (repeatable)")
 	viewAuditCmd.Flags().BoolVar(&viewAuditGitHub, "github", false, "Emit GitHub Actions workflow annotations instead of human-readable summary")
-	viewAuditCmd.Flags().StringVar(&viewAuditRepoRoot, "repo-root", "", "Root to make file paths relative to (defaults to $GITHUB_WORKSPACE then CWD); used with --github")
+	viewAuditCmd.Flags().StringVar(&viewAuditGitLab, "gitlab", "", "Write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
+	viewAuditCmd.Flags().StringVar(&viewAuditRepoRoot, "repo-root", "", "Root to make file paths relative to (defaults to $GITHUB_WORKSPACE/$CI_PROJECT_DIR then CWD); used with --github/--gitlab")
 	rootCmd.AddCommand(viewAuditCmd)
 }
 
@@ -55,7 +62,14 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if viewAuditGitHub {
 		mode = DisplayGitHub
 	}
-	return renderReport(os.Stdout, os.Stderr, report, mode, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot)
+	if err := renderReport(os.Stdout, os.Stderr, report, mode, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot); err != nil {
+		return err
+	}
+	// --gitlab writes a report file and composes with the stdout summary/--github.
+	if viewAuditGitLab != "" {
+		return writeGitLabReport(viewAuditGitLab, report, viewAuditLevel, viewAuditPackages, viewAuditRepoRoot)
+	}
+	return nil
 }
 
 // DisplayMode selects how an in-memory SARIF report is rendered to the user

@@ -125,6 +125,9 @@ risk-guard . --github
 ```
 
 - `--github` renders GitHub Actions workflow annotations to stdout after writing SARIF.
+- `--gitlab <file>` writes a GitLab Code Quality (CodeClimate) report to `<file>`
+  after writing SARIF. GitLab has no inline-log annotations like GitHub; instead it
+  renders this report on the merge request diff.
 - The exit code is non-zero when there are blocking findings and the effective
   workflow mode is `active`. Modes `no-fail`, `silent`, and `disabled` never fail
   the build.
@@ -133,6 +136,18 @@ risk-guard . --github
 
 Upload `risk-guard-report.sarif` to GitHub code scanning to see findings inline on
 pull requests.
+
+On GitLab, emit the Code Quality report and expose it as an artifact so findings
+show inline on the merge request diff:
+
+```yaml
+risk-guard:
+  script:
+    - risk-guard . --gitlab gl-code-quality-report.json
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+```
 
 ## Configuration
 

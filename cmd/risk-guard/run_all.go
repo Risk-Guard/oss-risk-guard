@@ -10,6 +10,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	"github.com/fatih/color"
+	"github.com/owenrumney/go-sarif/v2/sarif"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,6 +22,7 @@ var (
 	runAllSBOMOut         string
 	runAllContinueOnError bool
 	runAllGitHub          bool
+	runAllGitLab          string
 	runAllModeOverride    string
 )
 
@@ -110,8 +112,32 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// GitLab output is independent of --github: --github writes annotations to
+	// stdout, --gitlab writes a Code Quality report file; both may be set. Gate
+	// on emitsAnnotations to match --github semantics (silent/disabled suppress).
+	if runAllGitLab != "" && emitsAnnotations(effectiveMode) {
+		if err := writeGitLabReport(runAllGitLab, report, "all", nil, ""); err != nil {
+			return err
+		}
+	}
+
 	if failsOnBlocking(effectiveMode) && reportHasErrorLevel(report) {
 		return errBlockingFindings
+	}
+	return nil
+}
+
+// writeGitLabReport renders a GitLab Code Quality (CodeClimate) report for the
+// in-memory SARIF and writes it to path (created/truncated). Diagnostics about
+// skipped findings go to stderr.
+func writeGitLabReport(path string, report *sarif.Report, level string, packages []string, repoRoot string) error {
+	f, err := os.Create(path) //nolint:gosec // path is an operator-supplied --gitlab output file
+	if err != nil {
+		return fmt.Errorf("creating GitLab report %s: %w", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	if err := renderGitLab(f, os.Stderr, report, level, packages, repoRoot); err != nil {
+		return fmt.Errorf("writing GitLab report %s: %w", path, err)
 	}
 	return nil
 }
