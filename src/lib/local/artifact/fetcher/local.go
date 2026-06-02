@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
 	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
@@ -19,7 +18,7 @@ func New() *Fetcher {
 	return &Fetcher{}
 }
 
-func (Fetcher) Fetch(ctx context.Context, pkg models.PackageInfo, dist *models.DistributionInfo) (*routes.ArtifactExtraction, error) {
+func (Fetcher) Fetch(ctx context.Context, pkg models.PackageInfo, dist *models.DistributionInfo) (*artifact.ArtifactExtraction, error) {
 	log := ctxutil.GetLogger(ctx)
 
 	filename := dist.Filename
@@ -43,7 +42,7 @@ func (Fetcher) Fetch(ctx context.Context, pkg models.PackageInfo, dist *models.D
 		zap.Int("files", len(extraction.Files)),
 		zap.Bool("verified", extraction.Verified))
 
-	return &routes.ArtifactExtraction{
+	return &artifact.ArtifactExtraction{
 		Ecosystem:       pkg.Ecosystem,
 		PackageName:     pkg.Name,
 		TarballFilename: filename,

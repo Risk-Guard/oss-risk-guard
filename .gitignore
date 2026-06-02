@@ -8,3 +8,4 @@ opensourcescore.dev/
 tests/**/*.git
 scratch/
 *.sarif
+risk-guard

@@ -1,7 +1,7 @@
 package artifact_fetch
 
 import (
-	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
@@ -9,10 +9,10 @@ import (
 // Output is the output of the artifact_fetch node.
 type Output struct {
 	dag_impl.BaseOutput `json:",inline"`
-	Extractions         []routes.ArtifactExtraction `json:"extractions"`
+	Extractions         []artifact.ArtifactExtraction `json:"extractions"`
 }
 
-func NewOutput(status executiondag.Status, statusReason string, extractions []routes.ArtifactExtraction, input dag_impl.Input) *Output {
+func NewOutput(status executiondag.Status, statusReason string, extractions []artifact.ArtifactExtraction, input dag_impl.Input) *Output {
 	baseOutput := dag_impl.NewBaseOutput(status, statusReason, input)
 	return &Output{
 		BaseOutput:  baseOutput,
@@ -22,7 +22,7 @@ func NewOutput(status executiondag.Status, statusReason string, extractions []ro
 
 func (o *Output) PersistKey() string { return "artifact" }
 
-func (o *Output) GetExtraction(ecosystem, packageName string) *routes.ArtifactExtraction {
+func (o *Output) GetExtraction(ecosystem, packageName string) *artifact.ArtifactExtraction {
 	for i := range o.Extractions {
 		if o.Extractions[i].Ecosystem == ecosystem && o.Extractions[i].PackageName == packageName {
 			return &o.Extractions[i]

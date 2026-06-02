@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/artifact/fetcher"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
@@ -46,14 +46,14 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
 
-	var extractions []routes.ArtifactExtraction
+	var extractions []artifact.ArtifactExtraction
 	successCount := 0
 
 	for _, pkg := range input.Packages {
 		pkgMeta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
 		if pkgMeta == nil {
 			skipReason := "no package metadata"
-			extractions = append(extractions, routes.ArtifactExtraction{
+			extractions = append(extractions, artifact.ArtifactExtraction{
 				Ecosystem:   pkg.Ecosystem,
 				PackageName: pkg.Name,
 				SkipReason:  &skipReason,
@@ -63,7 +63,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 
 		if pkgMeta.Distribution == nil || pkgMeta.Distribution.URL == "" {
 			skipReason := "no distribution URL"
-			extractions = append(extractions, routes.ArtifactExtraction{
+			extractions = append(extractions, artifact.ArtifactExtraction{
 				Ecosystem:   pkg.Ecosystem,
 				PackageName: pkg.Name,
 				SkipReason:  &skipReason,
