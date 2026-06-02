@@ -3,22 +3,392 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Risk Guard</title>
-    <style>
-      body {
-        font-family: system-ui, -apple-system, sans-serif;
-        max-width: 40rem;
-        margin: 6rem auto;
-        padding: 0 1.5rem;
-        color: #1a1a1a;
-        line-height: 1.6;
-      }
-      h1 { margin-bottom: 0.25rem; }
-      p.tagline { color: #555; }
-    </style>
+    <title>Risk Guard — overview</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <meta
+      name="description"
+      content="An overview of Risk Guard: what it does, what it scores, how to read and tune its results, and how to run it locally or in CI."
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    <h1>Risk Guard</h1>
-    <p class="tagline">Hello, world — Pages deploy test.</p>
+  <body class="bg-white text-slate-800 antialiased">
+    <!-- Header -->
+    <header class="border-b border-slate-200">
+      <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+        <span class="font-bold tracking-tight text-slate-900">Risk&nbsp;Guard</span>
+        <nav class="hidden gap-6 text-sm text-slate-600 sm:flex">
+          <a href="#how" class="hover:text-slate-900">How it works</a>
+          <a href="#scores" class="hover:text-slate-900">What it scores</a>
+          <a href="#results" class="hover:text-slate-900">Results</a>
+          <a href="#using" class="hover:text-slate-900">Using it</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-3xl px-6">
+      <!-- What it is -->
+      <section class="py-16">
+        <h1 class="text-3xl font-bold tracking-tight text-slate-900">What Risk Guard is</h1>
+        <p class="mt-6 text-lg leading-relaxed text-slate-600">
+          Risk Guard examines the third-party packages a project depends on and scores
+          how risky they are to rely on. It checks your own source and your direct
+          dependencies, and gathers everything into a single report — run it on your
+          machine, or automatically on every pull request.
+        </p>
+        <p class="mt-4 text-lg leading-relaxed text-slate-600">
+          Ecosystems: <span class="font-medium text-slate-800">npm, PyPI, RubyGems</span>.
+        </p>
+
+        <div class="mt-8">
+          <a
+            href="#using"
+            class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500"
+          >
+            Quick start
+            <svg viewBox="0 0 20 20" aria-hidden="true" class="h-4 w-4 fill-current">
+              <path d="M7.05 4.55a.75.75 0 011.06 0l4.9 4.9a.75.75 0 010 1.06l-4.9 4.9a.75.75 0 11-1.06-1.06L11.38 10 7.05 5.67a.75.75 0 010-1.12z" />
+            </svg>
+          </a>
+        </div>
+
+        <a
+          href="https://github.com/Risk-Guard/oss-risk-guard"
+          class="mt-4 flex items-center gap-4 rounded-xl border border-slate-200 p-5 hover:border-slate-400 hover:bg-slate-50"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" class="h-8 w-8 flex-none fill-slate-900">
+            <path
+              fill-rule="evenodd"
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+            />
+          </svg>
+          <span class="min-w-0">
+            <span class="block font-semibold text-slate-900">Open source on GitHub</span>
+            <span class="block truncate text-sm text-slate-500">github.com/Risk-Guard/oss-risk-guard · MIT</span>
+          </span>
+          <svg viewBox="0 0 20 20" aria-hidden="true" class="ml-auto h-5 w-5 flex-none fill-slate-400">
+            <path d="M7.05 4.55a.75.75 0 011.06 0l4.9 4.9a.75.75 0 010 1.06l-4.9 4.9a.75.75 0 11-1.06-1.06L11.38 10 7.05 5.67a.75.75 0 010-1.12z" />
+          </svg>
+        </a>
+
+      </section>
+
+      <!-- How it works -->
+      <section id="how" class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">How it works</h2>
+        <ol class="mt-8 space-y-6">
+          <li class="flex gap-4">
+            <span class="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">1</span>
+            <p class="leading-relaxed text-slate-600">
+              <span class="font-medium text-slate-900">Inventory.</span> Risk Guard reads
+              your repository and builds an SBOM (SPDX or CycloneDX) of your project's
+              packages. You can export it on its own, too.
+            </p>
+          </li>
+          <li class="flex gap-4">
+            <span class="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">2</span>
+            <p class="leading-relaxed text-slate-600">
+              <span class="font-medium text-slate-900">Score.</span> Each check runs
+              against your source and each direct dependency.
+            </p>
+          </li>
+          <li class="flex gap-4">
+            <span class="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">3</span>
+            <p class="leading-relaxed text-slate-600">
+              <span class="font-medium text-slate-900">Report.</span> Results merge into
+              one SARIF report — the standard format GitHub and GitLab render inline, so
+              findings appear where you review code.
+            </p>
+          </li>
+        </ol>
+
+        <div class="mt-10 border-t border-dashed border-slate-300 pt-8">
+          <p class="text-sm font-medium uppercase tracking-wide text-slate-400">
+            Optional — to enforce it on every change
+          </p>
+          <ol class="mt-6 space-y-6">
+            <li class="flex gap-4">
+              <span class="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-slate-300 text-sm font-semibold text-slate-500">4</span>
+              <p class="leading-relaxed text-slate-600">
+                <span class="font-medium text-slate-900">Define policy.</span> One
+                <code class="rounded bg-slate-100 px-1 text-sm">.risk-guard.yml</code> in git
+                sets which findings block, warn, or are acknowledged. A sensible default
+                ships, so this is optional.
+              </p>
+            </li>
+            <li class="flex gap-4">
+              <span class="flex h-7 w-7 flex-none items-center justify-center rounded-full border border-slate-300 text-sm font-semibold text-slate-500">5</span>
+              <p class="leading-relaxed text-slate-600">
+                <span class="font-medium text-slate-900">Protect PRs.</span> Run it in CI in
+                <code class="rounded bg-slate-100 px-1 text-sm">active</code> mode and risky
+                dependencies fail the check before they merge.
+              </p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- What it scores -->
+      <section id="scores" class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">What it scores</h2>
+        <p class="mt-4 leading-relaxed text-slate-600">Four areas of supply-chain risk:</p>
+        <dl class="mt-8 space-y-8">
+          <div>
+            <dt class="font-semibold text-slate-900">Security</dt>
+            <dd class="mt-1 leading-relaxed text-slate-600">
+              Missing security practices and unsafe configuration, such as a project with
+              no security policy or a package that points to an insecure
+              (<code class="rounded bg-slate-100 px-1 text-sm">http://</code>) source.
+            </dd>
+          </div>
+          <div>
+            <dt class="font-semibold text-slate-900">License compliance</dt>
+            <dd class="mt-1 leading-relaxed text-slate-600">
+              Packages with missing or undeclared licenses.
+            </dd>
+          </div>
+          <div>
+            <dt class="font-semibold text-slate-900">Maintenance &amp; continuity</dt>
+            <dd class="mt-1 leading-relaxed text-slate-600">
+              Abandoned or stale projects, single-maintainer packages, or source code that
+              has drifted far ahead of its last published release.
+            </dd>
+          </div>
+          <div>
+            <dt class="font-semibold text-slate-900">Provenance</dt>
+            <dd class="mt-1 leading-relaxed text-slate-600">
+              Whether a package is what it claims to be: mismatches between a package and
+              its stated source, install-time scripts, and downloaded artifacts that fail
+              hash verification.
+            </dd>
+          </div>
+        </dl>
+        <p class="mt-8 leading-relaxed text-slate-600">
+          Much of this risk exists before any CVE is filed — and sometimes a CVE is never
+          filed at all. A package taken over by a new maintainer, or quietly abandoned, is
+          a real risk that vulnerability databases won't describe.
+        </p>
+      </section>
+
+      <!-- Why it works this way -->
+      <section class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Why it works this way</h2>
+
+        <h3 class="mt-8 font-semibold text-slate-900">It's preventative</h3>
+        <p class="mt-2 leading-relaxed text-slate-600">
+          Risk Guard runs at the pull request and can fail the build before a risky
+          dependency is merged. The decision happens at adoption time — you keep the
+          dependency out, rather than discovering it after it's already in production. A
+          dependency you never merge is one you never have to triage, patch, or respond to.
+        </p>
+        <p class="mt-3 leading-relaxed text-slate-600">
+          Because its checks score intrinsic risk signals — abandonment, provenance,
+          install scripts, licensing — it can flag a problem that no vulnerability has been
+          published for yet.
+        </p>
+
+        <h3 class="mt-8 font-semibold text-slate-900">It doesn't overload your developers</h3>
+        <p class="mt-2 leading-relaxed text-slate-600">
+          Each finding belongs to a risk category, and the default policy gives each
+          category a severity. Out of the box, only the <code class="rounded bg-slate-100 px-1 text-sm">critical</code>
+          category (for example, a tampered artifact) and continuity problems in your
+          direct dependencies block the build — everything else is a warning. It's a short,
+          readable file you can see and change, kept in git: owners set it once, developers
+          don't each re-triage, and a finding you acknowledge stops blocking so it doesn't
+          resurface on every pull request. Findings appear inline on the diff, at review
+          time.
+        </p>
+      </section>
+
+      <!-- Reading the results -->
+      <section id="results" class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Reading the results</h2>
+        <p class="mt-4 leading-relaxed text-slate-600">
+          Each finding names a subject (a package, or your own repository), describes the
+          issue, and references the rule that produced it and where it applies. A local run
+          summarizes them:
+        </p>
+        <div class="mt-6 overflow-x-auto rounded-xl border border-slate-200">
+          <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead class="bg-slate-50 text-slate-500">
+              <tr>
+                <th class="px-4 py-3 font-semibold">Severity</th>
+                <th class="px-4 py-3 font-semibold">Subject</th>
+                <th class="px-4 py-3 font-semibold">Finding</th>
+                <th class="px-4 py-3 font-semibold">Rule</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-700">
+              <tr>
+                <td class="whitespace-nowrap px-4 py-3">⚠️ warning</td>
+                <td class="whitespace-nowrap px-4 py-3">nokogiri (rubygems)</td>
+                <td class="px-4 py-3">native extension runs at install time</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">PACKAGE_INSTALL_SCRIPTS</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap px-4 py-3">⚠️ warning</td>
+                <td class="whitespace-nowrap px-4 py-3">your repository</td>
+                <td class="px-4 py-3">a dependency's registry URL doesn't match its source repo</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">PACKAGE_SOURCE_URL_MISMATCH</td>
+              </tr>
+              <tr>
+                <td class="whitespace-nowrap px-4 py-3">⬜ info</td>
+                <td class="whitespace-nowrap px-4 py-3">is-odd@3.0.1 (npm)</td>
+                <td class="px-4 py-3">last repository commit was 2919 days ago</td>
+                <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">SOURCE_REPO_ABANDONED</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-6 leading-relaxed text-slate-600">
+          Every finding has a <span class="font-medium text-slate-800">severity</span> —
+          <code class="rounded bg-slate-100 px-1 text-sm">blocking</code>,
+          <code class="rounded bg-slate-100 px-1 text-sm">warning</code>, or
+          <code class="rounded bg-slate-100 px-1 text-sm">ignore</code> — assigned by a
+          default policy per risk category. Your <code class="rounded bg-slate-100 px-1 text-sm">.risk-guard.yml</code>
+          overrides it. The run's <span class="font-medium text-slate-800">mode</span> is
+          the master switch:
+        </p>
+        <ul class="mt-3 space-y-1.5 leading-relaxed text-slate-600">
+          <li><code class="rounded bg-slate-100 px-1 text-sm">active</code> — fail the build on blocking findings (the default).</li>
+          <li><code class="rounded bg-slate-100 px-1 text-sm">no-fail</code> — run and report everything, but never fail the build.</li>
+          <li><code class="rounded bg-slate-100 px-1 text-sm">silent</code> — run, skip the inline annotations, never fail.</li>
+          <li><code class="rounded bg-slate-100 px-1 text-sm">disabled</code> — skip the scan entirely.</li>
+        </ul>
+      </section>
+
+      <!-- Tuning it -->
+      <section class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Tuning it</h2>
+        <p class="mt-4 leading-relaxed text-slate-600">
+          Everything lives in one file at the repository root. Override a severity, or
+          acknowledge a finding you've accepted — it stays in the report but no longer
+          blocks:
+        </p>
+        <pre class="mt-4 overflow-x-auto rounded-xl bg-slate-900 px-4 py-4 text-sm leading-relaxed text-slate-100"><code># .risk-guard.yml
+version: 2
+workflow:
+  mode: active
+
+severity:
+  check/PACKAGE_INSTALL_SCRIPTS: warning     # downgrade one check
+
+expected_failures:                            # accept a finding; still reported
+  package/npm/lodash:
+    checks: [PACKAGE_STALE_RELEASE]
+    reason: "Pinned deliberately; upgrade tracked in #482"
+    expires: 2026-09-01T00:00:00Z</code></pre>
+        <p class="mt-4 leading-relaxed text-slate-600">
+          The
+          <a href="https://github.com/Risk-Guard/oss-risk-guard/blob/main/docs/configuration.md" class="text-indigo-600 underline">configuration reference</a>
+          covers the full selector grammar, per-environment rules, performance, and private
+          registries.
+        </p>
+      </section>
+
+      <!-- Privacy -->
+      <section class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Privacy</h2>
+        <p class="mt-4 leading-relaxed text-slate-600">
+          Risk Guard reads public information from the package registries (npm, PyPI,
+          RubyGems) and from projects' source repositories, so it needs network access to
+          them. It runs entirely on your machine or CI runner — your code and your
+          dependency list are never uploaded to any Risk Guard server.
+        </p>
+      </section>
+
+      <!-- Using it -->
+      <section id="using" class="border-t border-slate-200 py-16">
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900">Using it</h2>
+
+        <h3 class="mt-8 font-semibold text-slate-900">Install</h3>
+        <div data-tabs class="mt-3">
+          <div role="tablist" class="flex gap-6 border-b border-slate-200 text-sm">
+            <button role="tab" data-tab="curl" aria-selected="true"
+              class="-mb-px border-b-2 border-transparent pb-2 font-medium text-slate-500 aria-selected:border-indigo-600 aria-selected:text-slate-900">Install script</button>
+            <button role="tab" data-tab="go" aria-selected="false"
+              class="-mb-px border-b-2 border-transparent pb-2 font-medium text-slate-500 aria-selected:border-indigo-600 aria-selected:text-slate-900">go install</button>
+            <button role="tab" data-tab="binary" aria-selected="false"
+              class="-mb-px border-b-2 border-transparent pb-2 font-medium text-slate-500 aria-selected:border-indigo-600 aria-selected:text-slate-900">Prebuilt binary</button>
+          </div>
+          <div role="tabpanel" data-panel="curl" class="pt-4">
+            <p class="text-sm text-slate-600">Linux and macOS — verifies a checksum before installing:</p>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100"><code>curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh</code></pre>
+          </div>
+          <div role="tabpanel" data-panel="go" class="pt-4" hidden>
+            <p class="text-sm text-slate-600">With a Go toolchain installed:</p>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100"><code>go install github.com/Risk-Guard/oss-risk-guard/cmd/risk-guard@latest</code></pre>
+          </div>
+          <div role="tabpanel" data-panel="binary" class="pt-4" hidden>
+            <p class="text-sm text-slate-600">
+              Download an archive for your platform from the
+              <a href="https://github.com/Risk-Guard/oss-risk-guard/releases" class="text-indigo-600 underline">releases page</a>
+              and put <code class="rounded bg-slate-100 px-1 text-sm">risk-guard</code> on your <code class="rounded bg-slate-100 px-1 text-sm">PATH</code>.
+            </p>
+          </div>
+        </div>
+
+        <p class="mt-6 text-sm text-slate-600">
+          Then scan your repository — <code class="rounded bg-slate-100 px-1 text-sm">init</code>
+          runs a first scan and writes a starter <code class="rounded bg-slate-100 px-1 text-sm">.risk-guard.yml</code>
+          from the findings:
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100"><code>risk-guard init</code></pre>
+
+        <h3 class="mt-12 font-semibold text-slate-900">In CI</h3>
+        <div data-tabs class="mt-3">
+          <div role="tablist" class="flex gap-6 border-b border-slate-200 text-sm">
+            <button role="tab" data-tab="gh" aria-selected="true"
+              class="-mb-px border-b-2 border-transparent pb-2 font-medium text-slate-500 aria-selected:border-indigo-600 aria-selected:text-slate-900">GitHub</button>
+            <button role="tab" data-tab="gl" aria-selected="false"
+              class="-mb-px border-b-2 border-transparent pb-2 font-medium text-slate-500 aria-selected:border-indigo-600 aria-selected:text-slate-900">GitLab</button>
+          </div>
+          <div role="tabpanel" data-panel="gh" class="pt-4">
+            <p class="text-sm text-slate-600">
+              The <a href="https://github.com/Risk-Guard/action" class="text-indigo-600 underline">Risk Guard Action</a>
+              — findings appear in the Security tab and inline on pull requests:
+            </p>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100"><code>- uses: actions/checkout@v6
+- uses: Risk-Guard/action@v1</code></pre>
+          </div>
+          <div role="tabpanel" data-panel="gl" class="pt-4" hidden>
+            <p class="text-sm text-slate-600">
+              The <a href="https://gitlab.com/risk-guard/components" class="text-indigo-600 underline">Risk Guard component</a>
+              — findings appear in the merge request widget and the Security tab:
+            </p>
+            <pre class="mt-3 overflow-x-auto rounded-lg bg-slate-900 px-4 py-3 text-sm text-slate-100"><code>include:
+  - component: $CI_SERVER_FQDN/risk-guard/components/scan@1.0.3</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200">
+      <div class="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <span>Risk Guard — MIT licensed.</span>
+        <nav class="flex flex-wrap gap-6">
+          <a href="https://github.com/Risk-Guard/oss-risk-guard" class="hover:text-slate-900">CLI</a>
+          <a href="https://github.com/Risk-Guard/action" class="hover:text-slate-900">GitHub Action</a>
+          <a href="https://gitlab.com/risk-guard/components" class="hover:text-slate-900">GitLab Component</a>
+          <a href="https://github.com/Risk-Guard/oss-risk-guard/blob/main/docs/configuration.md" class="hover:text-slate-900">Docs</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script>
+      // Minimal tabs: click a [data-tab] to show its matching [data-panel] within the same [data-tabs] group.
+      document.querySelectorAll("[data-tabs]").forEach((group) => {
+        const tabs = group.querySelectorAll("[data-tab]");
+        const panels = group.querySelectorAll("[data-panel]");
+        tabs.forEach((tab) => {
+          tab.addEventListener("click", () => {
+            tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+            panels.forEach((p) => {
+              p.hidden = p.dataset.panel !== tab.dataset.tab;
+            });
+          });
+        });
+      });
+    </script>
   </body>
 </html>
