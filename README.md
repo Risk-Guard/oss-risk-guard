@@ -2,12 +2,18 @@
 
 Open source risk analysis and scoring for software dependencies.
 
-Risk Guard walks a local git repository, builds an SBOM, runs a graph of scoring
-checks against the source and its direct dependencies, and emits a single SARIF
-report. Use it locally to spot risky dependencies before you adopt them, or in CI
-to gate pull requests.
+Risk Guard walks a local git repository, builds an SBOM (software bill of
+materials), runs a graph of scoring checks — rules that flag supply-chain risk
+such as missing licenses, install scripts, or abandoned upstreams — against the
+source and its direct dependencies, and emits a single SARIF report (the
+code-scanning format GitHub and GitLab render inline). Use it locally to spot
+risky dependencies before you adopt them, or in CI to gate pull requests.
 
 Supported ecosystems: `npm`, `pypi`, `rubygems`.
+
+Risk Guard runs entirely on your machine. It fetches only public package
+metadata, artifacts, and source repositories from the registries and forges it
+analyzes — it never uploads your code or dependency list to any Risk Guard server.
 
 ## Install
 
@@ -90,6 +96,21 @@ risk-guard . --continue-on-error=false              # fail instead of emitting p
 
 Run `risk-guard --help` (or `risk-guard <command> --help`) for the full flag list.
 
+### Example output
+
+The SARIF report renders inline in GitHub/GitLab. Locally,
+`risk-guard view-audit risk-guard-report.sarif` prints a summary like:
+
+> **⚠️ 20 warning · 🔵 4 acknowledged · ⬜ 9 ignored**
+
+| Severity | Subject | Finding | Rule |
+| --- | --- | --- | --- |
+| ⚠️ warning | requests (pypi) | artifact has install-time scripts | `PACKAGE_INSTALL_SCRIPTS` |
+| ⚠️ warning | is-even@1.0.0 (npm) | No security policy file found | `SOURCE_NO_SECURITY_POLICY` |
+| ⚠️ warning | your repository | package does not declare a license | `PACKAGE_NO_LICENSE` |
+| ⚠️ warning | f-ask (pypi) | source is 2632 days ahead of last release | `PACKAGE_UNRELEASED_CHANGES` |
+| ⬜ info | is-even@1.0.0 (npm) | last repository commit was 2981 days ago | `SOURCE_REPO_ABANDONED` |
+
 ### Subcommands
 
 The root command runs the complete pipeline. These subcommands expose individual
@@ -99,10 +120,12 @@ stages:
 | --- | --- |
 | `scan <path>` | Score the local source repo only — no dependency audit. |
 | `audit` | Audit direct dependencies from an SBOM. |
-| `audit-package <key>` | Score a single package by its analysis-identifier key. |
+| `audit-package <key>` | Score a single package by key, e.g. `package/npm/express` or `package/npm/lodash?version=4.17.20`. |
 | `sbom <path>` | Generate an SBOM (SPDX or CycloneDX) for a local repo. |
 | `init [path]` | Run an initial scan and write a `.risk-guard.yml` seeded from the findings. |
 | `view-audit <sarif>` | Render a human-readable summary of an audit SARIF file. |
+| `policy show [path]` | Print the effective policy (built-in default overlaid with the repo's `.risk-guard.yml`). |
+| `policy add-expected-failures [path]` | Acknowledge findings by merging a SARIF report's blocking findings into `expected_failures` in `.risk-guard.yml`. |
 
 ### Common flags
 
@@ -114,7 +137,8 @@ These persistent flags apply to every command:
 | `--log-level` | `warn` | `debug`, `info`, `warn`, or `error`. |
 | `--logfile` | — | Also write debug logs to a file. |
 | `--secure-git` | `false` | Isolate git from local config/credentials (blocks SSH keys and credential helpers). |
-| `--no-color` | `false` | Disable colored output (also honors `NO_COLOR` and non-TTY stderr). |
+| `--color` | `auto` | Colored output: `auto` (honors TTY + `NO_COLOR`), `always`, or `never`. |
+| `--no-color` | `false` | Deprecated alias for `--color=never`. |
 
 ## Use in CI
 
@@ -181,7 +205,8 @@ Linting uses [golangci-lint](https://golangci-lint.run/) with the config in
 [`.golangci.yml`](.golangci.yml):
 
 ```bash
-golangci-lint run
+golangci-lint fmt    # apply gofumpt + goimports formatting
+golangci-lint run    # lint
 ```
 
 ## License
