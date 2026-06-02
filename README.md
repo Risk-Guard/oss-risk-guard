@@ -142,27 +142,50 @@ These persistent flags apply to every command:
 
 ## Use in CI
 
-In CI, run the pipeline and let the exit code gate the build:
+### GitHub Actions
 
-```bash
-risk-guard . --github
+Use the [Risk Guard Action](https://github.com/Risk-Guard/action). Findings appear
+in the **Security** tab and inline on pull requests.
+
+```yaml
+jobs:
+  risk-guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Risk-Guard/action@v1
 ```
 
-- `--github` renders GitHub Actions workflow annotations to stdout after writing SARIF.
-- `--gitlab <file>` writes a GitLab Code Quality (CodeClimate) report to `<file>`
-  after writing SARIF. GitLab has no inline-log annotations like GitHub; instead it
-  renders this report on the merge request diff.
+### GitLab CI/CD
+
+Use the [Risk Guard component](https://gitlab.com/risk-guard/components). Findings
+show in the merge request widget (all tiers) and the Security tab (Ultimate).
+
+```yaml
+include:
+  - component: $CI_SERVER_FQDN/risk-guard/components/scan@1.0.3
+```
+
+### Other CI, or running the CLI directly
+
+Run the pipeline and let the exit code gate the build:
+
+```bash
+risk-guard . --github                              # GitHub Actions annotations + SARIF
+risk-guard . --gitlab gl-code-quality-report.json  # GitLab Code Quality report + SARIF
+```
+
 - The exit code is non-zero when there are blocking findings and the effective
   workflow mode is `active`. Modes `no-fail`, `silent`, and `disabled` never fail
   the build.
 - `--mode` overrides `workflow.mode` from `.risk-guard.yml` for a single run, e.g.
   `--mode no-fail` to observe findings without breaking the build.
 
-Upload `risk-guard-report.sarif` to GitHub code scanning to see findings inline on
-pull requests.
-
-On GitLab, emit the Code Quality report and expose it as an artifact so findings
-show inline on the merge request diff:
+Upload `risk-guard-report.sarif` to GitHub code scanning, or expose the GitLab
+Code Quality report as an artifact, to render findings inline:
 
 ```yaml
 risk-guard:
