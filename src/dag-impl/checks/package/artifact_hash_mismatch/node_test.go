@@ -3,7 +3,7 @@ package artifact_hash_mismatch
 import (
 	"testing"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
@@ -37,7 +37,7 @@ func TestNode_GetCategories(t *testing.T) {
 }
 
 func TestCheck_NoViolation_AllVerified(t *testing.T) {
-	extractions := []routes.ArtifactExtraction{
+	extractions := []artifact.ArtifactExtraction{
 		{
 			Ecosystem:   "npm",
 			PackageName: "express",
@@ -60,7 +60,7 @@ func TestCheck_NoViolation_AllVerified(t *testing.T) {
 
 func TestCheck_Violation_HashMismatch(t *testing.T) {
 	errStr := "hash mismatch: expected abc, got def"
-	extractions := []routes.ArtifactExtraction{
+	extractions := []artifact.ArtifactExtraction{
 		{
 			Ecosystem:   "npm",
 			PackageName: "express",
@@ -94,7 +94,7 @@ func TestCheck_Skipped_NoExtractions(t *testing.T) {
 
 func TestCheck_SkipsSkippedExtractions(t *testing.T) {
 	skipReason := "no distribution URL"
-	extractions := []routes.ArtifactExtraction{
+	extractions := []artifact.ArtifactExtraction{
 		{
 			Ecosystem:   "npm",
 			PackageName: "express",

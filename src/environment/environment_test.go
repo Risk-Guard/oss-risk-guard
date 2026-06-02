@@ -29,8 +29,8 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.CacheMaxAgeDays != 2 {
 		t.Errorf("expected CacheMaxAgeDays to be 2, got %d", cfg.CacheMaxAgeDays)
 	}
-	if cfg.GoogleCloudProject != "oss-risk-guard" {
-		t.Errorf("expected GoogleCloudProject to be 'oss-risk-guard', got %q", cfg.GoogleCloudProject)
+	if cfg.GoogleCloudProject != "" {
+		t.Errorf("expected GoogleCloudProject to default to empty, got %q", cfg.GoogleCloudProject)
 	}
 	if cfg.MetadataBackend != "filesystem" {
 		t.Errorf("expected MetadataBackend to be 'filesystem', got %q", cfg.MetadataBackend)

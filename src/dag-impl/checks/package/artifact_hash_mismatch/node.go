@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/api/routes"
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
@@ -46,7 +46,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	return n.evaluate(artifactOut.Extractions, input), nil
 }
 
-func (n *Node) evaluate(extractions []routes.ArtifactExtraction, input dag_impl.Input) *checks.Output {
+func (n *Node) evaluate(extractions []artifact.ArtifactExtraction, input dag_impl.Input) *checks.Output {
 	var violations []string
 	var scanned []string
 

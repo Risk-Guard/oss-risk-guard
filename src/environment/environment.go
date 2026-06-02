@@ -27,26 +27,27 @@ type Config struct {
 	CacheMaxAgeDays int    `env:"HTTP_CACHE_MAX_AGE_DAYS" envDefault:"2"`
 
 	MetadataBackend  string `env:"METADATA_BACKEND" envDefault:"filesystem"`
-	BackendGCSBucket string `env:"BACKEND_GCS_BUCKET" envDefault:"risk-guard-package-data"`
+	BackendGCSBucket string `env:"BACKEND_GCS_BUCKET" envDefault:""`
 	KeyPrefix        string `env:"GCS_PREFIX" envDefault:"v3"`
-	HTTPGCSBucket    string `env:"HTTP_GCS_BUCKET" envDefault:"oss-risk-guard-http-cache"`
+	HTTPGCSBucket    string `env:"HTTP_GCS_BUCKET" envDefault:""`
 	HTTPGCSPrefix    string `env:"HTTP_GCS_PREFIX" envDefault:"v1"`
 
 	ValkeyURL string `env:"VALKEY_URL" envDefault:"redis://localhost:6379"`
 
 	// HIGH_MEM_SERVER is the URL of a high-memory server running the /artifact endpoint.
 	// When set, artifact extraction is delegated to this server instead of running locally.
-	HighMemServer string `env:"HIGH_MEM_SERVER" envDefault:"https://api-mem.ossriskguard.app"`
+	// No default: the open-source CLI extracts locally; only the hosted server sets this.
+	HighMemServer string `env:"HIGH_MEM_SERVER" envDefault:""`
 
 	// HIGH_MEM_AUDIENCE is the audience for ID token authentication.
 	// Defaults to "risk-guard-api" which is configured as a custom audience on the Cloud Run service.
 	HighMemAudience string `env:"HIGH_MEM_AUDIENCE" envDefault:"risk-guard-api"`
 
-	GoogleCloudProject string `env:"GOOGLE_CLOUD_PROJECT" envDefault:"oss-risk-guard"`
+	GoogleCloudProject string `env:"GOOGLE_CLOUD_PROJECT" envDefault:""`
 
-	ScorePackageWorkflow string `env:"SCORE_PACKAGE_WORKFLOW" envDefault:"projects/oss-risk-guard/locations/us-central1/workflows/package-workflow"`
-	ScoreSourceWorkflow  string `env:"SCORE_SOURCE_WORKFLOW" envDefault:"projects/oss-risk-guard/locations/us-central1/workflows/source-workflow"`
-	ScoreDepsWorkflow    string `env:"SCORE_DEPS_WORKFLOW" envDefault:"projects/oss-risk-guard/locations/us-central1/workflows/score-deps-workflow"`
+	ScorePackageWorkflow string `env:"SCORE_PACKAGE_WORKFLOW" envDefault:""`
+	ScoreSourceWorkflow  string `env:"SCORE_SOURCE_WORKFLOW" envDefault:""`
+	ScoreDepsWorkflow    string `env:"SCORE_DEPS_WORKFLOW" envDefault:""`
 
 	ServiceName string `env:"SERVICE_NAME" envDefault:"risk-guard"`
 
