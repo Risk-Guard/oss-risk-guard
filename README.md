@@ -2,6 +2,8 @@
 
 Open source risk analysis and scoring for software dependencies.
 
+**Website:** [risk-guard.github.io/oss-risk-guard](https://risk-guard.github.io/oss-risk-guard/)
+
 Risk Guard walks a local git repository, builds an SBOM (software bill of
 materials), runs a graph of scoring checks — rules that flag supply-chain risk
 such as missing licenses, install scripts, or abandoned upstreams — against the

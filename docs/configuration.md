@@ -51,7 +51,7 @@ severity:
   source/"github.com/your-org/*"/category/critical: ignore
 
   # Long form with a reason and a future escalation date
-  check/VULN_CHECK:
+  check/PACKAGE_STALE_RELEASE:
     severity: warning
     reason: "Triaged 2026-04-01; tracking in JIRA-123"
     blocking_after: 2026-07-01T00:00:00Z
@@ -68,7 +68,7 @@ severity:
 # `*` wildcards are allowed in the key.
 expected_failures:
   package/npm/lodash:
-    checks: [VULN_CHECK]
+    checks: [PACKAGE_STALE_RELEASE]
     reason: "Pinned to last patched release; upgrade tracked in #482"
     approved_by: "security@example.com"
     expires: 2026-09-01T00:00:00Z
