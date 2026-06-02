@@ -9,7 +9,7 @@ Requires Go 1.25.1+.
 ```bash
 go run ./cmd/risk-guard .    # run the full pipeline against the current repo
 go test ./...                # tests
-go build -o ./risk-guard ./cmd/risk-guard # build 
+go build -o ./risk-guard ./cmd/risk-guard # build
 ```
 
 Formatting and linting use [golangci-lint](https://golangci-lint.run/) v2
