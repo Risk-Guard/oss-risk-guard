@@ -57,7 +57,7 @@ func CloneContentOnly(ctx context.Context, sourceURL, destDir, commitSHA string,
 		cloneURL,
 		destDir,
 	)
-	applySecureGitEnv(ctx, cloneCmd)
+	applyGitEnv(ctx, cloneCmd)
 	applyGitCeiling(cloneCmd, destDir)
 
 	output, err := cloneCmd.CombinedOutput()
@@ -104,7 +104,7 @@ func fetchAndCheckoutSHA(ctx context.Context, cloneCtx context.Context, sourceUR
 
 	//nolint:gosec // G204: commitSHA is validated by IsFullSHA at call site
 	fetchCmd := exec.CommandContext(cloneCtx, "git", "-C", destDir, "fetch", "--depth=1", "origin", commitSHA)
-	applySecureGitEnv(ctx, fetchCmd)
+	applyGitEnv(ctx, fetchCmd)
 	applyGitCeiling(fetchCmd, destDir)
 	if output, err := fetchCmd.CombinedOutput(); err != nil {
 		return cleanupAndReturn(destDir, classifyCloneError(sourceURL, fmt.Errorf("%w: %s", err, string(output))))
@@ -112,7 +112,7 @@ func fetchAndCheckoutSHA(ctx context.Context, cloneCtx context.Context, sourceUR
 
 	//nolint:gosec // G204: commitSHA is validated by IsFullSHA at call site
 	checkoutCmd := exec.CommandContext(cloneCtx, "git", "-C", destDir, "checkout", commitSHA)
-	applySecureGitEnv(ctx, checkoutCmd)
+	applyGitEnv(ctx, checkoutCmd)
 	applyGitCeiling(checkoutCmd, destDir)
 	if output, err := checkoutCmd.CombinedOutput(); err != nil {
 		return cleanupAndReturn(destDir, classifyCloneError(sourceURL, fmt.Errorf("%w: %s", err, string(output))))
@@ -127,7 +127,7 @@ func checkoutHEAD(ctx context.Context, cloneCtx context.Context, sourceURL, dest
 	}
 
 	checkoutCmd := exec.CommandContext(cloneCtx, "git", "-C", destDir, "checkout", "HEAD") //nolint:gosec // Args are hardcoded git subcommands
-	applySecureGitEnv(ctx, checkoutCmd)
+	applyGitEnv(ctx, checkoutCmd)
 	applyGitCeiling(checkoutCmd, destDir)
 	if output, err := checkoutCmd.CombinedOutput(); err != nil {
 		return cleanupAndReturn(destDir, classifyCloneError(sourceURL, fmt.Errorf("%w: %s", err, string(output))))

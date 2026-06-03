@@ -1,12 +1,48 @@
 package git
 
 import (
+	"context"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 )
+
+func TestApplyGitEnv_NonSecureDisablesPrompts(t *testing.T) {
+	ctx := environment.SetSharedConfig(context.Background(), &environment.Config{})
+	cmd := exec.Command("git", "status")
+	cmd.Env = []string{"FOO=bar", "GIT_TERMINAL_PROMPT=1"}
+	applyGitEnv(ctx, cmd)
+
+	if !contains(cmd.Env, "GIT_TERMINAL_PROMPT=0") {
+		t.Errorf("expected GIT_TERMINAL_PROMPT=0, got %v", cmd.Env)
+	}
+	if contains(cmd.Env, "GIT_TERMINAL_PROMPT=1") {
+		t.Errorf("stale GIT_TERMINAL_PROMPT=1 not overridden: %v", cmd.Env)
+	}
+	if !contains(cmd.Env, "FOO=bar") {
+		t.Errorf("preserved env entry lost: %v", cmd.Env)
+	}
+	if !contains(cmd.Env, "GIT_ASKPASS=") {
+		t.Errorf("expected GIT_ASKPASS= to disable askpass: %v", cmd.Env)
+	}
+}
+
+func TestApplyGitEnv_SecureModeIsolatesAndDisablesPrompts(t *testing.T) {
+	ctx := environment.SetSharedConfig(context.Background(), &environment.Config{SecureGit: true})
+	cmd := exec.Command("git", "status")
+	applyGitEnv(ctx, cmd)
+
+	if !contains(cmd.Env, "GIT_TERMINAL_PROMPT=0") {
+		t.Errorf("secure mode should also disable prompts: %v", cmd.Env)
+	}
+	if !contains(cmd.Env, "HOME=/nonexistent") {
+		t.Errorf("expected isolated HOME in secure mode: %v", cmd.Env)
+	}
+}
 
 func TestApplyGitCeiling_SetsAbsolutePath(t *testing.T) {
 	cmd := exec.Command("git", "status")

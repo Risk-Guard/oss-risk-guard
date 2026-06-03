@@ -71,6 +71,9 @@ func ResolveRepoRoot(ctx context.Context, path string) (root string, isGit bool,
 		return "", false, fmt.Errorf("path is not a directory: %s", absPath)
 	}
 
+	// rev-parse --show-toplevel is a local-only metadata read — it never
+	// contacts a remote and so never prompts. Keep it free of the shared-config
+	// dependency that applyGitEnv carries, so ResolveRepoRoot works in any ctx.
 	out, err := exec.CommandContext(ctx, "git", "-C", absPath, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return absPath, false, nil
@@ -129,7 +132,7 @@ func AnalyzeRepository(ctx context.Context, repoPath string) (*models.GitMetadat
 func getRemoteURL(ctx context.Context, repoPath string) (string, bool, error) {
 	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "config", "--get", "remote.origin.url")
-	applySecureGitEnv(ctx, cmd)
+	applyGitEnv(ctx, cmd)
 	applyGitCeiling(cmd, repoPath)
 	out, err := cmd.Output()
 	if err != nil {
@@ -168,7 +171,7 @@ type CommitInfo struct {
 func extractCommitHistory(ctx context.Context, repoPath string) ([]CommitInfo, error) {
 	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", "--date-order", "--format=%ae%x09%aI")
-	applySecureGitEnv(ctx, cmd)
+	applyGitEnv(ctx, cmd)
 	applyGitCeiling(cmd, repoPath)
 	out, err := cmd.Output()
 	if err != nil {
