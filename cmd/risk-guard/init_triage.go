@@ -21,7 +21,7 @@ type finding struct {
 	Message   string
 }
 
-func collectInitFindings(report *sarif.Report) []finding {
+func collectInitFindings(report *sarif.Report, level string) []finding {
 	var out []finding
 	for _, run := range report.Runs {
 		for _, res := range run.Results {
@@ -29,11 +29,10 @@ func collectInitFindings(report *sarif.Report) []finding {
 			if res.Level != nil {
 				lvl = *res.Level
 			}
-			// Init triage only surfaces blocking (error) findings. Warnings,
-			// notes, and info don't fail the build and just add noise to the
-			// prompt; users who want to acknowledge them can edit
-			// .risk-guard.yml by hand.
-			if lvl != "error" {
+			// Triage runs one SARIF level at a time: init triages "error"
+			// findings into expected_failures and "warning" findings into
+			// expected_warnings. Notes and info are left for hand-editing.
+			if lvl != level {
 				continue
 			}
 			code := ""
@@ -95,12 +94,57 @@ const (
 	triageReviewEach
 )
 
-func chooseTriageMode(n int) (triageDecision, error) {
+// triageTarget describes which findings a triage pass is for: the noun used in
+// the prompt ("blocking finding", "warning") and the config section the picks
+// land in ("expected_failures", "expected_warnings").
+type triageTarget struct {
+	noun    string
+	section string
+}
+
+var (
+	triageFailures = triageTarget{noun: "blocking finding", section: "expected_failures"}
+	triageWarnings = triageTarget{noun: "warning", section: "expected_warnings"}
+)
+
+func pluralize(noun string, n int) string {
+	if n == 1 {
+		return noun
+	}
+	return noun + "s"
+}
+
+// triageInitFindings prompts for how to handle a set of same-level findings and
+// returns the entries to record in the target section. Returns nil (add
+// nothing) when the user keeps defaults or reviews and ignores none.
+func triageInitFindings(findings []finding, t triageTarget) (map[string]policy.ExpectedFailureV2, error) {
+	decision, err := chooseTriageMode(len(findings), t)
+	if err != nil {
+		return nil, err
+	}
+	switch decision {
+	case triageIgnoreAll:
+		return buildExpectedFailures(findings), nil
+	case triageReviewEach:
+		picked := map[string]map[string]struct{}{}
+		if err := reviewEachInto(findings, picked); err != nil {
+			return nil, err
+		}
+		if len(picked) == 0 {
+			return nil, nil
+		}
+		return groupedToExpectedFailures(picked), nil
+	default:
+		return nil, nil
+	}
+}
+
+func chooseTriageMode(n int, t triageTarget) (triageDecision, error) {
 	var choice string
 	err := huh.NewSelect[string]().
-		Title(fmt.Sprintf("Found %d finding(s). What would you like to do?", n)).
+		Title(fmt.Sprintf("Found %d %s. What would you like to do?", n, pluralize(t.noun, n))).
 		Options(
-			huh.NewOption("Ignore all (add expected_failures for every finding)", "ignore-all"),
+			huh.NewOption(fmt.Sprintf("Ignore all (add %s for every %s)", t.section, t.noun), "ignore-all"),
 			huh.NewOption("Review each one", "review"),
 			huh.NewOption("Keep defaults (don't add anything)", "none"),
 		).
@@ -117,15 +161,6 @@ func chooseTriageMode(n int) (triageDecision, error) {
 	default:
 		return triageNone, nil
 	}
-}
-
-func reviewEach(findings []finding, pol *policy.Policy) error {
-	picked := map[string]map[string]struct{}{}
-	if err := reviewEachInto(findings, picked); err != nil {
-		return err
-	}
-	applyExpectedFailures(pol, picked)
-	return nil
 }
 
 // addPick records a (entity, check) pair into the picked set, creating the
@@ -204,13 +239,6 @@ func buildExpectedFailures(findings []finding) map[string]policy.ExpectedFailure
 		grouped[f.EntityKey][f.CheckCode] = struct{}{}
 	}
 	return groupedToExpectedFailures(grouped)
-}
-
-func applyExpectedFailures(pol *policy.Policy, picked map[string]map[string]struct{}) {
-	if len(picked) == 0 {
-		return
-	}
-	pol.ExpectedFailures = groupedToExpectedFailures(picked)
 }
 
 func groupedToExpectedFailures(grouped map[string]map[string]struct{}) map[string]policy.ExpectedFailureV2 {

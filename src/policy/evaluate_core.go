@@ -93,6 +93,27 @@ func evaluateWithBreakdown(
 				continue
 			}
 
+			// expected_warnings is a noise baseline for warning-level findings
+			// only: it never silences a blocking finding (guarded below), and a
+			// lapsed entry reverts to a plain warning rather than escalating to
+			// blocking the way an expired expected_failure does.
+			if !sevResult.IsBlocking() {
+				if ack := policy.getExpectedWarning(analysis.AnalysisID, violation.CheckCode, depth); ack != nil {
+					if ack.Expires != nil && ack.Expires.Before(evaluationTime) {
+						finding.Kind = FindingWarning
+						finding.Note = formatExpiredNote(ack)
+						result.Findings = append(result.Findings, finding)
+						summary.Warning++
+					} else {
+						finding.Kind = FindingAcknowledged
+						finding.Note = formatAckNote(ack)
+						result.Findings = append(result.Findings, finding)
+						summary.Acknowledged++
+					}
+					continue
+				}
+			}
+
 			if sevResult.IsBlocking() {
 				finding.Kind = FindingBlocking
 				result.Findings = append(result.Findings, finding)

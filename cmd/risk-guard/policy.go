@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	"github.com/fatih/color"
@@ -75,9 +74,9 @@ func repoArg(args []string) string {
 }
 
 func runPolicyShow(_ *cobra.Command, args []string) error {
-	repoPath, err := git.ValidateGitRepo(repoArg(args))
+	repoPath, err := resolveScanPath(repoArg(args))
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 
 	res, raw, err := loadRepoPolicy(repoPath)
@@ -99,11 +98,11 @@ func runPolicyShow(_ *cobra.Command, args []string) error {
 }
 
 func runAddExpectedFailures(_ *cobra.Command, args []string) error {
-	// Resolve the repo root the same way init/run do so we read and write the
-	// exact .risk-guard.yml the rest of the tool uses.
-	repoPath, err := git.ValidateGitRepo(repoArg(args))
+	// Resolve the target the same way init/run do so we read and write the exact
+	// .risk-guard.yml the rest of the tool uses at the named path.
+	repoPath, err := resolveScanPath(repoArg(args))
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 
 	if _, statErr := os.Stat(addEFSarif); statErr != nil {
@@ -118,7 +117,7 @@ func runAddExpectedFailures(_ *cobra.Command, args []string) error {
 		return errReported
 	}
 
-	findings := collectInitFindings(report)
+	findings := collectInitFindings(report, levelError)
 	if len(findings) == 0 {
 		fmt.Fprintln(os.Stderr, "No blocking findings in SARIF; nothing to add.")
 		return nil

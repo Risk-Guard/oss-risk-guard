@@ -52,25 +52,38 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 func (n *Node) handleLocalResolve(ctx context.Context, sourceURL string, input dag_impl.Input) (*Output, error) {
 	logger := ctxutil.GetLogger(ctx)
 
-	repoPath, err := git.ValidateGitRepo(sourceURL)
+	// A local source is the directory the user named; its content is scannable
+	// whether or not it is a git repo. Resolution therefore only fails if the
+	// path itself is unusable. The enclosing git work tree (if any) is found by
+	// walking up, and supplies the commit used by history checks — but its
+	// absence is not a resolution failure: content checks still run, and the
+	// commit-dependent checks skip downstream in git_clone_metadata.
+	gitRoot, isGit, err := git.ResolveRepoRoot(ctx, sourceURL)
 	if err != nil {
 		return NewOutput(
 			executiondag.StatusSkipped,
-			fmt.Sprintf("validating local git repository: %v", err),
+			fmt.Sprintf("resolving local source: %v", err),
 			input,
 		), nil
 	}
 
-	commit, err := git.GetHeadCommit(ctx, repoPath)
+	out := NewOutput(executiondag.StatusSuccess, "", input)
+	if !isGit {
+		logger.Debug("local source is not in a git work tree; history checks will be skipped",
+			zap.String("path", sourceURL))
+		return out, nil
+	}
+
+	commit, err := git.GetHeadCommit(ctx, gitRoot)
 	if err != nil {
 		return nil, fmt.Errorf("getting HEAD commit: %w", err)
 	}
 
-	logger.Debug("resolved local git repository",
-		zap.String("path", repoPath),
+	logger.Debug("resolved local git work tree",
+		zap.String("path", sourceURL),
+		zap.String("git_root", gitRoot),
 		zap.String("commit", commit))
 
-	out := NewOutput(executiondag.StatusSuccess, "", input)
 	out.Commit = commit
 	return out, nil
 }

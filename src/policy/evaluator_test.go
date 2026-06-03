@@ -906,3 +906,121 @@ func TestEvaluate_RootExpectedFailure(t *testing.T) {
 		require.Equal(t, "BLOCKED", result.Status)
 	})
 }
+
+func TestEvaluate_ExpectedWarning_Acknowledges(t *testing.T) {
+	pol := &CompiledPolicy{
+		Rules: []SeverityRule{
+			{
+				Path:        SeverityPath{Target: PathTarget{IsCategory: true, Name: string(category.RiskCategoryContinuityAssurance)}},
+				Value:       SeverityValue{Severity: SeverityWarning},
+				Specificity: 0,
+			},
+		},
+		ExpectedWarnings: map[string]ExpectedFailureV2{
+			"package/npm/noisy-pkg": {Checks: []string{"SOURCE_REPO_STALE"}, Reason: "known stale; baselined", ApprovedBy: "admin"},
+		},
+	}
+
+	v := &violations.ViolationsResult{
+		RootAnalysis: "package/npm/noisy-pkg",
+		Analyses: []violations.AnalysisViolations{
+			{
+				AnalysisID:     "package/npm/noisy-pkg",
+				DependencyPath: nil,
+				Violations: []violations.Violation{
+					{CheckCode: "SOURCE_REPO_STALE", Rationale: "warning check failed"},
+				},
+			},
+		},
+	}
+
+	result, err := EvaluateCompiled(pol, v, "https://github.com/test/repo", time.Now(), testCategoryMap(), "")
+	require.NoError(t, err)
+
+	require.Equal(t, "PASS", result.Status)
+	require.Empty(t, findingsOfKind(result.Findings, FindingWarning))
+	acked := findingsOfKind(result.Findings, FindingAcknowledged)
+	require.Len(t, acked, 1)
+	require.Contains(t, acked[0].Note, "known stale; baselined")
+	require.Equal(t, 1, result.Summary.Acknowledged)
+	require.Equal(t, 0, result.Summary.Warning)
+}
+
+func TestEvaluate_ExpectedWarning_DoesNotSilenceBlocking(t *testing.T) {
+	// The same entity+check is listed in expected_warnings, but the finding
+	// resolves to blocking severity. expected_warnings must not touch it.
+	pol := &CompiledPolicy{
+		Rules: []SeverityRule{
+			{
+				Path:        SeverityPath{Target: PathTarget{IsCategory: true, Name: string(category.RiskCategoryCritical)}},
+				Value:       SeverityValue{Severity: SeverityBlocking},
+				Specificity: 0,
+			},
+		},
+		ExpectedWarnings: map[string]ExpectedFailureV2{
+			"package/npm/risky-pkg": {Checks: []string{"PACKAGE_ACTIVE_MALWARE"}, Reason: "must not silence a blocking finding"},
+		},
+	}
+
+	v := &violations.ViolationsResult{
+		RootAnalysis: "package/npm/risky-pkg",
+		Analyses: []violations.AnalysisViolations{
+			{
+				AnalysisID:     "package/npm/risky-pkg",
+				DependencyPath: nil,
+				Violations: []violations.Violation{
+					{CheckCode: "PACKAGE_ACTIVE_MALWARE", Rationale: "failed check"},
+				},
+			},
+		},
+	}
+
+	result, err := EvaluateCompiled(pol, v, "https://github.com/test/repo", time.Now(), testCategoryMap(), "")
+	require.NoError(t, err)
+
+	require.Equal(t, "BLOCKED", result.Status)
+	require.Empty(t, findingsOfKind(result.Findings, FindingAcknowledged))
+	require.Len(t, findingsOfKind(result.Findings, FindingBlocking), 1)
+	require.Equal(t, 1, result.Summary.Blocking)
+}
+
+func TestEvaluate_ExpiredExpectedWarning_RevertsToWarning(t *testing.T) {
+	expired := time.Now().Add(-24 * time.Hour)
+	pol := &CompiledPolicy{
+		Rules: []SeverityRule{
+			{
+				Path:        SeverityPath{Target: PathTarget{IsCategory: true, Name: string(category.RiskCategoryContinuityAssurance)}},
+				Value:       SeverityValue{Severity: SeverityWarning},
+				Specificity: 0,
+			},
+		},
+		ExpectedWarnings: map[string]ExpectedFailureV2{
+			"package/npm/noisy-pkg": {Checks: []string{"SOURCE_REPO_STALE"}, Reason: "temporary", Expires: &expired},
+		},
+	}
+
+	v := &violations.ViolationsResult{
+		RootAnalysis: "package/npm/noisy-pkg",
+		Analyses: []violations.AnalysisViolations{
+			{
+				AnalysisID:     "package/npm/noisy-pkg",
+				DependencyPath: nil,
+				Violations: []violations.Violation{
+					{CheckCode: "SOURCE_REPO_STALE", Rationale: "warning check failed"},
+				},
+			},
+		},
+	}
+
+	result, err := EvaluateCompiled(pol, v, "https://github.com/test/repo", time.Now(), testCategoryMap(), "")
+	require.NoError(t, err)
+
+	// A lapsed warning baseline reverts to a plain warning — it never escalates
+	// to blocking the way an expired expected_failure does.
+	require.Equal(t, "WARNING", result.Status)
+	require.Empty(t, findingsOfKind(result.Findings, FindingExpired))
+	require.Empty(t, findingsOfKind(result.Findings, FindingAcknowledged))
+	require.Len(t, findingsOfKind(result.Findings, FindingWarning), 1)
+	require.Equal(t, 1, result.Summary.Warning)
+	require.Equal(t, 0, result.Summary.Expired)
+}

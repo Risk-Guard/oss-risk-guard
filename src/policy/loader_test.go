@@ -168,6 +168,49 @@ expected_failures:
 	require.Equal(t, "admin@example.com", pol.ExpectedFailures["package/npm/@alloc/quick-lru"].ApprovedBy)
 }
 
+func TestLoadFromBytes_ExpectedWarnings(t *testing.T) {
+	yamlData := `
+version: 2
+severity:
+  category/critical: blocking
+expected_warnings:
+  package/npm/lodash:
+    checks: [PACKAGE_STALE_RELEASE]
+    reason: "Baselined noise; tracked in #482"
+    approved_by: "security@example.com"
+  root:
+    checks: [SOURCE_FEW_CONTRIBUTORS]
+    reason: "Internal repo"
+`
+	pol, err := LoadFromBytes([]byte(yamlData), "test.yml")
+	require.NoError(t, err)
+	require.Len(t, pol.ExpectedWarnings, 2)
+	require.Equal(t, []string{"PACKAGE_STALE_RELEASE"}, pol.ExpectedWarnings["package/npm/lodash"].Checks)
+	require.Equal(t, "Baselined noise; tracked in #482", pol.ExpectedWarnings["package/npm/lodash"].Reason)
+	require.Empty(t, pol.ExpectedFailures)
+
+	// Round-trips back out so the server and `init` rewrite preserve the section.
+	out, err := ToYAML(pol)
+	require.NoError(t, err)
+	require.Contains(t, out, "expected_warnings")
+	require.Contains(t, out, "PACKAGE_STALE_RELEASE")
+}
+
+func TestLoadFromBytes_ExpectedWarnings_MissingChecksArray(t *testing.T) {
+	yamlData := `
+version: 2
+severity:
+  category/critical: blocking
+expected_warnings:
+  package/npm/lodash:
+    reason: "Missing checks array"
+`
+	_, err := LoadFromBytes([]byte(yamlData), "test.yml")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "expected_warnings")
+	require.Contains(t, err.Error(), "checks array is required")
+}
+
 func TestLoadFromBytes_SpecificityOrdering(t *testing.T) {
 	yamlData := `
 version: 2

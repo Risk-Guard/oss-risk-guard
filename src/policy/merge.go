@@ -49,6 +49,14 @@ func merge(base, overlay *CompiledPolicy) *CompiledPolicy {
 		expectedFailures[k] = v.clone()
 	}
 
+	expectedWarnings := make(map[string]ExpectedFailureV2)
+	for k, v := range base.ExpectedWarnings {
+		expectedWarnings[k] = v.clone()
+	}
+	for k, v := range overlay.ExpectedWarnings {
+		expectedWarnings[k] = v.clone()
+	}
+
 	var workflow *WorkflowConfig
 	if overlay.Workflow != nil {
 		wf := *overlay.Workflow
@@ -61,6 +69,7 @@ func merge(base, overlay *CompiledPolicy) *CompiledPolicy {
 	return &CompiledPolicy{
 		Rules:            allRules,
 		ExpectedFailures: expectedFailures,
+		ExpectedWarnings: expectedWarnings,
 		Workflow:         workflow,
 	}
 }

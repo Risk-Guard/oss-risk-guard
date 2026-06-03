@@ -176,7 +176,6 @@ func init() {
 // shared `evaluate`, `scoreAll`, and `buildCacheConfig` helpers pick them up.
 func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for merged SARIF report (default ./risk-guard-report.sarif)")
-	cmd.Flags().StringVar(&overridesFile, "overrides", "", "YAML file with field overrides")
 	cmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
 	cmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
 	cmd.Flags().StringVar(&runAllSBOMFormat, "sbom-format", sbomFormatSPDX, "In-memory SBOM format used to enumerate deps: spdx or cyclonedx")

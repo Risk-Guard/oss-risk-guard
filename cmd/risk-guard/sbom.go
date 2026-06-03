@@ -13,7 +13,6 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
@@ -89,9 +88,9 @@ func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 
 	logger := ctxutil.GetLogger(ctx)
 
-	repoPath, err := git.ValidateGitRepo(path)
+	repoPath, err := resolveScanPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("invalid git repository: %w", err)
+		return nil, fmt.Errorf("resolving source path: %w", err)
 	}
 
 	rootKey := sourceKey(repoPath)

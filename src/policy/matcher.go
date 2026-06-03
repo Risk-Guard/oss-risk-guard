@@ -100,10 +100,28 @@ func (p *CompiledPolicy) getExpectedFailure(entityKey, checkCode string, depth i
 	if p == nil {
 		return nil
 	}
+	return matchAck(p.ExpectedFailures, entityKey, checkCode, depth)
+}
+
+// getExpectedWarning resolves an expected_warnings acknowledgment for a finding.
+// It uses the same entity/check matching as expected_failures but reads the
+// separate expected_warnings table. Callers only consult it for warning-level
+// findings, so it can never silence a blocking finding.
+func (p *CompiledPolicy) getExpectedWarning(entityKey, checkCode string, depth int) *ExpectedFailureV2 {
+	if p == nil {
+		return nil
+	}
+	return matchAck(p.ExpectedWarnings, entityKey, checkCode, depth)
+}
+
+// matchAck finds the most specific acknowledgment in table whose key pattern
+// matches entityKey and whose checks include checkCode. "root" entries match
+// only at depth 0. Shared by expected_failures and expected_warnings.
+func matchAck(table map[string]ExpectedFailureV2, entityKey, checkCode string, depth int) *ExpectedFailureV2 {
 	var bestPattern string
 	var bestEF *ExpectedFailureV2
 	bestSpec := -1
-	for pattern, ef := range p.ExpectedFailures {
+	for pattern, ef := range table {
 		if pattern == "root" {
 			continue
 		}
@@ -129,7 +147,7 @@ func (p *CompiledPolicy) getExpectedFailure(entityKey, checkCode string, depth i
 		return bestEF
 	}
 	if depth == 0 {
-		if ef, ok := p.ExpectedFailures["root"]; ok {
+		if ef, ok := table["root"]; ok {
 			if checksContain(ef.Checks, checkCode) {
 				efCopy := ef
 				bestEF = &efCopy

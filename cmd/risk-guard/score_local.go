@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
 
 	dagcmd "github.com/Risk-Guard/oss-risk-guard/src/cmd/subcommands/dag"
@@ -55,9 +54,9 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 		command.SetContext(runpath.SetChecksOutputPath(command.Context(), checksOutFile))
 	}
 
-	repoPath, err := git.ValidateGitRepo(path)
+	repoPath, err := resolveScanPath(path)
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 
 	ctx, overridesHash, err := setupAuditContext(command, repoPath)

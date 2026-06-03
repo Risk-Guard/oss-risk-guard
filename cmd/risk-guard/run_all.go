@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
@@ -32,9 +31,9 @@ var (
 // --github, after the SARIF is written the same in-memory report is rendered
 // to stdout as GitHub Actions workflow annotations.
 func runAll(cmd *cobra.Command, args []string) error {
-	repoPath, err := git.ValidateGitRepo(args[0])
+	repoPath, err := resolveScanPath(args[0])
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 	if auditJobs < 1 {
 		return fmt.Errorf("--jobs must be >= 1")

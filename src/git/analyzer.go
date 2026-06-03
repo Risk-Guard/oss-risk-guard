@@ -46,6 +46,42 @@ func ValidateGitRepo(path string) (string, error) {
 	return absPath, nil
 }
 
+// ResolveRepoRoot resolves path to the root of its git work tree using
+// `git rev-parse --show-toplevel`, which walks up parent directories the same
+// way git itself does (and handles worktrees/submodules where .git is a file).
+// isGit is false when path is not inside a git repo, or git is unavailable; in
+// that case root is the cleaned absolute path so callers can still operate on
+// the directory — the source DAG auto-skips git-history checks for non-git
+// paths. A missing path or non-directory is a hard error regardless, since that
+// is a user mistake rather than an absent repo.
+func ResolveRepoRoot(ctx context.Context, path string) (root string, isGit bool, err error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to resolve path: %w", err)
+	}
+
+	info, err := os.Stat(absPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, fmt.Errorf("path does not exist: %s", absPath)
+		}
+		return "", false, fmt.Errorf("failed to access path: %w", err)
+	}
+	if !info.IsDir() {
+		return "", false, fmt.Errorf("path is not a directory: %s", absPath)
+	}
+
+	out, err := exec.CommandContext(ctx, "git", "-C", absPath, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return absPath, false, nil
+	}
+	top := strings.TrimSpace(string(out))
+	if top == "" {
+		return absPath, false, nil
+	}
+	return top, true, nil
+}
+
 func AnalyzeRepository(ctx context.Context, repoPath string) (*models.GitMetadata, error) {
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
