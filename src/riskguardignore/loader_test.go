@@ -10,6 +10,42 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 )
 
+func TestMatcher_Match(t *testing.T) {
+	// patterns are the normalized form LoadIgnorePatterns produces.
+	m := &Matcher{patterns: []string{"**/third_party", "**/vendor", "**/*.generated.go", "src/tests"}}
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"third_party", true},                      // the directory itself
+		{"third_party/foo/setup.py", true},         // file beneath it
+		{"a/third_party/x/requirements.txt", true}, // nested beneath it
+		{"vendor/lib/package.json", true},
+		{"src/tests", true},
+		{"src/tests/conftest.py", true},
+		{"pkg/foo.generated.go", true},
+		{"requirements.txt", false},
+		{"src/main.go", false},
+		{"third_party_notes.txt", false}, // prefix only, not the dir
+	}
+	for _, c := range cases {
+		if got := m.Match(c.path); got != c.want {
+			t.Errorf("Match(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+}
+
+func TestMatcher_EmptyMatchesNothing(t *testing.T) {
+	var nilM *Matcher
+	if nilM.Match("anything") || !nilM.Empty() {
+		t.Error("nil matcher should be empty and match nothing")
+	}
+	empty := &Matcher{}
+	if empty.Match("x") || !empty.Empty() {
+		t.Error("empty matcher should be empty and match nothing")
+	}
+}
+
 func TestNormalizePattern(t *testing.T) {
 	tests := []struct {
 		input    string

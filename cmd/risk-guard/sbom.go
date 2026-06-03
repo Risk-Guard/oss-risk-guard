@@ -17,7 +17,9 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/package_detection"
+	"github.com/Risk-Guard/oss-risk-guard/src/riskguardignore"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -99,6 +101,7 @@ func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("detecting packages: %w", err)
 	}
+	manifests = filterIgnoredManifests(ctx, repoPath, manifests)
 	logger.Info("detected manifests", zap.Int("count", len(manifests)))
 
 	edges, parseErrs := collectEdges(rootKey, manifests, repoPath)
@@ -113,6 +116,53 @@ func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 	logger.Info("collected SBOM nodes", zap.Int("count", len(nodes)))
 
 	return buildSBOMJSON(format, rootKey, nodes)
+}
+
+// filterIgnoredManifests drops manifests that live entirely under
+// .riskguardignore'd paths, so dependencies declared in excluded directories
+// (e.g. vendored third_party/ submodules) are not enumerated or audited. It
+// uses the same matcher as the source-file ignore path, and reports how many
+// manifests it excluded rather than dropping them silently.
+func filterIgnoredManifests(ctx context.Context, repoPath string, manifests []models.DetectedManifest) []models.DetectedManifest {
+	logger := ctxutil.GetLogger(ctx)
+	matcher, err := riskguardignore.NewMatcher(repoPath)
+	if err != nil {
+		logger.Warn("reading .riskguardignore; auditing all manifests", zap.Error(err))
+		return manifests
+	}
+	if matcher.Empty() {
+		return manifests
+	}
+
+	kept := manifests[:0]
+	dropped := 0
+	for _, m := range manifests {
+		if manifestIgnored(matcher, m) {
+			dropped++
+			logger.Debug("excluded manifest via .riskguardignore", zap.Strings("paths", m.Paths))
+			continue
+		}
+		kept = append(kept, m)
+	}
+	if dropped > 0 {
+		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("excluded %d manifest(s) via .riskguardignore", dropped))
+	}
+	return kept
+}
+
+// manifestIgnored reports whether every file in a manifest is ignored. A
+// manifest groups files that define one package (e.g. pyproject.toml + setup.py
+// in the same dir), so it is excluded only when all of them are ignored.
+func manifestIgnored(matcher *riskguardignore.Matcher, m models.DetectedManifest) bool {
+	if len(m.Paths) == 0 {
+		return false
+	}
+	for _, p := range m.Paths {
+		if !matcher.Match(p) {
+			return false
+		}
+	}
+	return true
 }
 
 // sourceKey mirrors dag_impl.NewSourceInputWithOverrides's analysis-identifier

@@ -74,6 +74,7 @@ func ResolveRepoRoot(ctx context.Context, path string) (root string, isGit bool,
 	// rev-parse --show-toplevel is a local-only metadata read — it never
 	// contacts a remote and so never prompts. Keep it free of the shared-config
 	// dependency that applyGitEnv carries, so ResolveRepoRoot works in any ctx.
+	//nolint:gosec // G204: args are hardcoded git subcommands; absPath is a validated local directory
 	out, err := exec.CommandContext(ctx, "git", "-C", absPath, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return absPath, false, nil

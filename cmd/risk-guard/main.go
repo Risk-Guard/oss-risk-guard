@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
@@ -166,7 +167,18 @@ func init() {
 	rootCmd.PersistentFlags().String("color", "auto", "Colored output: auto (default; honors TTY + NO_COLOR), always, never")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (deprecated: use --color=never)")
 	_ = rootCmd.PersistentFlags().MarkDeprecated("no-color", "use --color=never")
-	rootCmd.PersistentFlags().String("cache-dir", "", "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR or os.UserCacheDir()/risk-guard).")
+
+	// Make the cache-dir default concrete: resolve the platform default
+	// (option 3) now so help shows the real path instead of the abstract
+	// "os.UserCacheDir()/risk-guard".
+	cacheHelp := "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR)."
+	if def := platformDefaultCacheDir(); def != "" {
+		cacheHelp = fmt.Sprintf("Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR, else %s).", def)
+		rootCmd.Long = strings.Replace(rootCmd.Long,
+			"os.UserCacheDir()/risk-guard (platform default)",
+			fmt.Sprintf("os.UserCacheDir()/risk-guard (%s — platform default)", def), 1)
+	}
+	rootCmd.PersistentFlags().String("cache-dir", "", cacheHelp)
 
 	registerRunAllFlags(rootCmd)
 }
@@ -214,6 +226,17 @@ func resolveColor(colorMode string, noColor bool) error {
 // flagValue (already resolved by the caller from --cache-dir, or the deprecated
 // --output-dir) > RISK_GUARD_CACHE_DIR env > os.UserCacheDir()/risk-guard.
 // Falls back to os.MkdirTemp if no user cache dir is available.
+// platformDefaultCacheDir returns the OS-default cache root — option 3 of the
+// resolution order (os.UserCacheDir()/risk-guard) — or "" when the user cache
+// dir is unavailable. Used only to make help text concrete.
+func platformDefaultCacheDir() string {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(base, "risk-guard")
+}
+
 func resolveCacheDir(flagValue string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil

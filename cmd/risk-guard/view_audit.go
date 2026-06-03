@@ -305,47 +305,6 @@ func renderPackage(w io.Writer, displayName string, findings []auditFinding) err
 	return nil
 }
 
-// blockingFindingLines names every error-level result as
-// "<subject> — <title> (<CHECK>)" so a failing run says exactly what blocks it.
-// The predicate matches countErrorLevel, so the list length equals the
-// "blocks N finding(s)" tally in the verdict.
-func blockingFindingLines(report *sarif.Report) []string {
-	if report == nil {
-		return nil
-	}
-	runIDs := runIDByPkg(report)
-	var lines []string
-	for _, run := range report.Runs {
-		titles := ruleTitleIndex(run)
-		for _, res := range run.Results {
-			if res.Level == nil || *res.Level != levelError {
-				continue
-			}
-			rule := derefString(res.RuleID)
-			pkg := packageFromResult(res)
-			subject := annotationSubject(runIDs[pkg], pkg)
-			if subject == "" {
-				subject = "this repository"
-			}
-			title := titles[rule]
-			if title == "" {
-				title = rule
-			}
-			line := fmt.Sprintf("%s — %s (%s)", subject, title, rule)
-			if file, ln := physicalFromResult(res); file != "" && file != "." {
-				if ln > 0 {
-					line += fmt.Sprintf("  from %s:%d", file, ln)
-				} else {
-					line += fmt.Sprintf("  from %s", file)
-				}
-			}
-			lines = append(lines, line)
-		}
-	}
-	sort.Strings(lines)
-	return lines
-}
-
 // humanPackageName turns "package/npm/left-pad" into "left-pad (npm)" and
 // "package/npm/lodash?version=4.17.20" into "lodash@4.17.20 (npm)". Any key
 // parseKeyIdentity can't decode is returned unchanged.
