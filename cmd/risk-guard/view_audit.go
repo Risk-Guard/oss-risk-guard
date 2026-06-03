@@ -282,6 +282,20 @@ func renderPackage(w io.Writer, displayName string, findings []auditFinding) err
 		if _, err := fmt.Fprintf(w, "           %s\n", f.RuleID); err != nil {
 			return err
 		}
+		// Where the finding was discovered (the manifest that declared a
+		// dependency, or the source file) — the provenance that makes a finding
+		// actionable. Skip the synthetic repo-root anchor (commonsarif
+		// RepoRootURI = ".") that EnsurePhysicalLocations stamps on findings with
+		// no real location; it isn't useful provenance.
+		if f.File != "" && f.File != "." {
+			loc := f.File
+			if f.Line > 0 {
+				loc = fmt.Sprintf("%s:%d", f.File, f.Line)
+			}
+			if _, err := fmt.Fprintf(w, "           ↳ %s\n", loc); err != nil {
+				return err
+			}
+		}
 		for line := range strings.SplitSeq(f.Message, "\n") {
 			if _, err := fmt.Fprintf(w, "           %s\n", line); err != nil {
 				return err
@@ -317,7 +331,15 @@ func blockingFindingLines(report *sarif.Report) []string {
 			if title == "" {
 				title = rule
 			}
-			lines = append(lines, fmt.Sprintf("%s — %s (%s)", subject, title, rule))
+			line := fmt.Sprintf("%s — %s (%s)", subject, title, rule)
+			if file, ln := physicalFromResult(res); file != "" && file != "." {
+				if ln > 0 {
+					line += fmt.Sprintf("  from %s:%d", file, ln)
+				} else {
+					line += fmt.Sprintf("  from %s", file)
+				}
+			}
+			lines = append(lines, line)
 		}
 	}
 	sort.Strings(lines)

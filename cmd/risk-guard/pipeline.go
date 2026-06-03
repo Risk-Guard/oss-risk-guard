@@ -80,7 +80,7 @@ func keysAndLocations(deps []sbom.DirectDep) ([]string, map[string]*models.Locat
 // runPackageAudits owns the per-batch audit progress UI and scoring loop.
 // Returns the raw per-package violations and any per-package failures. The
 // rulebook is NOT applied here — that happens once at merge time.
-func runPackageAudits(ctx context.Context, keys []string, overridesHash string) ([]*violations.AnalysisViolations, []packageError, error) {
+func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*models.LocationInfo, overridesHash string) ([]*violations.AnalysisViolations, []packageError, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("no direct dependencies to audit"))
 		return nil, nil, nil
@@ -105,7 +105,7 @@ func runPackageAudits(ctx context.Context, keys []string, overridesHash string) 
 		zap.Int("count", len(keys)),
 		zap.Int("jobs", auditJobs))
 
-	analyses, failures, totals, err := scoreAll(ctx, keys, overridesHash, checkMetadata, auditJobs, cacheCfg)
+	analyses, failures, totals, err := scoreAll(ctx, keys, locByKey, overridesHash, checkMetadata, auditJobs, cacheCfg)
 	if err != nil {
 		return nil, nil, err
 	}

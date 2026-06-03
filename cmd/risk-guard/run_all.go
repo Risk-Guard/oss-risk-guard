@@ -88,7 +88,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 	}
 	keys, locByKey := keysAndLocations(deps)
 
-	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
+	depViolations, failures, err := runPackageAudits(ctx, keys, locByKey, overridesHash)
 	if err != nil {
 		if !runAllContinueOnError {
 			return err

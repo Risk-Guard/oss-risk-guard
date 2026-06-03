@@ -16,6 +16,8 @@ type testFinding struct {
 	Level            string
 	Message          string
 	ShortDescription string
+	File             string
+	Line             int
 }
 
 func newTestReport(t *testing.T, findings []testFinding) *sarif.Report {
@@ -39,6 +41,13 @@ func newTestReport(t *testing.T, findings []testFinding) *sarif.Report {
 			Name: &pkgName,
 			Kind: &kind,
 		}})
+		if f.File != "" {
+			phys := sarif.NewPhysicalLocation().WithArtifactLocation(sarif.NewSimpleArtifactLocation(f.File))
+			if f.Line > 0 {
+				phys = phys.WithRegion(sarif.NewSimpleRegion(f.Line, f.Line))
+			}
+			loc.WithPhysicalLocation(phys)
+		}
 		res.WithLocations([]*sarif.Location{loc})
 	}
 	report.AddRun(run)
@@ -87,9 +96,31 @@ func TestRenderAudit_GroupsSortsAndUsesRuleTitle(t *testing.T) {
 	}
 }
 
+func TestRenderPackage_ShowsFileLineProvenance(t *testing.T) {
+	var buf bytes.Buffer
+	findings := []auditFinding{
+		{Level: "error", RuleID: "SOURCE_REPO_NOT_FOUND", Title: "Source repo not found", Message: "could not resolve", File: "third_party/foo/requirements.txt", Line: 3},
+		{Level: "warning", RuleID: "NO_LOCATION_RULE", Title: "No location", Message: "no file attached"},
+		{Level: "warning", RuleID: "ROOT_ANCHOR_RULE", Title: "Root anchored", Message: "anchored at repo root", File: "."},
+	}
+	if err := renderPackage(&buf, "package/pypi/foo", findings); err != nil {
+		t.Fatalf("renderPackage: %v", err)
+	}
+	out := buf.String()
+
+	if !strings.Contains(out, "third_party/foo/requirements.txt:3") {
+		t.Errorf("expected file:line provenance in output:\n%s", out)
+	}
+	// Only the finding with a real location prints one — the no-location finding
+	// and the synthetic "." repo-root anchor must not.
+	if got := strings.Count(out, "↳"); got != 1 {
+		t.Errorf("expected exactly one location line, got %d:\n%s", got, out)
+	}
+}
+
 func TestBlockingFindingLines(t *testing.T) {
 	report := newTestReport(t, []testFinding{
-		{Package: "package/pypi/beautifulsoup4", RuleID: "SOURCE_REPO_NOT_FOUND", Level: "error", Message: "repo not found", ShortDescription: "Source repository could not be found or accessed"},
+		{Package: "package/pypi/beautifulsoup4", RuleID: "SOURCE_REPO_NOT_FOUND", Level: "error", Message: "repo not found", ShortDescription: "Source repository could not be found or accessed", File: "requirements.txt", Line: 7},
 		{Package: "package/npm/lodash", RuleID: "WARN_RULE", Level: "warning", Message: "just a warning", ShortDescription: "A warning"},
 		{Package: "package/pypi/numpy", RuleID: "PACKAGE_INSTALL_SCRIPTS", Level: "error", Message: "install scripts", ShortDescription: "Package runs install scripts"},
 	})
@@ -113,6 +144,10 @@ func TestBlockingFindingLines(t *testing.T) {
 	}
 	if !strings.Contains(joined, "numpy (pypi)") || !strings.Contains(joined, "PACKAGE_INSTALL_SCRIPTS") {
 		t.Errorf("missing numpy blocking detail:\n%s", joined)
+	}
+	// Provenance (manifest file:line) is appended when the SARIF carries it.
+	if !strings.Contains(joined, "from requirements.txt:7") {
+		t.Errorf("expected manifest provenance on the blocking line:\n%s", joined)
 	}
 	// Warnings must never appear in the blocking list.
 	if strings.Contains(joined, "WARN_RULE") || strings.Contains(joined, "lodash") {

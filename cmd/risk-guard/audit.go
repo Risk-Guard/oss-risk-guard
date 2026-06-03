@@ -77,7 +77,7 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
+	depViolations, failures, err := runPackageAudits(ctx, keys, locByKey, overridesHash)
 	if err != nil {
 		return err
 	}

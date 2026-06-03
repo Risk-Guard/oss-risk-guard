@@ -151,7 +151,7 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 		} else {
 			var keys []string
 			keys, locByKey = keysAndLocations(deps)
-			audited, fails, aerr := runPackageAudits(ctx, keys, overridesHash)
+			audited, fails, aerr := runPackageAudits(ctx, keys, locByKey, overridesHash)
 			if aerr != nil {
 				logger.Warn("audit failed; continuing with partial report", zap.Error(aerr))
 				fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("audit failed: %v", aerr))
