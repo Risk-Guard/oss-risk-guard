@@ -87,6 +87,39 @@ func TestRenderAudit_GroupsSortsAndUsesRuleTitle(t *testing.T) {
 	}
 }
 
+func TestBlockingFindingLines(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/pypi/beautifulsoup4", RuleID: "SOURCE_REPO_NOT_FOUND", Level: "error", Message: "repo not found", ShortDescription: "Source repository could not be found or accessed"},
+		{Package: "package/npm/lodash", RuleID: "WARN_RULE", Level: "warning", Message: "just a warning", ShortDescription: "A warning"},
+		{Package: "package/pypi/numpy", RuleID: "PACKAGE_INSTALL_SCRIPTS", Level: "error", Message: "install scripts", ShortDescription: "Package runs install scripts"},
+	})
+
+	lines := blockingFindingLines(report)
+
+	// Exactly the error-level results — the list length must equal the verdict tally.
+	if got := countErrorLevel(report); got != len(lines) {
+		t.Fatalf("blocking lines (%d) must equal countErrorLevel (%d): %v", len(lines), got, lines)
+	}
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 blocking lines, got %d: %v", len(lines), lines)
+	}
+
+	joined := strings.Join(lines, "\n")
+	// Each line names the subject, the human title, and the check code.
+	if !strings.Contains(joined, "beautifulsoup4 (pypi)") ||
+		!strings.Contains(joined, "Source repository could not be found or accessed") ||
+		!strings.Contains(joined, "SOURCE_REPO_NOT_FOUND") {
+		t.Errorf("missing bs4 blocking detail:\n%s", joined)
+	}
+	if !strings.Contains(joined, "numpy (pypi)") || !strings.Contains(joined, "PACKAGE_INSTALL_SCRIPTS") {
+		t.Errorf("missing numpy blocking detail:\n%s", joined)
+	}
+	// Warnings must never appear in the blocking list.
+	if strings.Contains(joined, "WARN_RULE") || strings.Contains(joined, "lodash") {
+		t.Errorf("warning leaked into blocking lines:\n%s", joined)
+	}
+}
+
 func TestRenderAudit_LevelFilter(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "package/npm/lodash", RuleID: "RULE_A", Level: "error", Message: "err"},

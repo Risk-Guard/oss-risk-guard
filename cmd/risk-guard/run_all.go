@@ -142,7 +142,11 @@ func printRunVerdict(mode policy.WorkflowMode, report *sarif.Report, repoPath, o
 	}
 
 	fmt.Fprintf(os.Stderr, "%s\n", color.RedString(
-		"Exit with status 1 because mode is %s and policy blocks %d finding(s)", mode, blocking))
+		"Exit with status 1 because mode is %s and policy blocks %d finding(s):", mode, blocking))
+	for _, line := range blockingFindingLines(report) {
+		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%s", line))
+	}
+
 	// Only spell out -s when the report isn't at the default add reads from.
 	ack := "risk-guard policy add-expected-failures " + repoPath
 	if outPath != defaultUnifiedSARIF {
