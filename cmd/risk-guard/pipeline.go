@@ -80,9 +80,10 @@ func keysAndLocations(deps []sbom.DirectDep) ([]string, map[string]*models.Locat
 // runPackageAudits owns the per-batch audit progress UI and scoring loop.
 // Returns the raw per-package violations and any per-package failures. The
 // rulebook is NOT applied here — that happens once at merge time.
-func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*models.LocationInfo, overridesHash string) ([]*violations.AnalysisViolations, []packageError, error) {
+func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*models.LocationInfo, overridesHash string, sourceFindings *int) ([]*violations.AnalysisViolations, []packageError, error) {
 	if len(keys) == 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("no direct dependencies to audit"))
+		printSourceFindings(sourceFindings)
 		return nil, nil, nil
 	}
 
@@ -111,8 +112,9 @@ func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*m
 	}
 
 	fmt.Fprintf(os.Stderr, "  %s  %s\n",
-		color.YellowString("%d findings across %d packages", totals.findings, totals.scored),
+		color.YellowString("%d findings across %d unique dependency packages", totals.findings, totals.scored),
 		color.HiBlackString("(severity applied at merge)"))
+	printSourceFindings(sourceFindings)
 	if totals.failed > 0 {
 		fmt.Fprintf(os.Stderr, "  %s\n", color.RedString("%d packages failed to score", totals.failed))
 	}
@@ -120,6 +122,27 @@ func runPackageAudits(ctx context.Context, keys []string, locByKey map[string]*m
 		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("%d/%d packages served from cache", totals.cached, len(keys)))
 	}
 	return analyses, failures, nil
+}
+
+// printSourceFindings prints the local-source pre-grade finding count beneath
+// the dependency tally so the two reconcile against the post-grade "Policy
+// result" total. A nil count means the command scans no local source (e.g.
+// `audit`), so the line is omitted rather than printed as "0 findings in source".
+func printSourceFindings(n *int) {
+	if n == nil {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("%d findings in source", *n))
+}
+
+// sourceFindingCount counts the pre-grade violations from the local-source scan
+// the same way per-package findings are counted (len of the violations slice),
+// so "N findings in source" lines up with "M findings across … packages".
+func sourceFindingCount(v *violations.AnalysisViolations) int {
+	if v == nil {
+		return 0
+	}
+	return len(v.Violations)
 }
 
 // assembleReport runs the merge step: applies the resolved root policy

@@ -127,7 +127,7 @@ func triageInitFindings(findings []finding, t triageTarget) (map[string]policy.E
 		return buildExpectedFailures(findings), nil
 	case triageReviewEach:
 		picked := map[string]map[string]struct{}{}
-		if err := reviewEachInto(findings, picked); err != nil {
+		if err := reviewEachInto(findings, picked, t); err != nil {
 			return nil, err
 		}
 		if len(picked) == 0 {
@@ -142,11 +142,11 @@ func triageInitFindings(findings []finding, t triageTarget) (map[string]policy.E
 func chooseTriageMode(n int, t triageTarget) (triageDecision, error) {
 	var choice string
 	err := huh.NewSelect[string]().
-		Title(fmt.Sprintf("Found %d %s. What would you like to do?", n, pluralize(t.noun, n))).
+		Title(fmt.Sprintf("How do you want to handle these %d %s?", n, pluralize(t.noun, n))).
 		Options(
-			huh.NewOption(fmt.Sprintf("Ignore all (add %s for every %s)", t.section, t.noun), "ignore-all"),
+			huh.NewOption(fmt.Sprintf("Baseline all — accept them now in %s", t.section), "ignore-all"),
 			huh.NewOption("Review each one", "review"),
-			huh.NewOption("Keep defaults (don't add anything)", "none"),
+			huh.NewOption("Leave as-is (add nothing)", "none"),
 		).
 		Value(&choice).
 		Run()
@@ -155,8 +155,11 @@ func chooseTriageMode(n int, t triageTarget) (triageDecision, error) {
 	}
 	switch choice {
 	case "ignore-all":
+		echoChoice("Baselining all %d %s (added to %s)", n, pluralize(t.noun, n), t.section)
 		return triageIgnoreAll, nil
 	case "review":
+		// No echo: "review" isn't a change in itself; the per-finding picks
+		// below record what actually lands in the policy.
 		return triageReviewEach, nil
 	default:
 		return triageNone, nil
@@ -175,15 +178,15 @@ func addPick(picked map[string]map[string]struct{}, entity, check string) {
 // reviewEachInto prompts the user per finding and records each "ignore" pick
 // into picked. Unlike reviewEach it does not touch a policy, so callers that
 // merge (rather than overwrite) expected_failures can reuse the prompt loop.
-func reviewEachInto(findings []finding, picked map[string]map[string]struct{}) error {
-	for _, f := range findings {
+func reviewEachInto(findings []finding, picked map[string]map[string]struct{}, t triageTarget) error {
+	for i, f := range findings {
 		var pick string
 		err := huh.NewSelect[string]().
-			Title(fmt.Sprintf("%s — %s (%s)", f.EntityKey, f.CheckCode, f.Level)).
+			Title(fmt.Sprintf("[%d of %d %s to review]\n%s — %s (%s)", i+1, len(findings), pluralize(t.noun, len(findings)), f.EntityKey, f.CheckCode, f.Level)).
 			Description(f.Message).
 			Options(
-				huh.NewOption("Ignore (add to expected_failures)", "ignore"),
-				huh.NewOption("Keep default", "keep"),
+				huh.NewOption(fmt.Sprintf("Baseline (add to %s)", t.section), "ignore"),
+				huh.NewOption("Leave as-is", "keep"),
 			).
 			Value(&pick).
 			Run()
@@ -192,7 +195,9 @@ func reviewEachInto(findings []finding, picked map[string]map[string]struct{}) e
 		}
 		if pick == "ignore" {
 			addPick(picked, f.EntityKey, f.CheckCode)
+			echoChoice("%s — %s baselined (added to %s)", f.EntityKey, f.CheckCode, t.section)
 		}
+		// "leave as-is" is a no-op: nothing changes, so nothing is echoed.
 	}
 	return nil
 }

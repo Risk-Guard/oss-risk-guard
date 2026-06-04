@@ -105,10 +105,19 @@ func inferSBOMFormat(path string) string {
 // JSON bytes in the requested format ("spdx" or "cyclonedx"). It performs no
 // disk I/O on the output. Validates repoPath as a git repo.
 func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
+	data, _, err := buildSBOMBytesWithManifests(ctx, path, format)
+	return data, err
+}
+
+// buildSBOMBytesWithManifests is buildSBOMBytes plus the post-.riskguardignore
+// list of detected manifests, so callers (init) can offer them for further
+// exclusion without re-walking the tree. The manifests are the ones that
+// actually contributed to the SBOM (already filtered through filterIgnoredManifests).
+func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]byte, []models.DetectedManifest, error) {
 	switch format {
 	case sbomFormatSPDX, sbomFormatCycloneDX:
 	default:
-		return nil, fmt.Errorf("unsupported sbom format %q (want %q or %q)", format, sbomFormatSPDX, sbomFormatCycloneDX)
+		return nil, nil, fmt.Errorf("unsupported sbom format %q (want %q or %q)", format, sbomFormatSPDX, sbomFormatCycloneDX)
 	}
 
 	logger := ctxutil.GetLogger(ctx)
@@ -117,14 +126,14 @@ func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 
 	repoPath, err := resolveScanPath(path)
 	if err != nil {
-		return nil, fmt.Errorf("resolving source path: %w", err)
+		return nil, nil, fmt.Errorf("resolving source path: %w", err)
 	}
 
 	rootKey := sourceKey(repoPath)
 
 	manifests, err := package_detection.DetectPackages(repoPath, def.All())
 	if err != nil {
-		return nil, fmt.Errorf("detecting packages: %w", err)
+		return nil, nil, fmt.Errorf("detecting packages: %w", err)
 	}
 	manifests = filterIgnoredManifests(ctx, repoPath, manifests)
 	logger.Info("detected manifests", zap.Int("count", len(manifests)))
@@ -136,7 +145,11 @@ func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 	logger.Info("collected SBOM nodes", zap.Int("count", len(nodes)))
 	fmt.Fprintf(os.Stderr, "\n  %s\n", color.HiBlackString("%d unique packages", countPackages(nodes)))
 
-	return buildSBOMJSON(format, rootKey, nodes)
+	data, err := buildSBOMJSON(format, rootKey, nodes)
+	if err != nil {
+		return nil, nil, err
+	}
+	return data, manifests, nil
 }
 
 // filterIgnoredManifests drops manifests that live entirely under

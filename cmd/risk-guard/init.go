@@ -98,17 +98,31 @@ func runInit(cmd *cobra.Command, args []string) error {
 	case !isInteractive():
 		fmt.Fprintf(os.Stderr, "\nnon-interactive; leaving %d finding(s) at default severity\n", len(findings)+len(warnings))
 	default:
-		// Blocking findings first (expected_failures), then warnings
-		// (expected_warnings): each is its own render → intro → prompt pass.
+		// First, let the user set each fired check's severity
+		// (blocking/warning/ignore); non-default picks are recorded in the
+		// policy. Apply those picks to the in-memory report and recompute the
+		// finding sets so the triage render and counts below reflect the tuned
+		// policy rather than the audit-time levels.
+		choices, terr := tuneCheckSeverities(findings, warnings, pol)
+		if terr != nil {
+			return terr
+		}
+		applySeverityChoices(report, choices)
+		findings = collectInitFindings(report, levelError)
+		warnings = collectInitFindings(report, levelWarning)
+
+		// Then acknowledge what remains: blocking findings first
+		// (expected_failures), then warnings (expected_warnings); each is its
+		// own intro → prompt pass.
 		if len(findings) > 0 {
-			ef, err := triageInitSection(report, findings, levelError, triageFailures)
+			ef, err := triageInitSection(findings, triageFailures)
 			if err != nil {
 				return err
 			}
 			pol.ExpectedFailures = ef
 		}
 		if len(warnings) > 0 {
-			ew, err := triageInitSection(report, warnings, levelWarning, triageWarnings)
+			ew, err := triageInitSection(warnings, triageWarnings)
 			if err != nil {
 				return err
 			}
@@ -120,6 +134,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	bold(os.Stderr, "Wrote %s\n", cfgPath)
+
+	// Finally, help the user run Risk Guard in CI: detect their CI and print a
+	// ready-to-paste snippet (or ask which platform when none is detected).
+	if isInteractive() {
+		if err := offerCIIntegration(repoPath); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -155,7 +177,19 @@ func runInitPipeline(cmd *cobra.Command, repoPath string, overrides map[string][
 		failures      []packageError
 		locByKey      map[string]*models.LocationInfo
 	)
-	sbomBytes, sbomErr := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
+	sbomBytes, manifests, sbomErr := buildSBOMBytesWithManifests(ctx, repoPath, runAllSBOMFormat)
+	// After the SBOM is built, offer to exclude detected directories. Picks are
+	// written to .riskguardignore; if anything changed, re-create the SBOM so the
+	// dependency audit below reflects the exclusions.
+	if sbomErr == nil && isInteractive() {
+		changed, perr := promptAndApplyIgnore(repoPath, manifests)
+		if perr != nil {
+			return nil, perr
+		}
+		if changed {
+			sbomBytes, _, sbomErr = buildSBOMBytesWithManifests(ctx, repoPath, runAllSBOMFormat)
+		}
+	}
 	if sbomErr != nil {
 		logger.Warn("building SBOM failed; continuing local-only", zap.Error(sbomErr))
 		fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("building SBOM failed: %v", sbomErr))
@@ -166,7 +200,8 @@ func runInitPipeline(cmd *cobra.Command, repoPath string, overrides map[string][
 		} else {
 			var keys []string
 			keys, locByKey = keysAndLocations(deps)
-			audited, fails, aerr := runPackageAudits(ctx, keys, locByKey, overridesHash)
+			srcFindings := sourceFindingCount(localViolations)
+			audited, fails, aerr := runPackageAudits(ctx, keys, locByKey, overridesHash, &srcFindings)
 			if aerr != nil {
 				logger.Warn("audit failed; continuing with partial report", zap.Error(aerr))
 				fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("audit failed: %v", aerr))
@@ -179,16 +214,27 @@ func runInitPipeline(cmd *cobra.Command, repoPath string, overrides map[string][
 	return assembleReport(ctx, sourceInput.AnalysisIdentifier, localViolations, depViolations, failures, locByKey)
 }
 
-// triageInitSection renders the findings at one level, explains the baseline
-// rationale, prompts, and returns the entries to record in the target section.
-func triageInitSection(report *sarif.Report, findings []finding, level string, t triageTarget) (map[string]policy.ExpectedFailureV2, error) {
-	fmt.Fprintln(os.Stderr)
-	if err := renderFindings(selectFindingsByLevel(report, levelEquals(level)), []Printer{newTextPrinter(os.Stderr)}); err != nil {
-		return nil, fmt.Errorf("rendering %s findings: %w", level, err)
-	}
+// triageInitSection explains the baseline rationale for the target section,
+// prompts, and returns the entries to record. It deliberately does not dump the
+// findings list: the per-finding detail is shown only if the user chooses to
+// review each, and the full set surfaces in a normal audit run.
+func triageInitSection(findings []finding, t triageTarget) (map[string]policy.ExpectedFailureV2, error) {
 	fmt.Fprintln(os.Stderr)
 	printTriageIntro(t, len(findings))
-	return triageInitFindings(findings, t)
+	res, err := triageInitFindings(findings, t)
+	if err != nil {
+		return nil, err
+	}
+	acked := 0
+	for _, ef := range res {
+		acked += len(ef.Checks)
+	}
+	if acked == 0 {
+		echoGroupDone("Left all %s as-is — nothing added to %s", pluralize(t.noun, 2), t.section)
+	} else {
+		echoGroupDone("Baselined %d %s in %s", acked, pluralize(t.noun, acked), t.section)
+	}
+	return res, nil
 }
 
 // printTriageIntro explains, before the prompt, why init offers to acknowledge
@@ -199,20 +245,22 @@ func triageInitSection(report *sarif.Report, findings []finding, level string, t
 // full policy on each new pull request.
 func printTriageIntro(t triageTarget, n int) {
 	bold := color.New(color.Bold).FprintfFunc()
-	bold(os.Stderr, "Found %d existing %s from your current code history.\n", n, pluralize(t.noun, n))
+	bold(os.Stderr, "%d %s already exist in your code today.\n", n, pluralize(t.noun, n))
 	if t.section == triageWarnings.section {
 		fmt.Fprintln(os.Stderr, "Warnings don't fail the build, but on an established repo they pile up as")
 		fmt.Fprintln(os.Stderr, "annotation noise on code you haven't touched.")
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Ignoring them records today's warnings as a baseline (expected_warnings) so the")
-		fmt.Fprintln(os.Stderr, "noise clears now — while new pull requests still surface fresh warnings. Work")
-		fmt.Fprintln(os.Stderr, "the baseline off over time as you fix the underlying issues.")
+		fmt.Fprintln(os.Stderr, "Baselining them clears today's noise. This:")
+		fmt.Fprintf(os.Stderr, "  • saves to %s under %s\n", initFileName, t.section)
+		fmt.Fprintln(os.Stderr, "  • becomes a backlog to work off over time")
+		fmt.Fprintln(os.Stderr, "  • still surfaces fresh warnings on new pull requests in CI")
 	} else {
-		fmt.Fprintln(os.Stderr, "Adopting Risk Guard as-is, these would block every build until each is fixed.")
+		fmt.Fprintln(os.Stderr, "As-is, these would fail every build until each is fixed.")
 		fmt.Fprintln(os.Stderr)
-		fmt.Fprintln(os.Stderr, "Ignoring them records today's findings as an accepted baseline (expected_failures)")
-		fmt.Fprintln(os.Stderr, "so you can move forward now — while every new pull request is still held to the")
-		fmt.Fprintln(os.Stderr, "full policy. Work the baseline off over time as you fix the underlying issues.")
+		fmt.Fprintln(os.Stderr, "Baselining them records today's findings as accepted. This:")
+		fmt.Fprintf(os.Stderr, "  • saves to %s under %s\n", initFileName, t.section)
+		fmt.Fprintln(os.Stderr, "  • becomes a backlog to work off as you fix each issue")
+		fmt.Fprintln(os.Stderr, "  • still blocks any new finding on future pull requests in CI")
 	}
 	fmt.Fprintln(os.Stderr)
 }
@@ -234,6 +282,21 @@ func writeConfig(path string, pol *policy.Policy) error {
 		return fmt.Errorf("writing %s: %w", path, err)
 	}
 	return nil
+}
+
+// echoChoice prints a one-line record of an interactive choice to stderr. huh
+// erases each prompt the moment it's submitted, so without this the user's
+// selection leaves no trace in the scrollback. Callers echo only choices that
+// change something — a no-op "keep default"/unchanged/blank pick records nothing.
+func echoChoice(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "  %s %s\n", color.GreenString("✓"), fmt.Sprintf(format, args...))
+}
+
+// echoGroupDone prints a ✅ marker after a group of prompts finishes, giving the
+// user a scannable "this step is done" divider to read the results under. The
+// leading blank line separates it from the just-cleared prompt.
+func echoGroupDone(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, "\n%s %s\n", color.GreenString("✅"), fmt.Sprintf(format, args...))
 }
 
 func isInteractive() bool {

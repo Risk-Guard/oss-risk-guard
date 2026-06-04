@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	"github.com/fatih/color"
@@ -55,13 +57,31 @@ requires an interactive terminal.`,
 	RunE:          runAddExpectedFailures,
 }
 
+var policyChecksCmd = &cobra.Command{
+	Use:   "checks",
+	Short: "List all available checks and their risk categories",
+	Long: `List every check risk-guard can run, with its risk categories and a short
+description. Categories are colored to mirror how the default policy grades them.`,
+	Args:          cobra.NoArgs,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE:          runPolicyChecks,
+}
+
 func init() {
 	addExpectedFailuresCmd.Flags().BoolVar(&addEFAll, "all", false, "Add all findings without prompting")
 	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from")
 
 	policyCmd.AddCommand(policyShowCmd)
 	policyCmd.AddCommand(addExpectedFailuresCmd)
+	policyCmd.AddCommand(policyChecksCmd)
 	rootCmd.AddCommand(policyCmd)
+}
+
+func runPolicyChecks(_ *cobra.Command, _ []string) error {
+	checks, _ := dag_builder.GetAllCheckMetadata(localdag.Builder)
+	_, err := fmt.Fprint(os.Stdout, renderCheckList(checks))
+	return err
 }
 
 // repoArg returns the optional positional repo path, defaulting to "." when
@@ -152,7 +172,7 @@ func runAddExpectedFailures(_ *cobra.Command, args []string) error {
 		if !isInteractive() {
 			return fmt.Errorf("non-interactive terminal: pass --all to add all %d finding(s)", len(findings))
 		}
-		if err := reviewEachInto(findings, picked); err != nil {
+		if err := reviewEachInto(findings, picked, triageFailures); err != nil {
 			return err
 		}
 	}
