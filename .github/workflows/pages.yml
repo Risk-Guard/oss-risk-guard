@@ -26,6 +26,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Stage install script as get.sh
+        # Publish the canonical installer at /get.sh so it can be piped to sh
+        run: cp getRiskGuard.sh site/get.sh
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

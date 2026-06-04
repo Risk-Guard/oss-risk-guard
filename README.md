@@ -26,7 +26,7 @@ Pick whichever fits your machine. Each gives you a `risk-guard` binary.
 Download the latest prebuilt binary in one command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh
+curl -fsSL https://risk-guard.github.io/oss-risk-guard/get.sh | sh
 ```
 
 It detects your OS/arch, downloads the matching release archive, verifies its
@@ -35,10 +35,10 @@ writable). Customize with:
 
 ```bash
 # Pin a version
-curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh -s -- v0.0.2
+curl -fsSL https://risk-guard.github.io/oss-risk-guard/get.sh | sh -s -- v0.0.2
 
 # Install somewhere else
-curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | RISK_GUARD_INSTALL_DIR="$HOME/bin" sh
+curl -fsSL https://risk-guard.github.io/oss-risk-guard/get.sh | RISK_GUARD_INSTALL_DIR="$HOME/bin" sh
 ```
 
 On an architecture without a prebuilt binary, the script points you at the
