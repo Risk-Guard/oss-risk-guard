@@ -41,9 +41,14 @@ func (n *Node) GetDependencies() []any {
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
-	if input.SourceURL == nil {
-		log.Debug("no source URL provided, skipping SOURCE_REPO_NOT_FOUND check")
-		return checks.NewSkippedOutput(n.Code, "No source repository specified", input), nil
+	if input.SourceURL == nil || *input.SourceURL == "" {
+		log.Debug("SOURCE_REPO_NOT_FOUND check: violation (no source repository defined in package metadata)")
+		return checks.NewViolationOutput(
+			n.Code,
+			"No source repository is defined in the package metadata, so its source cannot be located or verified",
+			[]string{"No source URL present in package metadata"},
+			input,
+		), nil
 	}
 
 	resolveOut := executiondag.GetOutput[*git_resolve.Node](ctx).(*git_resolve.Output)

@@ -64,7 +64,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	report, err := runInitPipeline(cmd, repoPath)
+	report, err := runInitPipeline(cmd, repoPath, nil)
 	if err != nil {
 		return err
 	}
@@ -77,11 +77,21 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	bold := color.New(color.Bold).FprintfFunc()
+	pol := minimalPolicy()
+
+	// Offer to correct unresolvable/missing source URLs first, then re-audit the
+	// affected packages so the baseline below reflects the corrected source.
+	if isInteractive() {
+		report, err = triageSourceURLs(cmd, repoPath, report, outPath, pol)
+		if err != nil {
+			return err
+		}
+	}
+
 	findings := collectInitFindings(report, levelError)
 	warnings := collectInitFindings(report, levelWarning)
-	bold := color.New(color.Bold).FprintfFunc()
 
-	pol := minimalPolicy()
 	switch {
 	case len(findings) == 0 && len(warnings) == 0:
 		bold(os.Stderr, "\nNo blocking or warning findings to triage.\n")
@@ -116,7 +126,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 // runInitPipeline mirrors runAll but keeps the SARIF report in memory and
 // degrades to a local-only report when SBOM or audit fails, so init can always
 // reach the triage step.
-func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error) {
+func runInitPipeline(cmd *cobra.Command, repoPath string, overrides map[string][]policy.PolicyOverride) (*sarif.Report, error) {
 	if auditJobs < 1 {
 		return nil, fmt.Errorf("--jobs must be >= 1")
 	}
@@ -124,6 +134,12 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 	ctx, overridesHash, err := setupAuditContext(cmd, repoPath)
 	if err != nil {
 		return nil, err
+	}
+	// Inject interactively-collected source-URL overrides so the per-package
+	// audit applies them (and only the affected packages re-score — their cache
+	// key changes; the rest are served from cache).
+	if len(overrides) > 0 {
+		ctx = policy.SetRootPolicy(ctx, policy.DefaultPolicy(), "", overrides)
 	}
 	logger := ctxutil.GetLogger(ctx)
 
@@ -168,7 +184,7 @@ func runInitPipeline(cmd *cobra.Command, repoPath string) (*sarif.Report, error)
 // rationale, prompts, and returns the entries to record in the target section.
 func triageInitSection(report *sarif.Report, findings []finding, level string, t triageTarget) (map[string]policy.ExpectedFailureV2, error) {
 	fmt.Fprintln(os.Stderr)
-	if err := renderReport(os.Stderr, os.Stderr, report, DisplayText, level, nil, ""); err != nil {
+	if err := renderFindings(selectFindingsByLevel(report, levelEquals(level)), []Printer{newTextPrinter(os.Stderr)}); err != nil {
 		return nil, fmt.Errorf("rendering %s findings: %w", level, err)
 	}
 	fmt.Fprintln(os.Stderr)

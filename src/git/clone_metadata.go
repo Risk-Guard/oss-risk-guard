@@ -30,7 +30,8 @@ func CloneMetadataOnly(ctx context.Context, sourceURL, destDir string) error {
 		}
 	}
 
-	cloneCtx, cancel := context.WithTimeout(ctx, MaxCloneTime)
+	timeout := cloneTimeout(ctx)
+	cloneCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if err := os.MkdirAll(filepath.Dir(destDir), 0o750); err != nil {
@@ -73,7 +74,7 @@ func CloneMetadataOnly(ctx context.Context, sourceURL, destDir string) error {
 			return &CloneError{
 				URL:       sourceURL,
 				Type:      ErrTypeTimeout,
-				Message:   fmt.Sprintf("clone operation timed out after %v", MaxCloneTime),
+				Message:   fmt.Sprintf("clone operation timed out after %v", timeout),
 				GitOutput: sanitizeGitOutput(extractGitErrorLine(string(output))),
 				Err:       wrappedErr,
 			}

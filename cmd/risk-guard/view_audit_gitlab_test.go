@@ -54,11 +54,11 @@ func newTestReportLoc(t *testing.T, findings []testFindingLoc) *sarif.Report {
 	return report
 }
 
-func renderGitLabIssues(t *testing.T, report *sarif.Report, level string, packages []string, repoRoot string) ([]codeClimateIssue, string) {
+func renderGitLabIssues(t *testing.T, report *sarif.Report, include func(string) bool, repoRoot string) ([]codeClimateIssue, string) {
 	t.Helper()
 	var out, errBuf bytes.Buffer
-	if err := renderGitLab(&out, &errBuf, report, level, packages, repoRoot); err != nil {
-		t.Fatalf("renderGitLab: %v", err)
+	if err := emitGitLabIssues(&out, &errBuf, selectFindingsByLevel(report, include), nil, repoRoot); err != nil {
+		t.Fatalf("emitGitLabIssues: %v", err)
 	}
 	var issues []codeClimateIssue
 	if err := json.Unmarshal(out.Bytes(), &issues); err != nil {
@@ -87,7 +87,7 @@ func TestRenderGitLab_ShapeAndRequiredFields(t *testing.T) {
 		{Package: "package/npm/lodash?version=4.17.20", RuleID: "STALE", Level: "error", Message: "stale release", ShortDescription: "Stale", File: "package.json", Line: 42},
 		{Package: "package/npm/express", RuleID: "NO_LICENSE", Level: "warning", Message: "no license", File: "package.json", Line: 7},
 	})
-	issues, _ := renderGitLabIssues(t, report, "all", nil, "")
+	issues, _ := renderGitLabIssues(t, report, allLevels, "")
 
 	if len(issues) != 2 {
 		t.Fatalf("expected 2 issues, got %d: %#v", len(issues), issues)
@@ -151,7 +151,7 @@ func TestRenderGitLab_RelativizesAbsolutePath(t *testing.T) {
 	report := newTestReportLoc(t, []testFindingLoc{
 		{Package: "package/npm/lodash", RuleID: "R", Level: "error", Message: "m", File: "/repo/src/package.json", Line: 3},
 	})
-	issues, _ := renderGitLabIssues(t, report, "all", nil, "/repo")
+	issues, _ := renderGitLabIssues(t, report, allLevels, "/repo")
 	if len(issues) != 1 {
 		t.Fatalf("expected 1 issue, got %d", len(issues))
 	}
@@ -165,7 +165,7 @@ func TestRenderGitLab_SkipsPathlessFindingWithWarning(t *testing.T) {
 		{Package: "package/npm/lodash", RuleID: "HASLOC", Level: "error", Message: "m", File: "package.json", Line: 5},
 		{Package: "package/npm/express", RuleID: "NOLOC", Level: "error", Message: "m"}, // no File
 	})
-	issues, warnOut := renderGitLabIssues(t, report, "all", nil, "")
+	issues, warnOut := renderGitLabIssues(t, report, allLevels, "")
 	if len(issues) != 1 || issues[0].CheckName != "HASLOC" {
 		t.Fatalf("expected only the located finding, got %#v", issues)
 	}
@@ -179,7 +179,7 @@ func TestRenderGitLab_SkipsRepoRootAnchoredFinding(t *testing.T) {
 		{Package: "package/npm/lodash", RuleID: "HASLOC", Level: "error", Message: "m", File: "package.json", Line: 5},
 		{Package: "package/npm/express", RuleID: "ROOTANCHOR", Level: "error", Message: "m", File: "."}, // RepoRootURI
 	})
-	issues, warnOut := renderGitLabIssues(t, report, "all", nil, "")
+	issues, warnOut := renderGitLabIssues(t, report, allLevels, "")
 	if len(issues) != 1 || issues[0].CheckName != "HASLOC" {
 		t.Fatalf("expected only the located finding, got %#v", issues)
 	}
@@ -192,7 +192,7 @@ func TestRenderGitLab_DefaultsBeginToOneWhenNoLine(t *testing.T) {
 	report := newTestReportLoc(t, []testFindingLoc{
 		{Package: "package/npm/lodash", RuleID: "R", Level: "warning", Message: "m", File: "Gemfile"},
 	})
-	issues, _ := renderGitLabIssues(t, report, "all", nil, "")
+	issues, _ := renderGitLabIssues(t, report, allLevels, "")
 	if len(issues) != 1 {
 		t.Fatalf("expected 1 issue, got %d", len(issues))
 	}
@@ -206,17 +206,17 @@ func TestRenderGitLab_LevelFilter(t *testing.T) {
 		{Package: "p1", RuleID: "R1", Level: "error", Message: "e", File: "a.json", Line: 1},
 		{Package: "p2", RuleID: "R2", Level: "warning", Message: "w", File: "b.json", Line: 1},
 	})
-	issues, _ := renderGitLabIssues(t, report, "error", nil, "")
+	issues, _ := renderGitLabIssues(t, report, levelEquals(levelError), "")
 	if len(issues) != 1 || issues[0].CheckName != "R1" {
 		t.Errorf("expected only error-level finding, got %#v", issues)
 	}
 }
 
-func TestRenderGitLab_EmptyReportIsEmptyArray(t *testing.T) {
+func TestEmitGitLab_EmptyReportIsEmptyArray(t *testing.T) {
 	report := newTestReportLoc(t, nil)
 	var out, errBuf bytes.Buffer
-	if err := renderGitLab(&out, &errBuf, report, "all", nil, ""); err != nil {
-		t.Fatalf("renderGitLab: %v", err)
+	if err := emitGitLabIssues(&out, &errBuf, selectFindingsByLevel(report, allLevels), nil, ""); err != nil {
+		t.Fatalf("emitGitLabIssues: %v", err)
 	}
 	if got := strings.TrimSpace(out.String()); got != "[]" {
 		t.Errorf("expected empty array [], got %q", got)

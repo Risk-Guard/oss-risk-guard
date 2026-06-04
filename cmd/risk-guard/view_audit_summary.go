@@ -5,21 +5,18 @@ import (
 	"os"
 	"sort"
 	"strings"
-
-	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
-// writeGitHubStepSummary appends a markdown findings table to the file named by
-// $GITHUB_STEP_SUMMARY. It is a no-op outside GitHub Actions (env var unset).
-// The table is ordered errors-first — the convention for a top-down rollup —
-// which is intentionally the reverse of the annotation stream's errors-last.
-func writeGitHubStepSummary(report *sarif.Report, pkgFilter map[string]bool, levelFilter string) error {
+// writeGitHubStepSummaryFindings appends a markdown findings table for a finding
+// set to the file named by $GITHUB_STEP_SUMMARY (no-op when unset). The table is
+// ordered errors-first — the convention for a top-down rollup — which is
+// intentionally the reverse of the annotation stream's errors-last.
+func writeGitHubStepSummaryFindings(findings []ghFinding) error {
 	path := os.Getenv("GITHUB_STEP_SUMMARY")
 	if path == "" {
 		return nil
 	}
 
-	findings, _ := collectGHFindings(report, pkgFilter, levelFilter)
 	sort.SliceStable(findings, func(i, j int) bool {
 		if ri, rj := levelRank(findings[i].f.Level), levelRank(findings[j].f.Level); ri != rj {
 			return ri < rj // errors first in the table

@@ -52,10 +52,24 @@ type Config struct {
 	ServiceName string `env:"SERVICE_NAME" envDefault:"risk-guard"`
 
 	SecureGit bool `env:"SECURE_GIT" envDefault:"false"`
+
+	CloneTimeoutSeconds int `env:"CLONE_TIMEOUT_SECONDS" envDefault:"30"`
 }
+
+const defaultCloneTimeoutSeconds = 30
 
 func (c *Config) GetSecureGit() bool {
 	return c.SecureGit
+}
+
+// GetCloneTimeout returns the per-git-clone timeout. A value <= 0 falls back to
+// the default.
+func (c *Config) GetCloneTimeout() time.Duration {
+	secs := c.CloneTimeoutSeconds
+	if secs <= 0 {
+		secs = defaultCloneTimeoutSeconds
+	}
+	return time.Duration(secs) * time.Second
 }
 
 func (c *Config) GetHighMemServer() string {
@@ -86,6 +100,7 @@ func (c *Config) Clone() *Config {
 		ScoreDepsWorkflow:    c.ScoreDepsWorkflow,
 		ServiceName:          c.ServiceName,
 		SecureGit:            c.SecureGit,
+		CloneTimeoutSeconds:  c.CloneTimeoutSeconds,
 	}
 }
 
@@ -198,6 +213,7 @@ func (c *Config) String() string {
 	fmt.Fprintf(&sb, "  HTTP_GCS_BUCKET: %s\n", c.HTTPGCSBucket)
 	fmt.Fprintf(&sb, "  HTTP_GCS_PREFIX: %s\n", c.HTTPGCSPrefix)
 	fmt.Fprintf(&sb, "  HTTP_CACHE_MAX_AGE_DAYS: %d\n", c.CacheMaxAgeDays)
+	fmt.Fprintf(&sb, "  CLONE_TIMEOUT_SECONDS: %d\n", c.CloneTimeoutSeconds)
 	fmt.Fprintf(&sb, "  GOOGLE_CLOUD_PROJECT: %s\n", c.GoogleCloudProject)
 	return sb.String()
 }

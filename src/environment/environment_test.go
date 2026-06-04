@@ -132,6 +132,27 @@ func TestGetCacheMaxAge(t *testing.T) {
 	}
 }
 
+func TestGetCloneTimeout(t *testing.T) {
+	cfg, err := loadWithEnv(t, map[string]string{
+		"CLONE_TIMEOUT_SECONDS": "90",
+	})
+	if err != nil {
+		t.Fatalf("Load() failed: %v", err)
+	}
+	if got := cfg.GetCloneTimeout(); got != 90*time.Second {
+		t.Errorf("expected GetCloneTimeout() to be 90s, got %v", got)
+	}
+}
+
+func TestGetCloneTimeout_DefaultsOnNonPositive(t *testing.T) {
+	for _, secs := range []int{0, -5} {
+		cfg := &Config{CloneTimeoutSeconds: secs}
+		if got := cfg.GetCloneTimeout(); got != defaultCloneTimeoutSeconds*time.Second {
+			t.Errorf("CloneTimeoutSeconds=%d: got %v, want default %ds", secs, got, defaultCloneTimeoutSeconds)
+		}
+	}
+}
+
 func TestString_RedactsSecrets(t *testing.T) {
 	cfg, err := loadWithEnv(t, map[string]string{
 		"NVD_API_KEY":  "secret-key",

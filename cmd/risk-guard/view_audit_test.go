@@ -54,7 +54,11 @@ func newTestReport(t *testing.T, findings []testFinding) *sarif.Report {
 	return report
 }
 
-func TestRenderAudit_GroupsSortsAndUsesRuleTitle(t *testing.T) {
+// allLevels selects every finding regardless of level — the test stand-in for
+// view-audit's old "all" filter, now expressed as a selectFindingsByLevel predicate.
+func allLevels(string) bool { return true }
+
+func TestTextPrinter_GroupsSortsAndUsesRuleTitle(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "package/npm/lodash?version=4.17.20", RuleID: "RULE_B", Level: "warning", Message: "warn message", ShortDescription: "Warn title"},
 		{Package: "package/npm/lodash?version=4.17.20", RuleID: "RULE_A", Level: "error", Message: "err message\nsecond line", ShortDescription: "Err title"},
@@ -62,8 +66,8 @@ func TestRenderAudit_GroupsSortsAndUsesRuleTitle(t *testing.T) {
 	})
 
 	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "all", nil); err != nil {
-		t.Fatalf("renderAudit: %v", err)
+	if err := renderFindings(selectFindingsByLevel(report, allLevels), []Printer{newTextPrinter(&buf)}); err != nil {
+		t.Fatalf("renderFindings: %v", err)
 	}
 	out := buf.String()
 
@@ -96,15 +100,18 @@ func TestRenderAudit_GroupsSortsAndUsesRuleTitle(t *testing.T) {
 	}
 }
 
-func TestRenderPackage_ShowsFileLineProvenance(t *testing.T) {
+func TestTextPrinter_ShowsFileLineProvenance(t *testing.T) {
 	var buf bytes.Buffer
+	p := newTextPrinter(&buf)
 	findings := []auditFinding{
 		{Level: "error", RuleID: "SOURCE_REPO_NOT_FOUND", Title: "Source repo not found", Message: "could not resolve", File: "third_party/foo/requirements.txt", Line: 3},
 		{Level: "warning", RuleID: "NO_LOCATION_RULE", Title: "No location", Message: "no file attached"},
 		{Level: "warning", RuleID: "ROOT_ANCHOR_RULE", Title: "Root anchored", Message: "anchored at repo root", File: "."},
 	}
-	if err := renderPackage(&buf, "package/pypi/foo", findings); err != nil {
-		t.Fatalf("renderPackage: %v", err)
+	for _, f := range findings {
+		if err := p.writeFinding(f); err != nil {
+			t.Fatalf("writeFinding: %v", err)
+		}
 	}
 	out := buf.String()
 
@@ -118,52 +125,15 @@ func TestRenderPackage_ShowsFileLineProvenance(t *testing.T) {
 	}
 }
 
-func TestBlockingFindingLines(t *testing.T) {
-	report := newTestReport(t, []testFinding{
-		{Package: "package/pypi/beautifulsoup4", RuleID: "SOURCE_REPO_NOT_FOUND", Level: "error", Message: "repo not found", ShortDescription: "Source repository could not be found or accessed", File: "requirements.txt", Line: 7},
-		{Package: "package/npm/lodash", RuleID: "WARN_RULE", Level: "warning", Message: "just a warning", ShortDescription: "A warning"},
-		{Package: "package/pypi/numpy", RuleID: "PACKAGE_INSTALL_SCRIPTS", Level: "error", Message: "install scripts", ShortDescription: "Package runs install scripts"},
-	})
-
-	lines := blockingFindingLines(report)
-
-	// Exactly the error-level results — the list length must equal the verdict tally.
-	if got := countErrorLevel(report); got != len(lines) {
-		t.Fatalf("blocking lines (%d) must equal countErrorLevel (%d): %v", len(lines), got, lines)
-	}
-	if len(lines) != 2 {
-		t.Fatalf("expected 2 blocking lines, got %d: %v", len(lines), lines)
-	}
-
-	joined := strings.Join(lines, "\n")
-	// Each line names the subject, the human title, and the check code.
-	if !strings.Contains(joined, "beautifulsoup4 (pypi)") ||
-		!strings.Contains(joined, "Source repository could not be found or accessed") ||
-		!strings.Contains(joined, "SOURCE_REPO_NOT_FOUND") {
-		t.Errorf("missing bs4 blocking detail:\n%s", joined)
-	}
-	if !strings.Contains(joined, "numpy (pypi)") || !strings.Contains(joined, "PACKAGE_INSTALL_SCRIPTS") {
-		t.Errorf("missing numpy blocking detail:\n%s", joined)
-	}
-	// Provenance (manifest file:line) is appended when the SARIF carries it.
-	if !strings.Contains(joined, "from requirements.txt:7") {
-		t.Errorf("expected manifest provenance on the blocking line:\n%s", joined)
-	}
-	// Warnings must never appear in the blocking list.
-	if strings.Contains(joined, "WARN_RULE") || strings.Contains(joined, "lodash") {
-		t.Errorf("warning leaked into blocking lines:\n%s", joined)
-	}
-}
-
-func TestRenderAudit_LevelFilter(t *testing.T) {
+func TestTextPrinter_LevelFilter(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "package/npm/lodash", RuleID: "RULE_A", Level: "error", Message: "err"},
 		{Package: "package/npm/lodash", RuleID: "RULE_B", Level: "warning", Message: "warn"},
 	})
 
 	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "error", nil); err != nil {
-		t.Fatalf("renderAudit: %v", err)
+	if err := renderFindings(selectFindingsByLevel(report, levelEquals(levelError)), []Printer{newTextPrinter(&buf)}); err != nil {
+		t.Fatalf("renderFindings: %v", err)
 	}
 	out := buf.String()
 	if !strings.Contains(out, "RULE_A") {
@@ -174,51 +144,24 @@ func TestRenderAudit_LevelFilter(t *testing.T) {
 	}
 }
 
-func TestRenderAudit_PackageFilter(t *testing.T) {
-	report := newTestReport(t, []testFinding{
-		{Package: "lodash", RuleID: "RULE_A", Level: "error", Message: "err"},
-		{Package: "express", RuleID: "RULE_B", Level: "error", Message: "err"},
-	})
-
-	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "all", []string{"lodash"}); err != nil {
-		t.Fatalf("renderAudit: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "lodash") {
-		t.Errorf("expected lodash: %s", out)
-	}
-	if strings.Contains(out, "express") {
-		t.Errorf("did not expect express: %s", out)
-	}
-}
-
-func TestRenderAudit_EmptyReport(t *testing.T) {
+func TestTextPrinter_EmptyReportPrintsNothing(t *testing.T) {
 	report := newTestReport(t, nil)
 	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "all", nil); err != nil {
-		t.Fatalf("renderAudit: %v", err)
+	if err := renderFindings(selectFindingsByLevel(report, allLevels), []Printer{newTextPrinter(&buf)}); err != nil {
+		t.Fatalf("renderFindings: %v", err)
 	}
-	if got := strings.TrimSpace(buf.String()); got != "no findings" {
-		t.Errorf("expected \"no findings\", got %q", got)
-	}
-}
-
-func TestRenderAudit_InvalidLevel(t *testing.T) {
-	report := newTestReport(t, nil)
-	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "critical", nil); err == nil {
-		t.Fatalf("expected error for invalid level")
+	if got := buf.String(); got != "" {
+		t.Errorf("expected no per-finding output for an empty report, got %q", got)
 	}
 }
 
-func TestRenderAudit_HeaderOmitsZeroCounts(t *testing.T) {
+func TestTextPrinter_HeaderOmitsZeroCounts(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "lodash", RuleID: "RULE_A", Level: "error", Message: "err"},
 	})
 	var buf bytes.Buffer
-	if err := renderAudit(&buf, report, "all", nil); err != nil {
-		t.Fatalf("renderAudit: %v", err)
+	if err := renderFindings(selectFindingsByLevel(report, allLevels), []Printer{newTextPrinter(&buf)}); err != nil {
+		t.Fatalf("renderFindings: %v", err)
 	}
 	out := buf.String()
 	if !strings.Contains(out, "1 error") {
@@ -439,15 +382,15 @@ func TestRelativizePath(t *testing.T) {
 	}
 }
 
-func TestRenderGitHub_LevelFilter(t *testing.T) {
+func TestEmitGitHubAnnotations_LevelFilter(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "p1", RuleID: "R1", Level: "error", Message: "e"},
 		{Package: "p2", RuleID: "R2", Level: "warning", Message: "w"},
 		{Package: "p3", RuleID: "R3", Level: "note", Message: "n"},
 	})
 	var out, errBuf bytes.Buffer
-	if err := renderGitHub(&out, &errBuf, report, "error", nil, ""); err != nil {
-		t.Fatalf("renderGitHub: %v", err)
+	if err := emitGitHubAnnotations(&out, &errBuf, selectFindingsByLevel(report, levelEquals(levelError)), ""); err != nil {
+		t.Fatalf("emitGitHubAnnotations: %v", err)
 	}
 	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
 	if len(lines) != 1 || !strings.HasPrefix(lines[0], "::error ") {
@@ -456,15 +399,15 @@ func TestRenderGitHub_LevelFilter(t *testing.T) {
 }
 
 // Findings are emitted least-to-most severe so blocking findings land last.
-func TestRenderGitHub_ErrorsLast(t *testing.T) {
+func TestEmitGitHubAnnotations_ErrorsLast(t *testing.T) {
 	report := newTestReport(t, []testFinding{
 		{Package: "package/npm/a", RuleID: "R1", Level: "error", Message: "boom"},
 		{Package: "package/npm/b", RuleID: "R2", Level: "warning", Message: "warn"},
 		{Package: "package/npm/c", RuleID: "R3", Level: "note", Message: "ack"},
 	})
 	var out, errBuf bytes.Buffer
-	if err := renderGitHub(&out, &errBuf, report, "all", nil, ""); err != nil {
-		t.Fatalf("renderGitHub: %v", err)
+	if err := emitGitHubAnnotations(&out, &errBuf, selectFindingsByLevel(report, allLevels), ""); err != nil {
+		t.Fatalf("emitGitHubAnnotations: %v", err)
 	}
 	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
 	if len(lines) != 3 {
@@ -485,8 +428,8 @@ func TestWriteGitHubStepSummary(t *testing.T) {
 	path := t.TempDir() + "/summary.md"
 	t.Setenv("GITHUB_STEP_SUMMARY", path)
 
-	if err := writeGitHubStepSummary(report, nil, "all"); err != nil {
-		t.Fatalf("writeGitHubStepSummary: %v", err)
+	if err := writeGitHubStepSummaryFindings(selectFindingsByLevel(report, allLevels)); err != nil {
+		t.Fatalf("writeGitHubStepSummaryFindings: %v", err)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -512,7 +455,7 @@ func TestWriteGitHubStepSummary(t *testing.T) {
 func TestWriteGitHubStepSummary_NoEnvIsNoop(t *testing.T) {
 	t.Setenv("GITHUB_STEP_SUMMARY", "")
 	report := newTestReport(t, []testFinding{{Package: "package/npm/x", RuleID: "R", Level: "error", Message: "m"}})
-	if err := writeGitHubStepSummary(report, nil, "all"); err != nil {
+	if err := writeGitHubStepSummaryFindings(selectFindingsByLevel(report, allLevels)); err != nil {
 		t.Errorf("expected no-op without env var, got: %v", err)
 	}
 }

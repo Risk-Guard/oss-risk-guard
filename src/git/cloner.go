@@ -15,8 +15,16 @@ import (
 )
 
 const (
+	// MaxCloneTime is the default per-clone timeout; CLONE_TIMEOUT_SECONDS
+	// overrides it (see cloneTimeout).
 	MaxCloneTime = 30 * time.Second
 )
+
+// cloneTimeout returns the configured per-clone timeout
+// (CLONE_TIMEOUT_SECONDS), defaulting to MaxCloneTime.
+func cloneTimeout(ctx context.Context) time.Duration {
+	return environment.GetSharedConfig(ctx).GetCloneTimeout()
+}
 
 // isolatedGitEnv returns environment variables that isolate git from local config/credentials.
 // This prevents git from using SSH keys, credential helpers, or user/system git configs.

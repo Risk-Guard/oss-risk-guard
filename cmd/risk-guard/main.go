@@ -80,6 +80,16 @@ Examples:
 		}
 		cfg.SecureGit = secureGit
 
+		// --clone-timeout wins over $CLONE_TIMEOUT_SECONDS, but only when set so
+		// the env value (or default) survives when the flag is omitted.
+		if cmd.Flags().Changed("clone-timeout") {
+			d, err := cmd.Flags().GetDuration("clone-timeout")
+			if err != nil {
+				return fmt.Errorf("failed to get clone-timeout flag: %w", err)
+			}
+			cfg.CloneTimeoutSeconds = int(d.Seconds())
+		}
+
 		colorMode, err := cmd.Flags().GetString("color")
 		if err != nil {
 			return fmt.Errorf("failed to get color flag: %w", err)
@@ -163,6 +173,7 @@ func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information")
 	rootCmd.PersistentFlags().String("log-level", "warn", "Set logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("secure-git", false, "Isolate git from local config/credentials (blocks SSH keys, credential helpers)")
+	rootCmd.PersistentFlags().Duration("clone-timeout", 0, "Per-git-clone timeout, e.g. 30s or 2m (overrides $CLONE_TIMEOUT_SECONDS; default 30s)")
 	rootCmd.PersistentFlags().String("logfile", "", "Write debug logs to file (in addition to console)")
 	rootCmd.PersistentFlags().String("color", "auto", "Colored output: auto (default; honors TTY + NO_COLOR), always, never")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (deprecated: use --color=never)")

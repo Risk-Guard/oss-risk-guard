@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
@@ -103,26 +104,39 @@ func TestModeBehaviors(t *testing.T) {
 	}
 }
 
-func TestRunAllDisplayMode_GatesByEffectiveMode(t *testing.T) {
-	prev := runAllGitHub
-	t.Cleanup(func() { runAllGitHub = prev })
+func TestReportPrinters_ByFlagsAndMode(t *testing.T) {
+	kinds := func(ps []Printer) []string {
+		var out []string
+		for _, p := range ps {
+			switch p.(type) {
+			case *textPrinter:
+				out = append(out, "text")
+			case *githubPrinter:
+				out = append(out, "github")
+			case *gitlabPrinter:
+				out = append(out, "gitlab")
+			}
+		}
+		return out
+	}
 
 	cases := []struct {
 		name   string
 		github bool
+		gitlab string
 		mode   policy.WorkflowMode
-		want   DisplayMode
+		want   []string
 	}{
-		{"no --github, any mode", false, policy.WorkflowModeActive, DisplayNone},
-		{"--github + active emits", true, policy.WorkflowModeActive, DisplayGitHub},
-		{"--github + no-fail emits", true, policy.WorkflowModeNoFail, DisplayGitHub},
-		{"--github + silent suppresses", true, policy.WorkflowModeSilent, DisplayNone},
-		{"--github + disabled suppresses", true, policy.WorkflowModeDisabled, DisplayNone},
+		{"default active -> text", false, "", policy.WorkflowModeActive, []string{"text"}},
+		{"--github replaces text", true, "", policy.WorkflowModeActive, []string{"github"}},
+		{"--github + --gitlab", true, "gl.json", policy.WorkflowModeActive, []string{"github", "gitlab"}},
+		{"--gitlab keeps text", false, "gl.json", policy.WorkflowModeActive, []string{"text", "gitlab"}},
+		{"silent suppresses all", true, "gl.json", policy.WorkflowModeSilent, nil},
+		{"disabled suppresses all", false, "", policy.WorkflowModeDisabled, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			runAllGitHub = c.github
-			if got := runAllDisplayMode(c.mode); got != c.want {
+			if got := kinds(reportPrinters(c.mode, c.github, c.gitlab, ".")); !slices.Equal(got, c.want) {
 				t.Errorf("got %v, want %v", got, c.want)
 			}
 		})

@@ -10,6 +10,7 @@ import (
 type SharedConfig interface {
 	GetSecureGit() bool
 	GetCacheMaxAge() time.Duration
+	GetCloneTimeout() time.Duration
 }
 
 type sharedConfigKey struct{}
