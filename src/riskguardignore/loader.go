@@ -55,6 +55,58 @@ func LoadIgnorePatterns(repoPath string) ([]string, error) {
 	return patterns, nil
 }
 
+// AppendIgnorePatterns appends entries to <repoPath>/.riskguardignore, creating
+// the file if absent and preserving any existing patterns and comments. An entry
+// whose normalized form already matches a pattern in the file is skipped, so
+// re-running init is idempotent. The raw (human-readable) entry is written, while
+// dedup compares normalized forms — so "third_party" and "third_party/" collapse
+// to one. Returns the entries actually written.
+func AppendIgnorePatterns(repoPath string, entries []string) ([]string, error) {
+	existing, err := LoadIgnorePatterns(repoPath)
+	if err != nil {
+		return nil, err
+	}
+	have := make(map[string]struct{}, len(existing))
+	for _, p := range existing {
+		have[p] = struct{}{}
+	}
+
+	var toWrite []string
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		norm := normalizePattern(e)
+		if norm == "" {
+			continue
+		}
+		if _, ok := have[norm]; ok {
+			continue
+		}
+		have[norm] = struct{}{}
+		toWrite = append(toWrite, e)
+	}
+	if len(toWrite) == 0 {
+		return nil, nil
+	}
+
+	ignorePath := filepath.Join(repoPath, IgnoreFileName)
+	file, err := os.OpenFile(ignorePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600) //nolint:gosec // path is derived from trusted repo path
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	var b strings.Builder
+	b.WriteString("\n# Added by risk-guard init\n")
+	for _, e := range toWrite {
+		b.WriteString(e)
+		b.WriteString("\n")
+	}
+	if _, err := file.WriteString(b.String()); err != nil {
+		return nil, err
+	}
+	return toWrite, nil
+}
+
 // normalizePattern converts gitignore-style patterns to doublestar format.
 func normalizePattern(pattern string) string {
 	pattern = strings.TrimSpace(pattern)

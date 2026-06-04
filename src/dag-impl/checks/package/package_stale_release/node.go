@@ -67,7 +67,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		pkgMeta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
 
 		if pkgMeta == nil {
-			log.Warn("Package metadata not available",
+			log.Info("Package metadata not available",
 				zap.String("ecosystem", pkg.Ecosystem),
 				zap.String("package", pkg.Name))
 			continue

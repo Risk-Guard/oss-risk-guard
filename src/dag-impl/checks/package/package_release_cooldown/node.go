@@ -62,7 +62,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	for _, pkg := range input.Packages {
 		versionMeta := versionOut.GetVersionMetadata(pkg.Ecosystem, pkg.Name)
 		if versionMeta == nil {
-			log.Warn("Version metadata not available",
+			log.Info("Version metadata not available",
 				zap.String("ecosystem", pkg.Ecosystem),
 				zap.String("package", pkg.Name))
 			continue

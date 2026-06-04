@@ -70,7 +70,7 @@ func (n *Node) extractPackageDepsFromTransformer(ctx context.Context, input dag_
 	for _, pkg := range input.Packages {
 		pkgMeta := tOutput.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
 		if pkgMeta == nil {
-			logger.Warn("deps_extractor: package metadata not found in transformer output",
+			logger.Info("deps_extractor: package metadata not found in transformer output",
 				zap.String("ecosystem", pkg.Ecosystem),
 				zap.String("name", pkg.Name),
 			)
