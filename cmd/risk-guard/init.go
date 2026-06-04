@@ -155,7 +155,6 @@ func runInitPipeline(cmd *cobra.Command, repoPath string, overrides map[string][
 		failures      []packageError
 		locByKey      map[string]*models.LocationInfo
 	)
-	bold(os.Stderr, "Building SBOM (%s)…\n", runAllSBOMFormat)
 	sbomBytes, sbomErr := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
 	if sbomErr != nil {
 		logger.Warn("building SBOM failed; continuing local-only", zap.Error(sbomErr))

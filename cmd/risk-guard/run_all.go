@@ -71,7 +71,6 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scoring local source: %w", err)
 	}
 
-	bold(os.Stderr, "Building SBOM (%s)…\n", runAllSBOMFormat)
 	sbomBytes, err := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
 	if err != nil {
 		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "building SBOM", err, logger)
