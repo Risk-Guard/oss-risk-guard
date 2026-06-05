@@ -56,22 +56,27 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 func (n *Node) handleLocal(ctx context.Context, sourceURL string, resolveOut *git_resolve.Output, input dag_impl.Input) (*Output, error) {
 	logger := ctxutil.GetLogger(ctx)
 
-	repoPath, err := git.ValidateGitRepo(sourceURL)
-	if err != nil {
-		return NewOutput(
-			executiondag.StatusSkipped,
-			fmt.Sprintf("validating local git repository: %v", err),
-			input,
-		), nil
+	// History metadata comes from the enclosing git work tree, found by walking
+	// up from the named source directory. When the source is not inside a git
+	// repo there is no history to analyze, so this node skips — and the
+	// commit-history source checks that depend on it auto-skip with it. The
+	// content checks are unaffected (they run off git_clone_content).
+	gitRoot, isGit, err := git.ResolveRepoRoot(ctx, sourceURL)
+	if err != nil || !isGit {
+		reason := "local source is not in a git work tree"
+		if err != nil {
+			reason = fmt.Sprintf("resolving local git work tree: %v", err)
+		}
+		return NewOutput(executiondag.StatusSkipped, reason, input), nil
 	}
 
-	gitMeta, err := git.AnalyzeRepository(ctx, repoPath)
+	gitMeta, err := git.AnalyzeRepository(ctx, gitRoot)
 	if err != nil {
 		return nil, fmt.Errorf("analyzing repository: %w", err)
 	}
 
-	logger.Debug("analyzed local git repository metadata",
-		zap.String("path", repoPath),
+	logger.Debug("analyzed local git work tree metadata",
+		zap.String("git_root", gitRoot),
 		zap.String("commit", resolveOut.Commit))
 
 	out := NewOutput(executiondag.StatusSuccess, "", input)

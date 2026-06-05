@@ -92,27 +92,41 @@ func (n *Node) handleLocalRepository(ctx context.Context, sourceURL string, reso
 	logger := ctxutil.GetLogger(ctx)
 
 	logger.Debug("using local path", zap.String("path", sourceURL))
-	repoPath, err := git.ValidateGitRepo(sourceURL)
+
+	// A local source's content is the files in the directory; git is not
+	// required to read them (commit history is a separate concern resolved by
+	// git_resolve / git_clone_metadata). Require only that the path is a
+	// readable directory so file-based checks run on any local source, git or
+	// not.
+	info, err := os.Stat(sourceURL)
 	if err != nil {
-		errMsg := fmt.Sprintf("validating local git repository: %v", err)
 		return NewOutput(
 			executiondag.StatusSkipped,
-			errMsg,
+			fmt.Sprintf("reading local source directory: %v", err),
+			"",
+			"",
+			input,
+		), nil
+	}
+	if !info.IsDir() {
+		return NewOutput(
+			executiondag.StatusSkipped,
+			fmt.Sprintf("local source path is not a directory: %s", sourceURL),
 			"",
 			"",
 			input,
 		), nil
 	}
 
-	n.applyIgnorePatterns(ctx, repoPath, input.Trusted)
+	n.applyIgnorePatterns(ctx, sourceURL, input.Trusted)
 
 	commit := resolveOut.Commit
 
-	logger.Debug("validated local git repository", zap.String("path", repoPath), zap.String("commit", commit))
+	logger.Debug("prepared local source content", zap.String("path", sourceURL), zap.String("commit", commit))
 	return NewOutput(
 		executiondag.StatusSuccess,
 		"",
-		repoPath,
+		sourceURL,
 		commit,
 		input,
 	), nil

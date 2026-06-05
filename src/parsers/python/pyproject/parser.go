@@ -3,6 +3,7 @@ package pyproject
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
@@ -14,14 +15,23 @@ import (
 )
 
 type PyProjectToml struct {
-	Project *Project `toml:"project"`
-	Tool    *Tool    `toml:"tool"`
+	Project          *Project         `toml:"project"`
+	Tool             *Tool            `toml:"tool"`
+	BuildSystem      *BuildSystem     `toml:"build-system"`
+	DependencyGroups map[string][]any `toml:"dependency-groups"`
 }
 
 type Project struct {
-	Name         string   `toml:"name"`
-	Dynamic      []string `toml:"dynamic"`
-	Dependencies []string `toml:"dependencies"`
+	Name                 string              `toml:"name"`
+	Dynamic              []string            `toml:"dynamic"`
+	Dependencies         []string            `toml:"dependencies"`
+	OptionalDependencies map[string][]string `toml:"optional-dependencies"`
+}
+
+// BuildSystem is the PEP 518 [build-system] table; Requires lists the packages
+// needed to build the project (setuptools, cmake, …) — build-time, not runtime.
+type BuildSystem struct {
+	Requires []string `toml:"requires"`
 }
 
 type NameResult struct {
@@ -98,17 +108,28 @@ func Parse(content string, sourceFile string) ([]models.Dependency, error) {
 
 	var deps []models.Dependency
 
-	if pyproject.Project != nil && pyproject.Project.Dependencies != nil {
-		for _, depStr := range pyproject.Project.Dependencies {
-			dep := pep508.ParseRequirementLine(depStr, sourceFile)
-			if dep != nil {
-				if dep.Location == nil {
-					dep.Location = &models.LocationInfo{}
-				}
-				dep.Location.LineNumber = findLineNumber(content, dep.GetName())
-				deps = append(deps, *dep)
-			}
+	if pyproject.Project != nil {
+		// [project.dependencies]: PEP 621 runtime deps. Absent when listed in
+		// [project.dynamic] and resolved at build time (e.g. a setup.py project
+		// that reads requirements.txt), in which case this is empty.
+		deps = append(deps, parseRequirementList(pyproject.Project.Dependencies, sourceFile, content, false)...)
+
+		// [project.optional-dependencies]: extras. Production-reachable when the
+		// extra is selected, so not marked dev.
+		for _, group := range sortedKeys(pyproject.Project.OptionalDependencies) {
+			deps = append(deps, parseRequirementList(pyproject.Project.OptionalDependencies[group], sourceFile, content, false)...)
 		}
+	}
+
+	// [build-system].requires: PEP 518 build deps — absent from a production
+	// install, so marked dev.
+	if pyproject.BuildSystem != nil {
+		deps = append(deps, parseRequirementList(pyproject.BuildSystem.Requires, sourceFile, content, true)...)
+	}
+
+	// [dependency-groups]: PEP 735 dev/tooling groups — marked dev.
+	for _, group := range sortedKeys(pyproject.DependencyGroups) {
+		deps = append(deps, parseDependencyGroup(pyproject.DependencyGroups[group], sourceFile, content)...)
 	}
 
 	if pyproject.Tool != nil && pyproject.Tool.Poetry != nil {
@@ -117,6 +138,52 @@ func Parse(content string, sourceFile string) ([]models.Dependency, error) {
 	}
 
 	return deps, nil
+}
+
+// parseRequirementList parses PEP 508 requirement strings (as found in
+// [project.dependencies], [project.optional-dependencies], and
+// [build-system].requires) into dependencies, stamping each with its source
+// location and the given dev flag.
+func parseRequirementList(reqs []string, sourceFile, content string, dev bool) []models.Dependency {
+	var deps []models.Dependency
+	for _, depStr := range reqs {
+		dep := pep508.ParseRequirementLine(depStr, sourceFile)
+		if dep == nil {
+			continue
+		}
+		if dep.Location == nil {
+			dep.Location = &models.LocationInfo{}
+		}
+		dep.Location.LineNumber = findLineNumber(content, dep.GetName())
+		dep.Dev = dev
+		deps = append(deps, *dep)
+	}
+	return deps
+}
+
+// parseDependencyGroup parses one [dependency-groups] group. Entries are either
+// PEP 508 requirement strings or {include-group = "..."} inclusion tables; the
+// latter only reference another group (parsed on its own pass) and carry no
+// package of their own, so they are skipped. All members are dev.
+func parseDependencyGroup(items []any, sourceFile, content string) []models.Dependency {
+	reqs := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			reqs = append(reqs, s)
+		}
+	}
+	return parseRequirementList(reqs, sourceFile, content, true)
+}
+
+// sortedKeys returns a map's keys in deterministic order so dependency output
+// does not depend on Go's randomized map iteration.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func parsePoetryDependencies(poetryDeps map[string]any, sourceFile string, content string, dev bool) []models.Dependency {

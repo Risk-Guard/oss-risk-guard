@@ -2,14 +2,14 @@
 # getRiskGuard.sh — install the risk-guard binary from GitHub Releases.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/Risk-Guard/oss-risk-guard/main/getRiskGuard.sh | sh
+#   curl -fsSL https://risk-guard.github.io/oss-risk-guard/get.sh | sh
 #
 # Pin a version (positional arg or env var):
-#   curl -fsSL .../getRiskGuard.sh | sh -s -- v0.0.2
-#   curl -fsSL .../getRiskGuard.sh | RISK_GUARD_VERSION=v0.0.2 sh
+#   curl -fsSL .../get.sh | sh -s -- v0.0.2
+#   curl -fsSL .../get.sh | RISK_GUARD_VERSION=v0.0.2 sh
 #
 # Choose an install dir (default: /usr/local/bin if writable/root, else ~/.local/bin):
-#   curl -fsSL .../getRiskGuard.sh | RISK_GUARD_INSTALL_DIR="$HOME/bin" sh
+#   curl -fsSL .../get.sh | RISK_GUARD_INSTALL_DIR="$HOME/bin" sh
 #
 # Supports Linux and macOS. On Windows, download the .zip from the Releases page.
 

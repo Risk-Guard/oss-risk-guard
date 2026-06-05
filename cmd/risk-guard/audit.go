@@ -77,7 +77,9 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
+	// The audit command scores an SBOM only; there is no local-source scan, so
+	// pass nil to omit the "findings in source" line.
+	depViolations, failures, err := runPackageAudits(ctx, keys, locByKey, overridesHash, nil)
 	if err != nil {
 		return err
 	}

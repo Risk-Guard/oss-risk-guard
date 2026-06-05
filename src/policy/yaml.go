@@ -35,12 +35,14 @@ func ToPolicy(p *CompiledPolicy) *Policy {
 	}
 
 	expectedFailures := maps.Clone(p.ExpectedFailures)
+	expectedWarnings := maps.Clone(p.ExpectedWarnings)
 
 	return &Policy{
 		Version:          CurrentVersion,
 		Workflow:         p.Workflow,
 		Severity:         severity,
 		ExpectedFailures: expectedFailures,
+		ExpectedWarnings: expectedWarnings,
 	}
 }
 

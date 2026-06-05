@@ -109,6 +109,131 @@ module = "from-flit"
 	}
 }
 
+func TestParseBuildSystemRequiresDev(t *testing.T) {
+	content := `
+[build-system]
+requires = ["setuptools>=77", "cmake>=3.27", "numpy"]
+build-backend = "setuptools.build_meta"
+`
+	deps, err := Parse(content, "pyproject.toml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dev := make(map[string]bool)
+	for _, d := range deps {
+		dev[d.AnalysisIdentifier] = d.Dev
+	}
+	for _, want := range []string{"package/pypi/setuptools", "package/pypi/cmake", "package/pypi/numpy"} {
+		got, ok := dev[want]
+		if !ok {
+			t.Errorf("expected build dep %s to be parsed", want)
+			continue
+		}
+		if !got {
+			t.Errorf("expected build dep %s to be Dev=true", want)
+		}
+	}
+}
+
+func TestParseOptionalDependenciesRuntime(t *testing.T) {
+	content := `
+[project]
+name = "demo"
+
+[project.optional-dependencies]
+optree = ["optree>=0.13.0"]
+opt-einsum = ["opt-einsum>=3.3"]
+`
+	deps, err := Parse(content, "pyproject.toml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dev := make(map[string]bool)
+	for _, d := range deps {
+		dev[d.AnalysisIdentifier] = d.Dev
+	}
+	for _, want := range []string{"package/pypi/optree", "package/pypi/opt-einsum"} {
+		got, ok := dev[want]
+		if !ok {
+			t.Errorf("expected optional dep %s to be parsed", want)
+			continue
+		}
+		if got {
+			t.Errorf("expected optional dep %s to be Dev=false (production-reachable)", want)
+		}
+	}
+}
+
+func TestParseDependencyGroupsDevAndSkipsInclude(t *testing.T) {
+	content := `
+[dependency-groups]
+test = ["pytest>=7", "hypothesis"]
+dev = [{include-group = "test"}, "black"]
+`
+	deps, err := Parse(content, "pyproject.toml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	dev := make(map[string]bool)
+	for _, d := range deps {
+		dev[d.AnalysisIdentifier] = d.Dev
+	}
+	for _, want := range []string{"package/pypi/pytest", "package/pypi/hypothesis", "package/pypi/black"} {
+		got, ok := dev[want]
+		if !ok {
+			t.Errorf("expected group dep %s to be parsed", want)
+			continue
+		}
+		if !got {
+			t.Errorf("expected group dep %s to be Dev=true", want)
+		}
+	}
+	// The {include-group = "test"} table references another group and is not a
+	// package, so it must not produce a spurious dependency.
+	if len(deps) != 3 {
+		t.Errorf("expected 3 deps (include-group skipped), got %d: %v", len(deps), dev)
+	}
+}
+
+// TestParseDynamicRuntimeDepsStillGetsBuildAndGroups mirrors pytorch: runtime
+// dependencies are declared dynamic (so [project.dependencies] is empty), but
+// build-system, optional, and dependency-group deps must still be enumerated.
+func TestParseDynamicRuntimeDepsStillGetsBuildAndGroups(t *testing.T) {
+	content := `
+[build-system]
+requires = ["setuptools", "numpy"]
+
+[project]
+name = "torch"
+dynamic = ["dependencies", "version"]
+
+[project.optional-dependencies]
+optree = ["optree>=0.13.0"]
+
+[dependency-groups]
+dev = ["expecttest>=0.3.0", "filelock"]
+`
+	deps, err := Parse(content, "pyproject.toml")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := make(map[string]bool)
+	for _, d := range deps {
+		got[d.AnalysisIdentifier] = true
+	}
+	for _, want := range []string{
+		"package/pypi/setuptools", "package/pypi/numpy",
+		"package/pypi/optree", "package/pypi/expecttest", "package/pypi/filelock",
+	} {
+		if !got[want] {
+			t.Errorf("expected %s to be parsed, got %v", want, got)
+		}
+	}
+}
+
 func TestParseProjectDependenciesNotDev(t *testing.T) {
 	content := `
 [project]

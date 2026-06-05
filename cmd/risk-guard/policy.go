@@ -5,7 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
+	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
+	localdag "github.com/Risk-Guard/oss-risk-guard/src/lib/local/dag"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
 	"github.com/fatih/color"
@@ -56,13 +57,31 @@ requires an interactive terminal.`,
 	RunE:          runAddExpectedFailures,
 }
 
+var policyChecksCmd = &cobra.Command{
+	Use:   "checks",
+	Short: "List all available checks and their risk categories",
+	Long: `List every check risk-guard can run, with its risk categories and a short
+description. Categories are colored to mirror how the default policy grades them.`,
+	Args:          cobra.NoArgs,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE:          runPolicyChecks,
+}
+
 func init() {
 	addExpectedFailuresCmd.Flags().BoolVar(&addEFAll, "all", false, "Add all findings without prompting")
 	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from")
 
 	policyCmd.AddCommand(policyShowCmd)
 	policyCmd.AddCommand(addExpectedFailuresCmd)
+	policyCmd.AddCommand(policyChecksCmd)
 	rootCmd.AddCommand(policyCmd)
+}
+
+func runPolicyChecks(_ *cobra.Command, _ []string) error {
+	checks, _ := dag_builder.GetAllCheckMetadata(localdag.Builder)
+	_, err := fmt.Fprint(os.Stdout, renderCheckList(checks))
+	return err
 }
 
 // repoArg returns the optional positional repo path, defaulting to "." when
@@ -75,9 +94,9 @@ func repoArg(args []string) string {
 }
 
 func runPolicyShow(_ *cobra.Command, args []string) error {
-	repoPath, err := git.ValidateGitRepo(repoArg(args))
+	repoPath, err := resolveScanPath(repoArg(args))
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 
 	res, raw, err := loadRepoPolicy(repoPath)
@@ -99,11 +118,11 @@ func runPolicyShow(_ *cobra.Command, args []string) error {
 }
 
 func runAddExpectedFailures(_ *cobra.Command, args []string) error {
-	// Resolve the repo root the same way init/run do so we read and write the
-	// exact .risk-guard.yml the rest of the tool uses.
-	repoPath, err := git.ValidateGitRepo(repoArg(args))
+	// Resolve the target the same way init/run do so we read and write the exact
+	// .risk-guard.yml the rest of the tool uses at the named path.
+	repoPath, err := resolveScanPath(repoArg(args))
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 
 	if _, statErr := os.Stat(addEFSarif); statErr != nil {
@@ -118,7 +137,7 @@ func runAddExpectedFailures(_ *cobra.Command, args []string) error {
 		return errReported
 	}
 
-	findings := collectInitFindings(report)
+	findings := collectInitFindings(report, levelError)
 	if len(findings) == 0 {
 		fmt.Fprintln(os.Stderr, "No blocking findings in SARIF; nothing to add.")
 		return nil
@@ -153,7 +172,7 @@ func runAddExpectedFailures(_ *cobra.Command, args []string) error {
 		if !isInteractive() {
 			return fmt.Errorf("non-interactive terminal: pass --all to add all %d finding(s)", len(findings))
 		}
-		if err := reviewEachInto(findings, picked); err != nil {
+		if err := reviewEachInto(findings, picked, triageFailures); err != nil {
 			return err
 		}
 	}

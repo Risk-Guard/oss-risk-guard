@@ -103,6 +103,29 @@ func TestBuildSBOMNodes_DedupesDuplicateEdges(t *testing.T) {
 	}
 }
 
+func TestInferSBOMFormat(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		{"sbom.spdx.json", sbomFormatSPDX},
+		{"out/bom.SPDX.JSON", sbomFormatSPDX},
+		{"artifact.spdx", sbomFormatSPDX},
+		{"sbom.cdx.json", sbomFormatCycloneDX},
+		{"out/sbom.CDX.json", sbomFormatCycloneDX},
+		{"artifact.cdx", sbomFormatCycloneDX},
+		{"sbom.bom.json", sbomFormatCycloneDX},
+		{"sbom.json", sbomFormatSPDX}, // no hint → default
+		{"-", sbomFormatSPDX},         // stdout → default
+		{"weird.txt", sbomFormatSPDX}, // unknown → default
+	}
+	for _, tc := range cases {
+		if got := inferSBOMFormat(tc.path); got != tc.want {
+			t.Errorf("inferSBOMFormat(%q) = %q, want %q", tc.path, got, tc.want)
+		}
+	}
+}
+
 func TestBuildSBOMJSON_UnknownFormat(t *testing.T) {
 	_, err := buildSBOMJSON("turtle", "source/x", nil)
 	if err == nil {

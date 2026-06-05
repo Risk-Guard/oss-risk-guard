@@ -4,11 +4,49 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 )
+
+func TestMatcher_Match(t *testing.T) {
+	// patterns are the normalized form LoadIgnorePatterns produces.
+	m := &Matcher{patterns: []string{"**/third_party", "**/vendor", "**/*.generated.go", "src/tests"}}
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"third_party", true},                      // the directory itself
+		{"third_party/foo/setup.py", true},         // file beneath it
+		{"a/third_party/x/requirements.txt", true}, // nested beneath it
+		{"vendor/lib/package.json", true},
+		{"src/tests", true},
+		{"src/tests/conftest.py", true},
+		{"pkg/foo.generated.go", true},
+		{"requirements.txt", false},
+		{"src/main.go", false},
+		{"third_party_notes.txt", false}, // prefix only, not the dir
+	}
+	for _, c := range cases {
+		if got := m.Match(c.path); got != c.want {
+			t.Errorf("Match(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+}
+
+func TestMatcher_EmptyMatchesNothing(t *testing.T) {
+	var nilM *Matcher
+	if nilM.Match("anything") || !nilM.Empty() {
+		t.Error("nil matcher should be empty and match nothing")
+	}
+	empty := &Matcher{}
+	if empty.Match("x") || !empty.Empty() {
+		t.Error("empty matcher should be empty and match nothing")
+	}
+}
 
 func TestNormalizePattern(t *testing.T) {
 	tests := []struct {
@@ -129,6 +167,83 @@ vendor/
 		if p != expected[i] {
 			t.Errorf("pattern[%d] = %q, want %q", i, p, expected[i])
 		}
+	}
+}
+
+func hasNormalized(t *testing.T, repoPath, want string) bool {
+	t.Helper()
+	patterns, err := LoadIgnorePatterns(repoPath)
+	if err != nil {
+		t.Fatalf("LoadIgnorePatterns: %v", err)
+	}
+	return slices.Contains(patterns, want)
+}
+
+func TestAppendIgnorePatterns_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	written, err := AppendIgnorePatterns(dir, []string{"third_party", "vendor"})
+	if err != nil {
+		t.Fatalf("AppendIgnorePatterns: %v", err)
+	}
+	if len(written) != 2 {
+		t.Fatalf("expected 2 entries written, got %v", written)
+	}
+	if _, err := os.Stat(filepath.Join(dir, IgnoreFileName)); err != nil {
+		t.Fatalf("ignore file not created: %v", err)
+	}
+	if !hasNormalized(t, dir, "**/third_party") || !hasNormalized(t, dir, "**/vendor") {
+		t.Errorf("appended entries not loadable")
+	}
+}
+
+func TestAppendIgnorePatterns_PreservesExisting(t *testing.T) {
+	dir := t.TempDir()
+	original := "# my notes\nnode_modules/\n"
+	if err := os.WriteFile(filepath.Join(dir, IgnoreFileName), []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AppendIgnorePatterns(dir, []string{"third_party"}); err != nil {
+		t.Fatalf("AppendIgnorePatterns: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, IgnoreFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "# my notes") || !strings.Contains(content, "node_modules/") {
+		t.Errorf("existing content lost: %q", content)
+	}
+	if !strings.Contains(content, "third_party") {
+		t.Errorf("new entry not appended: %q", content)
+	}
+}
+
+func TestAppendIgnorePatterns_Dedup(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, IgnoreFileName), []byte("third_party/\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	written, err := AppendIgnorePatterns(dir, []string{"third_party", "vendor"})
+	if err != nil {
+		t.Fatalf("AppendIgnorePatterns: %v", err)
+	}
+	if len(written) != 1 || written[0] != "vendor" {
+		t.Fatalf("expected only [vendor] written, got %v", written)
+	}
+}
+
+func TestAppendIgnorePatterns_NormalizedDedup(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, IgnoreFileName), []byte("third_party\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// "third_party/" normalizes to the same pattern as the existing "third_party".
+	written, err := AppendIgnorePatterns(dir, []string{"third_party/"})
+	if err != nil {
+		t.Fatalf("AppendIgnorePatterns: %v", err)
+	}
+	if len(written) != 0 {
+		t.Fatalf("expected nothing written, got %v", written)
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 
 // runIDByPkg builds an index from the package key (as appears in
 // result.locations[*].logicalLocations[*].name) back to its Run's
-// AutomationDetails.ID. Used so renderGitHub can resolve a human subject for
+// AutomationDetails.ID. Used so selectFindingsByLevel can resolve a human subject for
 // each finding even though findings are keyed on package name.
 func runIDByPkg(report *sarif.Report) map[string]string {
 	out := map[string]string{}
@@ -42,53 +42,13 @@ type ghFinding struct {
 	f       auditFinding
 }
 
-// collectGHFindings flattens the per-package grouping into a single slice and
-// resolves a display subject for each finding, so callers can order globally.
-func collectGHFindings(report *sarif.Report, pkgFilter map[string]bool, levelFilter string) ([]ghFinding, []string) {
-	grouped, skipped := collectFindings(report, pkgFilter, levelFilter)
-	runIDs := runIDByPkg(report)
-	out := make([]ghFinding, 0, len(grouped))
-	for pkg, findings := range grouped {
-		for _, f := range findings {
-			out = append(out, ghFinding{
-				subject: annotationSubject(runIDs[pkg], pkg),
-				runID:   runIDs[pkg],
-				pkg:     pkg,
-				f:       f,
-			})
-		}
-	}
-	return out, skipped
-}
-
-// renderGitHub writes one GitHub Actions workflow command per finding to w,
-// ordered least-to-most severe so blocking findings land last — next to the
-// step's failure line, where they are most visible (GitHub caps annotations at
-// 10 per severity per step, and each severity has its own bucket, so emission
-// order does not cost us any error annotations). Each command's message is
-// self-contained: subject first, then the finding, then de-duplicated detail,
-// so there is no ambiguity about which finding a line of detail belongs to.
-//
-// When $GITHUB_STEP_SUMMARY is set, a full findings table is also written there
-// (uncapped), giving the complete rollup the annotation cap can't.
-//
-// Skip-warnings and other non-annotation diagnostics go to warn so they don't
-// get parsed by the GH runner as annotations. repoRoot resolution order:
-// explicit arg, then $GITHUB_WORKSPACE, then CWD.
-func renderGitHub(w io.Writer, warn io.Writer, report *sarif.Report, level string, packages []string, repoRoot string) error {
-	pkgFilter := stringSet(packages)
-	levelFilter, err := normalizeLevelFilter(level)
-	if err != nil {
-		return err
-	}
-
-	findings, skipped := collectGHFindings(report, pkgFilter, levelFilter)
-	for _, rule := range skipped {
-		// Skip-warnings are diagnostic; a stderr write failure shouldn't abort
-		// annotation emission.
-		_, _ = fmt.Fprintf(warn, "warning: skipping result with no package logical-location (rule=%s)\n", rule)
-	}
-
+// emitGitHubAnnotations writes the GitHub Actions workflow commands for a
+// finding set (ordered least-to-most severe so blocking findings land last, next
+// to the step's failure line) and appends the uncapped job-summary table. It is
+// the githubPrinter's sink, fed the same selectFindingsByLevel output for both `run` and
+// `view-audit`, so both produce identical annotations for the same findings.
+// Diagnostics go to warn so the GH runner doesn't parse them as annotations.
+func emitGitHubAnnotations(w io.Writer, warn io.Writer, findings []ghFinding, repoRoot string) error {
 	// Errors last: rank 0 (error) sorts after rank 3 (info). Within a severity,
 	// keep a subject's findings together, then order by rule for determinism.
 	sort.SliceStable(findings, func(i, j int) bool {
@@ -108,7 +68,7 @@ func renderGitHub(w io.Writer, warn io.Writer, report *sarif.Report, level strin
 		}
 	}
 
-	if err := writeGitHubStepSummary(report, pkgFilter, levelFilter); err != nil {
+	if err := writeGitHubStepSummaryFindings(findings); err != nil {
 		// A summary-write failure (e.g. the 1 MiB cap) must not fail the run;
 		// the annotations already carried the findings.
 		_, _ = fmt.Fprintf(warn, "warning: writing job summary: %v\n", err)
@@ -176,6 +136,13 @@ func annotationSubject(runID, pkgKey string) string {
 	}
 	if runID != "" && runID != "local-source" {
 		return runID
+	}
+	// A locationless finding (no package key, no run identity) would otherwise
+	// render with a blank subject (" — N finding(s)"). Never hide a finding —
+	// give it a placeholder subject, the same spirit as falling back to the
+	// rule ID when a title is missing.
+	if pkgKey == "" {
+		return "(unknown package)"
 	}
 	return pkgKey
 }

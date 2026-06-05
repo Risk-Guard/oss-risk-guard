@@ -7,8 +7,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-
-	"github.com/owenrumney/go-sarif/v2/sarif"
 )
 
 // codeClimateIssue is one entry of a GitLab Code Quality report. The schema is
@@ -32,24 +30,18 @@ type ccLines struct {
 	Begin int `json:"begin"`
 }
 
-// renderGitLab writes the findings as a GitLab Code Quality (CodeClimate) JSON
-// array to w. It is the GitLab analog of renderGitHub: same finding collection,
-// subject resolution, level filter, and message wording — but emitted as a
-// report file GitLab uploads (artifacts:reports:codequality) rather than stdout
-// workflow commands, because GitLab has no inline-log annotation mechanism.
+// emitGitLabIssues encodes a finding set as a GitLab Code Quality (CodeClimate)
+// JSON array to w — the GitLab analog of emitGitHubAnnotations, emitted as a
+// report file GitLab uploads (artifacts:reports:codequality) because GitLab has
+// no inline-log annotation mechanism. It is the gitlabPrinter's sink, fed the
+// same selectFindingsByLevel output for both `run` and `view-audit`.
 //
 // CodeClimate requires a location.path; a finding with no resolvable physical
-// location cannot be represented, so it is skipped with a warning to warn.
-// repoRoot relativizes absolute paths (see resolveRepoRoot / relativizePath).
-func renderGitLab(w io.Writer, warn io.Writer, report *sarif.Report, level string, packages []string, repoRoot string) error {
-	pkgFilter := stringSet(packages)
-	levelFilter, err := normalizeLevelFilter(level)
-	if err != nil {
-		return err
-	}
-
-	findings, skipped := collectGHFindings(report, pkgFilter, levelFilter)
-
+// location cannot be represented. skipped lists any such rule IDs the caller
+// dropped earlier; they are folded into the single "omitted" warning along with
+// selected findings that turn out to have no file location. repoRoot relativizes
+// absolute paths (see resolveRepoRoot / relativizePath).
+func emitGitLabIssues(w io.Writer, warn io.Writer, findings []ghFinding, skipped []string, repoRoot string) error {
 	root := resolveRepoRoot(repoRoot)
 	issues := make([]codeClimateIssue, 0, len(findings))
 	var pathless []string

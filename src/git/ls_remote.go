@@ -36,7 +36,7 @@ func lsRemote(ctx context.Context, sourceURL, ref string) (string, error) {
 
 	//nolint:gosec // G204: URL is validated by ValidateRemoteURL, ref validated by caller
 	cmd := exec.CommandContext(lsCtx, "git", "ls-remote", lsURL, ref)
-	applySecureGitEnv(ctx, cmd)
+	applyGitEnv(ctx, cmd)
 	var stderrBuf bytes.Buffer
 	cmd.Stderr = &stderrBuf
 

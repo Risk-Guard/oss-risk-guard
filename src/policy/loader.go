@@ -94,30 +94,48 @@ func Compile(p *Policy) (*CompiledPolicy, error) {
 		return nil, err
 	}
 
-	expectedFailures := make(map[string]ExpectedFailureV2)
-	for path, ef := range p.ExpectedFailures {
-		if err := ParseExpectedFailurePath(path); err != nil {
-			return nil, fmt.Errorf("expected_failures: %w", err)
-		}
-		if len(ef.Checks) == 0 {
-			return nil, fmt.Errorf("expected_failures %q: checks array is required", path)
-		}
-		if err := ValidatePattern(path); err != nil {
-			return nil, fmt.Errorf("expected_failures %q: invalid pattern: %w", path, err)
-		}
-		for _, check := range ef.Checks {
-			if err := ValidatePattern(check); err != nil {
-				return nil, fmt.Errorf("expected_failures %q check %q: invalid pattern: %w", path, check, err)
-			}
-		}
-		expectedFailures[path] = ef
+	expectedFailures, err := compileExpectedTable("expected_failures", p.ExpectedFailures)
+	if err != nil {
+		return nil, err
+	}
+
+	expectedWarnings, err := compileExpectedTable("expected_warnings", p.ExpectedWarnings)
+	if err != nil {
+		return nil, err
 	}
 
 	return &CompiledPolicy{
 		Rules:            rules,
 		ExpectedFailures: expectedFailures,
+		ExpectedWarnings: expectedWarnings,
 		Workflow:         p.Workflow,
 	}, nil
+}
+
+// compileExpectedTable validates and copies an acknowledgment table
+// (expected_failures or expected_warnings). section names the table for error
+// messages. Both tables share the same key/check grammar and the same rule that
+// every entry must list at least one check code.
+func compileExpectedTable(section string, in map[string]ExpectedFailureV2) (map[string]ExpectedFailureV2, error) {
+	out := make(map[string]ExpectedFailureV2)
+	for path, ef := range in {
+		if err := ParseExpectedFailurePath(path); err != nil {
+			return nil, fmt.Errorf("%s: %w", section, err)
+		}
+		if len(ef.Checks) == 0 {
+			return nil, fmt.Errorf("%s %q: checks array is required", section, path)
+		}
+		if err := ValidatePattern(path); err != nil {
+			return nil, fmt.Errorf("%s %q: invalid pattern: %w", section, path, err)
+		}
+		for _, check := range ef.Checks {
+			if err := ValidatePattern(check); err != nil {
+				return nil, fmt.Errorf("%s %q check %q: invalid pattern: %w", section, path, check, err)
+			}
+		}
+		out[path] = ef
+	}
+	return out, nil
 }
 
 func parseSeverityRules(severity map[string]SeverityValue) ([]SeverityRule, error) {

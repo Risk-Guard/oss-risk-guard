@@ -43,6 +43,7 @@ type Policy struct {
 	Workflow         *WorkflowConfig              `json:"workflow,omitempty" jsonschema:"description=Workflow behavior configuration"`
 	Severity         map[string]SeverityValue     `json:"severity,omitempty" jsonschema:"description=Severity rules mapping paths to severity levels. Path syntax: [source/pattern/][ecosystem/name/][depth/range/][env/dev|prod/](category/name | check/CODE). Supports * wildcard (matches within path segment). Source paths must be quoted. Examples: check/SOURCE_* or env/dev/category/critical or source/\"github.com/org/*\"/category/critical"`
 	ExpectedFailures map[string]ExpectedFailureV2 `json:"expected_failures,omitempty" jsonschema:"description=Acknowledged violations keyed by package/ecosystem/name or source/host/org/repo or root. Each entry has a checks array listing check codes. Supports * wildcard and optional ?version=X.Y.Z. Examples: package/npm/lodash with checks: [VULN_CHECK] or root with checks: [SOURCE_NO_LICENSE]"`
+	ExpectedWarnings map[string]ExpectedFailureV2 `json:"expected_warnings,omitempty" jsonschema:"description=Acknowledged WARNING-level findings (noise baseline) keyed the same way as expected_failures. Matched warnings are recorded as acknowledged so they stop adding annotation noise; this section never silences a blocking finding. Use it to baseline an existing repo's current warnings while still enforcing the full policy on new pull requests."`
 	Overrides        map[string][]PolicyOverride  `json:"overrides,omitempty" jsonschema:"description=Package or source scoped output overrides keyed by package/ecosystem/name or source/host/org/repo. Values are arrays of path overrides."`
 }
 
@@ -82,6 +83,7 @@ type ExpectedFailureV2 struct {
 type CompiledPolicy struct {
 	Rules            []SeverityRule
 	ExpectedFailures map[string]ExpectedFailureV2
+	ExpectedWarnings map[string]ExpectedFailureV2
 	Workflow         *WorkflowConfig
 }
 
@@ -133,6 +135,11 @@ func (p *CompiledPolicy) Clone() *CompiledPolicy {
 		expectedFailures[k] = v.clone()
 	}
 
+	expectedWarnings := make(map[string]ExpectedFailureV2, len(p.ExpectedWarnings))
+	for k, v := range p.ExpectedWarnings {
+		expectedWarnings[k] = v.clone()
+	}
+
 	var workflow *WorkflowConfig
 	if p.Workflow != nil {
 		wf := *p.Workflow
@@ -142,6 +149,7 @@ func (p *CompiledPolicy) Clone() *CompiledPolicy {
 	return &CompiledPolicy{
 		Rules:            rules,
 		ExpectedFailures: expectedFailures,
+		ExpectedWarnings: expectedWarnings,
 		Workflow:         workflow,
 	}
 }

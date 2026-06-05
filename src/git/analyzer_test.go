@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -347,4 +348,75 @@ func TestValidateGitRepo_RelativePath(t *testing.T) {
 	t.Log("NOTE: ValidateGitRepo() accepts both relative and absolute paths")
 	t.Log("- Returns absolute path on success")
 	t.Log("- Uses filepath.Abs() to resolve relative paths")
+}
+
+// TestResolveRepoRoot_WalksUpToToplevel verifies that a path inside a repo
+// resolves to the repo root, the way `git rev-parse --show-toplevel` does.
+func TestResolveRepoRoot_WalksUpToToplevel(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "repo")
+	tmplDir := filepath.Join(t.TempDir(), "tmpl")
+	if err := exec.Command("git", "init", "-q", "--template="+tmplDir, dir).Run(); err != nil {
+		t.Fatalf("git init: %v", err)
+	}
+	sub := filepath.Join(dir, "nested", "deep")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	ctx := context.Background()
+	rootFromRoot, isGit, err := ResolveRepoRoot(ctx, dir)
+	if err != nil {
+		t.Fatalf("ResolveRepoRoot(root): %v", err)
+	}
+	if !isGit {
+		t.Fatal("expected isGit=true for the repo root")
+	}
+	if filepath.Base(rootFromRoot) != "repo" {
+		t.Errorf("expected toplevel basename 'repo', got %q", rootFromRoot)
+	}
+
+	rootFromSub, isGit, err := ResolveRepoRoot(ctx, sub)
+	if err != nil {
+		t.Fatalf("ResolveRepoRoot(sub): %v", err)
+	}
+	if !isGit {
+		t.Fatal("expected isGit=true from a nested subdirectory")
+	}
+	if rootFromSub != rootFromRoot {
+		t.Errorf("walk-up mismatch: sub resolved to %q, root resolved to %q", rootFromSub, rootFromRoot)
+	}
+}
+
+// TestResolveRepoRoot_NonGitDirectoryProceeds verifies that a directory not in a
+// git repo is not an error: isGit is false and root is the cleaned absolute path
+// so callers can still operate on it (git-history checks downstream just skip).
+func TestResolveRepoRoot_NonGitDirectoryProceeds(t *testing.T) {
+	dir := t.TempDir()
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		t.Fatalf("abs: %v", err)
+	}
+
+	root, isGit, err := ResolveRepoRoot(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("ResolveRepoRoot on non-git dir returned error: %v", err)
+	}
+	if isGit {
+		t.Error("expected isGit=false for a directory with no git repo")
+	}
+	if root != abs {
+		t.Errorf("expected root to be the cleaned abs path %q, got %q", abs, root)
+	}
+}
+
+// TestResolveRepoRoot_NonExistentPath verifies a missing path is still a hard
+// error — that's a user mistake, not an absent repo.
+func TestResolveRepoRoot_NonExistentPath(t *testing.T) {
+	_, _, err := ResolveRepoRoot(context.Background(), "/nonexistent/path/to/repo")
+	if err == nil {
+		t.Fatal("expected error for non-existent path")
+	}
+	if !strings.Contains(err.Error(), "does not exist") {
+		t.Errorf("expected 'does not exist' error, got: %v", err)
+	}
 }

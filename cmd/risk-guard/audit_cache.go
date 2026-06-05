@@ -46,6 +46,11 @@ func buildCacheConfig(ctx context.Context) (cacheConfig, error) {
 func scoreOneCached(ctx context.Context, key, overridesHash string, checkMetadata []dag_builder.CheckInfo, cc cacheConfig) (*violations.AnalysisViolations, time.Duration, error) {
 	logger := ctxutil.GetLogger(ctx)
 
+	// Apply this package's .risk-guard.yml overrides before the cache key is
+	// built or the DAG runs, so an overridden audit re-resolves the source and
+	// caches under its own key.
+	ctx, overridesHash = packageOverrideContext(ctx, key, overridesHash)
+
 	if !cc.enabled {
 		analysis, err := scoreOne(ctx, key, overridesHash, checkMetadata)
 		return analysis, -1, err

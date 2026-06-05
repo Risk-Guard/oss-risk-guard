@@ -77,6 +77,23 @@ expected_failures:
     checks: [SOURCE_NO_LICENSE]
     reason: "Internal repo; license intentionally omitted"
 
+# Acknowledged warnings — a noise baseline. Same key/value grammar as
+# expected_failures, but this section applies only to warning-level findings:
+# matched warnings are recorded as acknowledged so they stop adding annotation
+# noise. It can never silence a blocking finding (if a check resolves to
+# blocking, expected_warnings is ignored and the build still fails).
+#
+# Use it to baseline an existing repo's current warnings — `risk-guard init`
+# seeds this for you — so the noise from your code history clears while new
+# pull requests still surface fresh warnings. An expired entry simply reverts
+# to a normal warning (it does not escalate to blocking).
+expected_warnings:
+  package/npm/left-pad:
+    checks: [PACKAGE_STALE_RELEASE]
+    reason: "Known stale; baselined at adoption"
+    approved_by: "security@example.com"
+    expires: 2026-12-01T00:00:00Z
+
 # Per-entity output overrides. Use sparingly — every override requires
 # a `reason` for audit trail.
 overrides:

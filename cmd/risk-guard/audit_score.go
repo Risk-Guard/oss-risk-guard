@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
@@ -39,7 +40,7 @@ type auditTotals struct {
 // scoreAll scores keys in bounded parallel (limit=jobs). Returns one
 // AnalysisViolations per successfully scored key (ordered by key) plus a
 // separate slice of per-key failures. A failure does not abort siblings.
-func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMetadata []dag_builder.CheckInfo, jobs int, cc cacheConfig) ([]*violations.AnalysisViolations, []packageError, auditTotals, error) {
+func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.LocationInfo, overridesHash string, checkMetadata []dag_builder.CheckInfo, jobs int, cc cacheConfig) ([]*violations.AnalysisViolations, []packageError, auditTotals, error) {
 	type indexedResult struct {
 		key      string
 		analysis *violations.AnalysisViolations
@@ -74,7 +75,7 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 			if cachedAge >= 0 {
 				totals.cached++
 			}
-			printProgress(done, len(keys), key, fcount, scoreErr, cachedAge)
+			printProgress(done, len(keys), key, fcount, scoreErr, cachedAge, locByKey[key])
 			mu.Unlock()
 			return nil
 		})
@@ -102,21 +103,38 @@ func scoreAll(ctx context.Context, keys []string, overridesHash string, checkMet
 	return analyses, failures, totals, nil
 }
 
-func printProgress(done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration) {
+func printProgress(done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
 	prefix := color.HiBlackString("[%d/%d]", done, total)
+	var prov string
+	if p := manifestProvenance(loc); p != "" {
+		prov = "  " + color.HiBlackString("from %s", p)
+	}
 	var suffix string
 	if cachedAge >= 0 {
 		suffix = "  " + color.HiBlackString("(cached, %s ago)", roundDuration(cachedAge))
 	}
 	switch {
 	case scoreErr != nil:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key, color.RedString("FAILED"), suffix)
+		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.RedString("FAILED"), prov, suffix)
 	case findingCount > 0:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key,
-			color.YellowString("%d findings", findingCount), suffix)
+		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key,
+			color.YellowString("%d findings", findingCount), prov, suffix)
 	default:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s\n", prefix, key, color.GreenString("ok"), suffix)
+		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.GreenString("ok"), prov, suffix)
 	}
+}
+
+// manifestProvenance renders the manifest file (and line) a dependency was
+// declared in, e.g. "requirements.txt:3" — the "where did this come from"
+// shown on each audit line. Returns "" when the SBOM gave no location.
+func manifestProvenance(loc *models.LocationInfo) string {
+	if loc == nil || loc.File == nil || *loc.File == "" {
+		return ""
+	}
+	if loc.LineNumber != nil && *loc.LineNumber > 0 {
+		return fmt.Sprintf("%s:%d", *loc.File, *loc.LineNumber)
+	}
+	return *loc.File
 }
 
 func scoreOne(ctx context.Context, key, overridesHash string, checkMetadata []dag_builder.CheckInfo) (*violations.AnalysisViolations, error) {

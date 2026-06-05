@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
@@ -78,6 +79,16 @@ Examples:
 			return fmt.Errorf("failed to get secure-git flag: %w", err)
 		}
 		cfg.SecureGit = secureGit
+
+		// --clone-timeout wins over $CLONE_TIMEOUT_SECONDS, but only when set so
+		// the env value (or default) survives when the flag is omitted.
+		if cmd.Flags().Changed("clone-timeout") {
+			d, err := cmd.Flags().GetDuration("clone-timeout")
+			if err != nil {
+				return fmt.Errorf("failed to get clone-timeout flag: %w", err)
+			}
+			cfg.CloneTimeoutSeconds = int(d.Seconds())
+		}
 
 		colorMode, err := cmd.Flags().GetString("color")
 		if err != nil {
@@ -162,11 +173,23 @@ func init() {
 	rootCmd.Flags().BoolP("version", "v", false, "Print version information")
 	rootCmd.PersistentFlags().String("log-level", "warn", "Set logging level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("secure-git", false, "Isolate git from local config/credentials (blocks SSH keys, credential helpers)")
+	rootCmd.PersistentFlags().Duration("clone-timeout", 0, "Per-git-clone timeout, e.g. 30s or 2m (overrides $CLONE_TIMEOUT_SECONDS; default 30s)")
 	rootCmd.PersistentFlags().String("logfile", "", "Write debug logs to file (in addition to console)")
 	rootCmd.PersistentFlags().String("color", "auto", "Colored output: auto (default; honors TTY + NO_COLOR), always, never")
 	rootCmd.PersistentFlags().Bool("no-color", false, "Disable colored output (deprecated: use --color=never)")
 	_ = rootCmd.PersistentFlags().MarkDeprecated("no-color", "use --color=never")
-	rootCmd.PersistentFlags().String("cache-dir", "", "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR or os.UserCacheDir()/risk-guard).")
+
+	// Make the cache-dir default concrete: resolve the platform default
+	// (option 3) now so help shows the real path instead of the abstract
+	// "os.UserCacheDir()/risk-guard".
+	cacheHelp := "Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR)."
+	if def := platformDefaultCacheDir(); def != "" {
+		cacheHelp = fmt.Sprintf("Single cache root for DAG outputs, clones, audit cache, and network cache (default: $RISK_GUARD_CACHE_DIR, else %s).", def)
+		rootCmd.Long = strings.Replace(rootCmd.Long,
+			"os.UserCacheDir()/risk-guard (platform default)",
+			fmt.Sprintf("os.UserCacheDir()/risk-guard (%s — platform default)", def), 1)
+	}
+	rootCmd.PersistentFlags().String("cache-dir", "", cacheHelp)
 
 	registerRunAllFlags(rootCmd)
 }
@@ -176,7 +199,6 @@ func init() {
 // shared `evaluate`, `scoreAll`, and `buildCacheConfig` helpers pick them up.
 func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for merged SARIF report (default ./risk-guard-report.sarif)")
-	cmd.Flags().StringVar(&overridesFile, "overrides", "", "YAML file with field overrides")
 	cmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
 	cmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
 	cmd.Flags().StringVar(&runAllSBOMFormat, "sbom-format", sbomFormatSPDX, "In-memory SBOM format used to enumerate deps: spdx or cyclonedx")
@@ -215,6 +237,17 @@ func resolveColor(colorMode string, noColor bool) error {
 // flagValue (already resolved by the caller from --cache-dir, or the deprecated
 // --output-dir) > RISK_GUARD_CACHE_DIR env > os.UserCacheDir()/risk-guard.
 // Falls back to os.MkdirTemp if no user cache dir is available.
+// platformDefaultCacheDir returns the OS-default cache root — option 3 of the
+// resolution order (os.UserCacheDir()/risk-guard) — or "" when the user cache
+// dir is unavailable. Used only to make help text concrete.
+func platformDefaultCacheDir() string {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(base, "risk-guard")
+}
+
 func resolveCacheDir(flagValue string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil

@@ -29,20 +29,6 @@ func normalizeLevel(raw string) string {
 	}
 }
 
-func normalizeLevelFilter(level string) (string, error) {
-	f := strings.ToLower(strings.TrimSpace(level))
-	if f == "" {
-		return "all", nil
-	}
-	switch f {
-	case "all", levelError, levelWarning, levelNote, levelInfo:
-		return f, nil
-	case "none":
-		return levelInfo, nil
-	}
-	return "", fmt.Errorf("invalid --level %q (want one of: all, error, warning, note, info)", level)
-}
-
 func levelRank(level string) int {
 	switch level {
 	case levelError:

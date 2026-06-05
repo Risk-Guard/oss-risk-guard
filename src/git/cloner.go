@@ -15,8 +15,16 @@ import (
 )
 
 const (
+	// MaxCloneTime is the default per-clone timeout; CLONE_TIMEOUT_SECONDS
+	// overrides it (see cloneTimeout).
 	MaxCloneTime = 30 * time.Second
 )
+
+// cloneTimeout returns the configured per-clone timeout
+// (CLONE_TIMEOUT_SECONDS), defaulting to MaxCloneTime.
+func cloneTimeout(ctx context.Context) time.Duration {
+	return environment.GetSharedConfig(ctx).GetCloneTimeout()
+}
 
 // isolatedGitEnv returns environment variables that isolate git from local config/credentials.
 // This prevents git from using SSH keys, credential helpers, or user/system git configs.
@@ -33,11 +41,45 @@ func isolatedGitEnv() []string {
 	}
 }
 
-// applySecureGitEnv sets isolated env on cmd if secure git mode is enabled.
-func applySecureGitEnv(ctx context.Context, cmd *exec.Cmd) {
+// applyGitEnv sets the environment for a git invocation. In secure-git mode it
+// fully isolates git from local config and credentials. Otherwise it preserves
+// the user's environment (PATH, HOME, credential helpers) but always disables
+// interactive prompting, so an automated scan can never block on a credential
+// or passphrase prompt: an inaccessible repo fails fast (and is recorded as
+// skipped) instead of hanging the whole run.
+func applyGitEnv(ctx context.Context, cmd *exec.Cmd) {
 	if environment.GetSharedConfig(ctx).GetSecureGit() {
 		cmd.Env = isolatedGitEnv()
+		return
 	}
+	cmd.Env = withNonInteractiveGit(cmd.Env)
+}
+
+// withNonInteractiveGit returns env with interactive git/ssh credential prompts
+// disabled. Any existing values for these toggles are dropped so ours win;
+// everything else (including credential helpers and SSH_AUTH_SOCK) is kept so
+// non-interactive auth still works.
+func withNonInteractiveGit(env []string) []string {
+	if env == nil {
+		env = os.Environ()
+	}
+	out := make([]string, 0, len(env)+4)
+	for _, e := range env {
+		switch {
+		case strings.HasPrefix(e, "GIT_TERMINAL_PROMPT="),
+			strings.HasPrefix(e, "GIT_ASKPASS="),
+			strings.HasPrefix(e, "SSH_ASKPASS="),
+			strings.HasPrefix(e, "GCM_INTERACTIVE="):
+		default:
+			out = append(out, e)
+		}
+	}
+	return append(out,
+		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS=",
+		"SSH_ASKPASS=",
+		"GCM_INTERACTIVE=never",
+	)
 }
 
 // applyGitCeiling prevents git from walking above destDir when searching for
@@ -140,7 +182,7 @@ func embedTokenInURL(sourceURL, token string) (string, error) {
 
 func configureSparseCheckoutNative(ctx context.Context, destDir string, patterns []string) error {
 	initCmd := exec.Command("git", "-C", destDir, "sparse-checkout", "init", "--no-cone") //nolint:gosec // Args are hardcoded git subcommands
-	applySecureGitEnv(ctx, initCmd)
+	applyGitEnv(ctx, initCmd)
 	applyGitCeiling(initCmd, destDir)
 	if output, err := initCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to init sparse checkout: %w: %s", err, string(output))

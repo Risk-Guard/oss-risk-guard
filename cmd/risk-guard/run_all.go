@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
-	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 
@@ -32,9 +31,9 @@ var (
 // --github, after the SARIF is written the same in-memory report is rendered
 // to stdout as GitHub Actions workflow annotations.
 func runAll(cmd *cobra.Command, args []string) error {
-	repoPath, err := git.ValidateGitRepo(args[0])
+	repoPath, err := resolveScanPath(args[0])
 	if err != nil {
-		return fmt.Errorf("invalid git repository: %w", err)
+		return err
 	}
 	if auditJobs < 1 {
 		return fmt.Errorf("--jobs must be >= 1")
@@ -72,7 +71,6 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("scoring local source: %w", err)
 	}
 
-	bold(os.Stderr, "Building SBOM (%s)…\n", runAllSBOMFormat)
 	sbomBytes, err := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
 	if err != nil {
 		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "building SBOM", err, logger)
@@ -89,7 +87,8 @@ func runAll(cmd *cobra.Command, args []string) error {
 	}
 	keys, locByKey := keysAndLocations(deps)
 
-	depViolations, failures, err := runPackageAudits(ctx, keys, overridesHash)
+	srcFindings := sourceFindingCount(localViolations)
+	depViolations, failures, err := runPackageAudits(ctx, keys, locByKey, overridesHash, &srcFindings)
 	if err != nil {
 		if !runAllContinueOnError {
 			return err
@@ -106,22 +105,22 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printPolicySummary(report)
+	return renderReport(report, effectiveMode, runAllGitHub, runAllGitLab, repoPath, outPath)
+}
 
-	if err := renderReport(os.Stdout, os.Stderr, report, runAllDisplayMode(effectiveMode), "all", nil, repoPath); err != nil {
+// renderReport is the one output pipeline `run`/`checks` and `view-audit` share.
+// Given a finished report it prints the policy summary, the live findings (to
+// text or --github/--gitlab sinks), and the pass/fail verdict — identical
+// whether the report came from a fresh scan or was read off disk, because the
+// only thing that differs between the two commands is where the report came
+// from. mode gates output and decides whether blocking findings fail the run;
+// repoRoot and sarifPath phrase the acknowledge hint and relativize file paths.
+func renderReport(report *sarif.Report, mode policy.WorkflowMode, toGitHub bool, gitlabPath, repoRoot, sarifPath string) error {
+	printPolicySummary(report)
+	if err := renderFindings(selectFindingsByLevel(report, isLiveLevel), reportPrinters(mode, toGitHub, gitlabPath, repoRoot)); err != nil {
 		return err
 	}
-
-	// GitLab output is independent of --github: --github writes annotations to
-	// stdout, --gitlab writes a Code Quality report file; both may be set. Gate
-	// on emitsAnnotations to match --github semantics (silent/disabled suppress).
-	if runAllGitLab != "" && emitsAnnotations(effectiveMode) {
-		if err := writeGitLabReport(runAllGitLab, report, "all", nil, repoPath); err != nil {
-			return err
-		}
-	}
-
-	return printRunVerdict(effectiveMode, report, repoPath, outPath)
+	return printRunVerdict(mode, report, repoRoot, sarifPath)
 }
 
 // printRunVerdict ends the run with an explicit verdict so the outcome (and
@@ -143,8 +142,11 @@ func printRunVerdict(mode policy.WorkflowMode, report *sarif.Report, repoPath, o
 	}
 
 	fmt.Fprintf(os.Stderr, "%s\n", color.RedString(
-		"Exit with status 1 because mode is %s and policy blocks %d finding(s)", mode, blocking))
-	// Only spell out -s when the report isn't at the default add reads from.
+		"Exit with status 1 because mode is %s and policy blocks %d finding(s).", mode, blocking))
+
+	// The blocking findings themselves were already printed above by the run's
+	// text/GitHub printer; the verdict just states the outcome and how to
+	// acknowledge. Only spell out -s when the report isn't at the default path.
 	ack := "risk-guard policy add-expected-failures " + repoPath
 	if outPath != defaultUnifiedSARIF {
 		ack += " -s " + outPath
@@ -155,35 +157,4 @@ func printRunVerdict(mode policy.WorkflowMode, report *sarif.Report, repoPath, o
 		color.CyanString("%s", ack),
 		color.HiBlackString("(drop --all to review each finding interactively)"))
 	return errBlockingFindings
-}
-
-// writeGitLabReport renders a GitLab Code Quality (CodeClimate) report for the
-// in-memory SARIF and writes it to path (created/truncated). Diagnostics about
-// skipped findings go to stderr.
-func writeGitLabReport(path string, report *sarif.Report, level string, packages []string, repoRoot string) error {
-	f, err := os.Create(path) //nolint:gosec // path is an operator-supplied --gitlab output file
-	if err != nil {
-		return fmt.Errorf("creating GitLab report %s: %w", path, err)
-	}
-	defer func() { _ = f.Close() }() // backstop for the error return below
-	if err := renderGitLab(f, os.Stderr, report, level, packages, repoRoot); err != nil {
-		return fmt.Errorf("writing GitLab report %s: %w", path, err)
-	}
-	// Close explicitly so a deferred-write error (e.g. ENOSPC surfaced only at
-	// close on some filesystems) is reported rather than silently dropped.
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("closing GitLab report %s: %w", path, err)
-	}
-	return nil
-}
-
-// runAllDisplayMode maps --github + effective workflow mode to a DisplayMode.
-// silent and disabled suppress annotations even when --github is set; the user
-// asked for the scan to run and SARIF to be written but explicitly opted out
-// of GH annotations.
-func runAllDisplayMode(mode policy.WorkflowMode) DisplayMode {
-	if runAllGitHub && emitsAnnotations(mode) {
-		return DisplayGitHub
-	}
-	return DisplayNone
 }

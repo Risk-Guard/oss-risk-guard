@@ -7,6 +7,20 @@ import (
 	"testing"
 )
 
+func TestPlatformDefaultCacheDir(t *testing.T) {
+	got := platformDefaultCacheDir()
+	base, err := os.UserCacheDir()
+	if err != nil {
+		if got != "" {
+			t.Errorf("expected empty when UserCacheDir is unavailable, got %q", got)
+		}
+		return
+	}
+	if want := filepath.Join(base, "risk-guard"); got != want {
+		t.Errorf("platformDefaultCacheDir() = %q, want %q", got, want)
+	}
+}
+
 func TestResolveCacheDir_FlagWins(t *testing.T) {
 	t.Setenv("RISK_GUARD_CACHE_DIR", "/env/cache")
 	got, err := resolveCacheDir("/flag/cache")

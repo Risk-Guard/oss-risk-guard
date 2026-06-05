@@ -11,7 +11,7 @@ import (
 func GetHeadCommit(ctx context.Context, repoPath string) (string, error) {
 	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
 	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "rev-parse", "HEAD")
-	applySecureGitEnv(ctx, cmd)
+	applyGitEnv(ctx, cmd)
 	applyGitCeiling(cmd, repoPath)
 	out, err := cmd.Output()
 	if err != nil {

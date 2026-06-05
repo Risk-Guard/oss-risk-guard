@@ -25,8 +25,8 @@ import (
 
 // extractAnalysisViolations distills a single DAG run's check outputs into
 // the per-package raw violations record cached by the audit pipeline.
-// DependencyPath is left nil here; the merge step is responsible for setting
-// the correct depth for the current project's graph.
+// DependencyPath is left nil here; the merge step (gradeViolations via
+// depsWithSourceDepth) sets the correct depth for the current project's graph.
 func extractAnalysisViolations(input dag_impl.Input, checkOutputs []checks.Output) *violations.AnalysisViolations {
 	var v []violations.Violation
 	for _, check := range checkOutputs {
@@ -45,6 +45,30 @@ func extractAnalysisViolations(input dag_impl.Input, checkOutputs []checks.Outpu
 		DependencyPath: nil,
 		Violations:     v,
 	}
+}
+
+// depsWithSourceDepth marks each direct-dependency analysis as depth 1 — one
+// edge below the root source — so depth-scoped policy resolves correctly. The
+// audit pipeline scores only direct dependencies, so their depth is exactly 1.
+// Without this, every dep carries the nil DependencyPath from
+// extractAnalysisViolations and is graded at depth 0, which (a) lets a "root"
+// expected_failure/expected_warning leak onto dependencies and (b) collapses
+// depth-ranged severity rules (e.g. depth/1/category/continuity-assurance) onto
+// the depth-0 bucket. The single ancestor recorded is the root source id, which
+// also surfaces as the SARIF fullyQualifiedName of the dependency.
+func depsWithSourceDepth(sourceID string, deps []*violations.AnalysisViolations) []violations.AnalysisViolations {
+	out := make([]violations.AnalysisViolations, 0, len(deps))
+	for _, d := range deps {
+		if d == nil {
+			continue
+		}
+		dep := *d
+		if len(dep.DependencyPath) == 0 {
+			dep.DependencyPath = []string{sourceID}
+		}
+		out = append(out, dep)
+	}
+	return out
 }
 
 // gradeViolations is the merge step: it folds every per-package
@@ -89,14 +113,10 @@ func gradeViolations(ctx context.Context, sourceID string, local *violations.Ana
 
 	analyses := make([]violations.AnalysisViolations, 0, 1+len(deps))
 	if local != nil {
+		// The local source is the graph root: depth 0 (DependencyPath nil).
 		analyses = append(analyses, *local)
 	}
-	for _, d := range deps {
-		if d == nil {
-			continue
-		}
-		analyses = append(analyses, *d)
-	}
+	analyses = append(analyses, depsWithSourceDepth(sourceID, deps)...)
 
 	combined := &violations.ViolationsResult{
 		RootAnalysis: sourceID,
