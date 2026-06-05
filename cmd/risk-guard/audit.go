@@ -17,34 +17,54 @@ var (
 	auditNoCache  bool
 )
 
+// auditCmd is a help-only parent grouping the source/deps/package scoring
+// commands and the saved-report viewer, so the related verbs share one
+// namespace (mirrors the `policy` group).
 var auditCmd = &cobra.Command{
 	Use:   "audit",
+	Short: "Score a source repo, its dependencies, or a single package; view a saved report",
+	Long: `Parent command for the risk-guard scoring verbs:
+
+  audit source   score the local source repo only (no dependency audit)
+  audit deps     audit direct dependencies from an SBOM
+  audit package  score a single package by its analysis-identifier key
+  audit view     render a saved SARIF report exactly as the run that produced it
+
+Run the full pipeline (source + SBOM + dependency audit) with the bare
+'risk-guard <path>' command.`,
+}
+
+var auditDepsCmd = &cobra.Command{
+	Use:   "deps",
 	Short: "Audit direct dependencies from an SBOM",
 	Long: `Audit reads an SBOM produced by 'risk-guard sbom' and scores its
-direct dependencies (depth=1 from the root component), emitting a merged SARIF
-report with one Run per dependency.
+direct dependencies (depth=1 from the root component). With --sarif a merged
+SARIF report (one Run per dependency) is written; without it a human-readable
+findings summary is printed instead.
 
 Examples:
-  risk-guard audit --sbom sbom.spdx --list
-  risk-guard audit --sbom sbom.spdx --sarif audit.sarif
-  risk-guard audit --sbom sbom.cdx.json --sarif audit.sarif --jobs 8`,
+  risk-guard audit deps --sbom sbom.spdx --list
+  risk-guard audit deps --sbom sbom.spdx
+  risk-guard audit deps --sbom sbom.cdx.json --sarif audit.sarif --jobs 8`,
 	Args: cobra.NoArgs,
 	RunE: runAudit,
 }
 
 func init() {
-	registerSharedDAGFlags(auditCmd)
-	auditCmd.Flags().StringVar(&auditSBOMFile, "sbom", "", "Path to SBOM file (SPDX 3.0 or CycloneDX 1.6 JSON)")
-	auditCmd.Flags().BoolVar(&auditList, "list", false, "List direct dependencies and exit")
-	auditCmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for merged SARIF report (SARIF 2.1.0 JSON)")
-	auditCmd.Flags().IntVar(&auditJobs, "jobs", 4, "Maximum number of packages to score in parallel")
-	auditCmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
-	auditCmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
-	auditCmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", "Maximum cache age (e.g. 30m, 48h, 2d). 0 disables caching")
-	auditCmd.Flags().BoolVar(&auditNoCache, "no-cache", false, "Force fresh scoring; do not read or write the audit cache")
-	if err := auditCmd.MarkFlagRequired("sbom"); err != nil {
+	registerSharedDAGFlags(auditDepsCmd)
+	auditDepsCmd.Flags().StringVar(&auditSBOMFile, "sbom", "", "Path to SBOM file (SPDX 3.0 or CycloneDX 1.6 JSON)")
+	auditDepsCmd.Flags().BoolVar(&auditList, "list", false, "List direct dependencies and exit")
+	auditDepsCmd.Flags().StringVar(&sarifOutFile, "sarif", "", flagHelpSARIF)
+	auditDepsCmd.Flags().IntVar(&auditJobs, "jobs", 4, flagHelpJobs)
+	auditDepsCmd.Flags().StringVar(&policyOverride, "policy-override", "", flagHelpPolicyOverride)
+	auditDepsCmd.Flags().StringVar(&policyDefault, "policy-default", "", flagHelpPolicyDefault)
+	auditDepsCmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", flagHelpMaxAge)
+	auditDepsCmd.Flags().BoolVar(&auditNoCache, "no-cache", false, flagHelpNoCache)
+	if err := auditDepsCmd.MarkFlagRequired("sbom"); err != nil {
 		panic(fmt.Errorf("marking --sbom required: %w", err))
 	}
+	registerSummaryRenderFlags(auditDepsCmd, true)
+	auditCmd.AddCommand(auditDepsCmd)
 	rootCmd.AddCommand(auditCmd)
 }
 
@@ -64,9 +84,6 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 			fmt.Println(k)
 		}
 		return nil
-	}
-	if sarifOutFile == "" {
-		return fmt.Errorf("--sarif is required when not using --list")
 	}
 	if auditJobs < 1 {
 		return fmt.Errorf("--jobs must be >= 1")
@@ -88,5 +105,10 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	return writeReport(report, sarifOutFile)
+	// With --sarif, persist the merged report; without it, print the findings
+	// summary to the terminal so a bare `audit deps` is still useful.
+	if sarifOutFile != "" {
+		return writeReport(report, sarifOutFile)
+	}
+	return renderReportSummary(report, summaryModeOverride, summaryGitHub, summaryGitLab, resolveRepoRoot(summaryRepoRoot))
 }

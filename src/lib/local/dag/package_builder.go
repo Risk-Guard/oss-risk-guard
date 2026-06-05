@@ -38,7 +38,7 @@ import (
 )
 
 // PackageBuilder is the DAG builder for scoring a package-shape input on the
-// local CLI (audit / audit-package). BuildGitDag resolves the source URL from
+// local CLI (audit deps / audit package). BuildGitDag resolves the source URL from
 // registry metadata and clones it, then the same check set as Builder runs.
 // No upstream vulnerability data sources, matching the local profile.
 func PackageBuilder(

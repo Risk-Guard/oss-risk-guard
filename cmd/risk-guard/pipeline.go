@@ -28,13 +28,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// setupAuditContext factors out the cache + storage backend init and
-// overrides-load sequence that runAll, runAudit, and runScoreLocal all
-// repeat. When repoPath is non-empty its .risk-guard.yml is also loaded and
-// stashed in context via policy.SetRootPolicy, so every DAG in the run
-// (local-source and per-package audits) sees the same user-supplied policy.
-// Returns the augmented ctx (also written back to cmd via cmd.SetContext)
-// and the overrides hash for use by package Inputs.
+// setupAuditContext factors out the cache + storage backend init that runAll,
+// runAudit, and runScoreLocal all repeat. When repoPath is non-empty its
+// .risk-guard.yml is also loaded and stashed in context via policy.SetRootPolicy,
+// so every DAG in the run (local-source and per-package audits) sees the same
+// user-supplied policy. Returns the augmented ctx (also written back to cmd via
+// cmd.SetContext) and an empty overrides hash — the hash seam is retained for the
+// package Input constructors but the CLI no longer feeds it (the --overrides flag
+// was removed).
 func setupAuditContext(cmd *cobra.Command, repoPath string) (context.Context, string, error) {
 	ctx := cmd.Context()
 	ctx, err := cache.InitializeCacheBackend(ctx)
@@ -42,10 +43,6 @@ func setupAuditContext(cmd *cobra.Command, repoPath string) (context.Context, st
 		return nil, "", err
 	}
 	ctx, err = storage.InitializeStorageBackend(ctx)
-	if err != nil {
-		return nil, "", err
-	}
-	ctx, overridesHash, err := loadAndSetupOverrides(ctx, overridesFile)
 	if err != nil {
 		return nil, "", err
 	}
@@ -59,7 +56,7 @@ func setupAuditContext(cmd *cobra.Command, repoPath string) (context.Context, st
 		}
 	}
 	cmd.SetContext(ctx)
-	return ctx, overridesHash, nil
+	return ctx, "", nil
 }
 
 // keysAndLocations splits a sbom.DirectDep slice into the parallel arrays the
@@ -314,12 +311,23 @@ func printPolicySummary(report *sarif.Report) {
 // writeReport persists report to outPath (mkdir-p of parent dir) and prints
 // the "Wrote N runs to <path>" line to stderr. outPath must be non-empty.
 func writeReport(report *sarif.Report, outPath string) error {
+	if err := writeReportFile(report, outPath); err != nil {
+		return err
+	}
+	bold := color.New(color.Bold).FprintfFunc()
+	bold(os.Stderr, "\nWrote %d runs to %s\n", len(report.Runs), outPath)
+	return nil
+}
+
+// writeReportFile writes report to outPath as pretty JSON, truncating any
+// existing file first. Every SARIF writer must go through here: go-sarif's
+// report.WriteFile opens O_CREATE|O_WRONLY without O_TRUNC, so overwriting a
+// longer file with a shorter report leaves stale trailing bytes and produces
+// invalid JSON (a doubled closing brace). os.Create truncates.
+func writeReportFile(report *sarif.Report, outPath string) error {
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o750); err != nil {
 		return fmt.Errorf("creating SARIF output directory: %w", err)
 	}
-	// go-sarif's report.WriteFile opens with O_CREATE|O_WRONLY but no O_TRUNC,
-	// so rewriting a shorter report over a longer existing file leaves stale
-	// trailing bytes and produces invalid JSON. os.Create truncates first.
 	f, err := os.Create(outPath) //nolint:gosec // outPath is an operator-supplied --sarif output file
 	if err != nil {
 		return fmt.Errorf("creating SARIF file: %w", err)
@@ -331,8 +339,6 @@ func writeReport(report *sarif.Report, outPath string) error {
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("closing SARIF file: %w", err)
 	}
-	bold := color.New(color.Bold).FprintfFunc()
-	bold(os.Stderr, "\nWrote %d runs to %s\n", len(report.Runs), outPath)
 	return nil
 }
 

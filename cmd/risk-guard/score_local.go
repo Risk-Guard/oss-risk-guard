@@ -18,7 +18,6 @@ import (
 
 var (
 	outputDir      string
-	overridesFile  string
 	policyFile     string
 	policyOverride string
 	policyDefault  string
@@ -27,24 +26,26 @@ var (
 	sarifOutFile   string
 )
 
-var scanCmd = &cobra.Command{
-	Use:   "scan <path>",
+var auditSourceCmd = &cobra.Command{
+	Use:   "source <path>",
 	Short: "Score the local source repo only (no dependency audit)",
 	Long: `Run the local-source scoring DAG against an on-disk git repository
-without auditing its dependencies. Outputs are written only when the relevant
-output flag is set (--sarif, --evaluation, --checks).
+without auditing its dependencies. With --sarif/--evaluation/--checks the
+corresponding artifacts are written; with none of them set, a human-readable
+findings summary is printed to the terminal.
 
 Examples:
-  risk-guard scan .
-  risk-guard scan . --sarif out.sarif
-  risk-guard scan /abs/path/to/repo --evaluation eval.yaml --checks checks.yaml`,
+  risk-guard audit source .
+  risk-guard audit source . --sarif out.sarif
+  risk-guard audit source /abs/path/to/repo --evaluation eval.yaml --checks checks.yaml`,
 	Args: cobra.ExactArgs(1),
 	RunE: runScoreLocal,
 }
 
 func init() {
-	registerLocalFlags(scanCmd)
-	rootCmd.AddCommand(scanCmd)
+	registerLocalFlags(auditSourceCmd)
+	registerSummaryRenderFlags(auditSourceCmd, false)
+	auditCmd.AddCommand(auditSourceCmd)
 }
 
 func runScoreLocal(command *cobra.Command, args []string) error {
@@ -78,12 +79,24 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 
 	logger.Info("DAG execution complete")
 
+	analysis := extractAnalysisViolations(input, dagResponse.Checks)
+
+	// No output flag set: grade and print a findings summary to the terminal so
+	// a bare `audit source <path>` is useful instead of running the DAG silently.
+	// (--checks alone still writes only the checks file, handled in-DAG above.)
+	if evalOutFile == "" && sarifOutFile == "" && checksOutFile == "" {
+		report, err := assembleReport(ctx, input.AnalysisIdentifier, analysis, nil, nil, nil)
+		if err != nil {
+			return err
+		}
+		return renderReportSummary(report, summaryModeOverride, summaryGitHub, summaryGitLab, repoPath)
+	}
+
 	if evalOutFile != "" || sarifOutFile != "" {
 		po := policyOverride
 		if po == "" {
 			po = policyFile
 		}
-		analysis := extractAnalysisViolations(input, dagResponse.Checks)
 		result, err := gradeViolations(ctx, input.AnalysisIdentifier, analysis, nil, po, policyDefault)
 		if err != nil {
 			return fmt.Errorf("evaluation failed: %w", err)
@@ -103,19 +116,18 @@ func runScoreLocal(command *cobra.Command, args []string) error {
 	return nil
 }
 
-// registerSharedDAGFlags wires the flags every DAG-running local command needs:
-// where to write artifacts, which overrides to apply, and which commit to scan.
+// registerSharedDAGFlags wires the deprecated cache-location flag every
+// DAG-running local command still accepts for back-compat.
 func registerSharedDAGFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&outputDir, "output-dir", "", "Deprecated: use --cache-dir instead")
-	cmd.Flags().StringVar(&overridesFile, "overrides", "", "YAML file with field overrides")
 }
 
 func registerLocalFlags(cmd *cobra.Command) {
 	registerSharedDAGFlags(cmd)
-	cmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
-	cmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
+	cmd.Flags().StringVar(&policyOverride, "policy-override", "", flagHelpPolicyOverride)
+	cmd.Flags().StringVar(&policyDefault, "policy-default", "", flagHelpPolicyDefault)
 	cmd.Flags().StringVar(&policyFile, "policy", "", "Deprecated: use --policy-override instead")
 	cmd.Flags().StringVar(&evalOutFile, "evaluation", "", "Output file for evaluation result (YAML)")
 	cmd.Flags().StringVar(&checksOutFile, "checks", "", "Output file for checks result (YAML)")
-	cmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for evaluation result (SARIF 2.1.0 JSON)")
+	cmd.Flags().StringVar(&sarifOutFile, "sarif", "", flagHelpSARIF)
 }
