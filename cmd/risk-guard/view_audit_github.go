@@ -137,6 +137,13 @@ func annotationSubject(runID, pkgKey string) string {
 	if runID != "" && runID != "local-source" {
 		return runID
 	}
+	// A locationless finding (no package key, no run identity) would otherwise
+	// render with a blank subject (" — N finding(s)"). Never hide a finding —
+	// give it a placeholder subject, the same spirit as falling back to the
+	// rule ID when a title is missing.
+	if pkgKey == "" {
+		return "(unknown package)"
+	}
 	return pkgKey
 }
 

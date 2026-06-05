@@ -303,6 +303,7 @@ func TestAnnotationSubject(t *testing.T) {
 		{"source key prefix", "", "source/github.com/o/r", "your repository"},
 		{"package humanized", "", "package/npm/lodash?version=4.0.0", "lodash@4.0.0 (npm)"},
 		{"package no version", "", "package/rubygems/example", "example (rubygems)"},
+		{"no package or run identity", "", "", "(unknown package)"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

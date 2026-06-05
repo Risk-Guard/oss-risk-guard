@@ -230,6 +230,14 @@ func (p *gitlabPrinter) Finalize() error {
 	if err != nil {
 		return fmt.Errorf("creating GitLab report %s: %w", p.path, err)
 	}
-	defer func() { _ = f.Close() }()
-	return emitGitLabIssues(f, p.warn, p.findings, nil, p.repoRoot)
+	if err := emitGitLabIssues(f, p.warn, p.findings, nil, p.repoRoot); err != nil {
+		_ = f.Close()
+		return err
+	}
+	// Surface a Close error: a flush failure that only lands here (e.g. ENOSPC)
+	// would otherwise leave a truncated report while the command reports success.
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("closing GitLab report %s: %w", p.path, err)
+	}
+	return nil
 }

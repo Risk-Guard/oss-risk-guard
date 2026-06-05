@@ -101,9 +101,10 @@ func inferSBOMFormat(path string) string {
 	}
 }
 
-// buildSBOMBytes runs manifest detection on repoPath and returns the SBOM as
-// JSON bytes in the requested format ("spdx" or "cyclonedx"). It performs no
-// disk I/O on the output. Validates repoPath as a git repo.
+// buildSBOMBytes runs manifest detection on path and returns the SBOM as JSON
+// bytes in the requested format ("spdx" or "cyclonedx"). It performs no disk I/O
+// on the output. Validates that path is an existing directory (via
+// resolveScanPath); it need not be a git repo.
 func buildSBOMBytes(ctx context.Context, path, format string) ([]byte, error) {
 	data, _, err := buildSBOMBytesWithManifests(ctx, path, format)
 	return data, err
