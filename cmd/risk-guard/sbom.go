@@ -11,6 +11,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/unsupported"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
@@ -145,6 +146,16 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 	nodes := buildSBOMNodes(rootKey, edges)
 	logger.Info("collected SBOM nodes", zap.Int("count", len(nodes)))
 	fmt.Fprintf(os.Stderr, "\n  %s\n", color.HiBlackString("%d unique packages", countPackages(nodes)))
+
+	// Surface the manifests the SBOM could not reach (CMake, Docker, Gradle, …) —
+	// the set behind SOURCE_UNSUPPORTED_MANIFEST_FILE — so they are visible here,
+	// not just counted in the finding. Unfiltered (matching that check) so the
+	// list reconciles with it.
+	if unsup, derr := unsupported.DetectUnsupportedManifests(repoPath); derr != nil {
+		logger.Warn("detecting unsupported manifests", zap.Error(derr))
+	} else {
+		printUnsupportedManifests(unsup)
+	}
 
 	data, err := buildSBOMJSON(format, rootKey, nodes)
 	if err != nil {

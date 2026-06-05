@@ -29,6 +29,24 @@ func normalizeLevel(raw string) string {
 	}
 }
 
+// levelFilterFor maps a --level value to a predicate that keeps that tier and
+// every more-severe one — a severity floor, like --log-level. blocking=error,
+// warning, acknowledged=note, all=info ("none"). The empty string (flag default)
+// resolves to warning, i.e. the live findings shown by default.
+func levelFilterFor(level string) (func(string) bool, error) {
+	floor, ok := map[string]int{
+		"blocking":     levelRank(levelError),
+		"":             levelRank(levelWarning),
+		levelWarning:   levelRank(levelWarning),
+		"acknowledged": levelRank(levelNote),
+		"all":          levelRank(levelInfo),
+	}[level]
+	if !ok {
+		return nil, fmt.Errorf("invalid --level %q: want blocking, warning, acknowledged, or all", level)
+	}
+	return func(l string) bool { return levelRank(l) <= floor }, nil
+}
+
 func levelRank(level string) int {
 	switch level {
 	case levelError:

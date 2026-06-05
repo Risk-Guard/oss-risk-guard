@@ -101,7 +101,7 @@ Run `risk-guard --help` (or `risk-guard <command> --help`) for the full flag lis
 ### Example output
 
 The SARIF report renders inline in GitHub/GitLab. Locally,
-`risk-guard view-audit risk-guard-report.sarif` prints a summary like:
+`risk-guard audit view risk-guard-report.sarif` prints a summary like:
 
 > **⚠️ 20 warning · 🔵 4 acknowledged · ⬜ 9 ignored**
 
@@ -120,12 +120,12 @@ stages:
 
 | Command | What it does |
 | --- | --- |
-| `scan <path>` | Score the local source repo only — no dependency audit. |
-| `audit` | Audit direct dependencies from an SBOM. |
-| `audit-package <key>` | Score a single package by key, e.g. `package/npm/express` or `package/npm/lodash?version=4.17.20`. |
+| `audit source <path>` | Score the local source repo only — no dependency audit. |
+| `audit deps` | Audit direct dependencies from an SBOM. |
+| `audit package <key>` | Score a single package by key, e.g. `package/npm/express` or `package/npm/lodash?version=4.17.20`. |
+| `audit view <sarif>` | Render a human-readable summary of an audit SARIF file. |
 | `sbom <path>` | Generate an SBOM (SPDX or CycloneDX) for a local repo. |
 | `init [path]` | Run an initial scan and write a `.risk-guard.yml` seeded from the findings. |
-| `view-audit <sarif>` | Render a human-readable summary of an audit SARIF file. |
 | `policy show [path]` | Print the effective policy (built-in default overlaid with the repo's `.risk-guard.yml`). |
 | `policy add-expected-failures [path]` | Acknowledge findings by merging a SARIF report's blocking findings into `expected_failures` in `.risk-guard.yml`. |
 
@@ -215,7 +215,7 @@ Requires Go 1.25.1+. Run the CLI without building a binary:
 
 ```bash
 go run ./cmd/risk-guard .                    # full pipeline against the current repo
-go run ./cmd/risk-guard scan .               # source-only scan
+go run ./cmd/risk-guard audit source .       # source-only scan
 go run ./cmd/risk-guard --help
 ```
 

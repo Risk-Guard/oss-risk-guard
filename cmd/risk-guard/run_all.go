@@ -38,6 +38,10 @@ func runAll(cmd *cobra.Command, args []string) error {
 	if auditJobs < 1 {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
+	levelFilter, err := levelFilterFor(findingLevel)
+	if err != nil {
+		return err
+	}
 
 	ctx, overridesHash, err := setupAuditContext(cmd, repoPath)
 	if err != nil {
@@ -105,22 +109,43 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return renderReport(report, effectiveMode, runAllGitHub, runAllGitLab, repoPath, outPath)
+	return renderReport(report, effectiveMode, runAllGitHub, runAllGitLab, repoPath, outPath, levelFilter)
 }
 
-// renderReport is the one output pipeline `run`/`checks` and `view-audit` share.
+// renderReport is the one output pipeline `run`/`checks` and `audit view` share.
 // Given a finished report it prints the policy summary, the live findings (to
 // text or --github/--gitlab sinks), and the pass/fail verdict — identical
 // whether the report came from a fresh scan or was read off disk, because the
 // only thing that differs between the two commands is where the report came
 // from. mode gates output and decides whether blocking findings fail the run;
 // repoRoot and sarifPath phrase the acknowledge hint and relativize file paths.
-func renderReport(report *sarif.Report, mode policy.WorkflowMode, toGitHub bool, gitlabPath, repoRoot, sarifPath string) error {
+func renderReport(report *sarif.Report, mode policy.WorkflowMode, toGitHub bool, gitlabPath, repoRoot, sarifPath string, levelFilter func(string) bool) error {
 	printPolicySummary(report)
-	if err := renderFindings(selectFindingsByLevel(report, isLiveLevel), reportPrinters(mode, toGitHub, gitlabPath, repoRoot)); err != nil {
+	if err := renderFindings(selectFindingsByLevel(report, levelFilter), reportPrinters(mode, toGitHub, gitlabPath, repoRoot)); err != nil {
 		return err
 	}
 	return printRunVerdict(mode, report, repoRoot, sarifPath)
+}
+
+// renderReportSummary prints an in-memory report the same way `run` and
+// `audit view` do: policy summary, live findings, and a pass/fail verdict (with
+// the matching exit code). The audit subcommands call this when no output-file
+// flag is set, so a bare `audit source/deps/package` prints a useful summary
+// instead of running the DAG and exiting silently. modeOverride/toGitHub/
+// gitlabPath shape the output exactly as on `run`/`audit view` — this is the
+// whole point of the shared renderReport pipeline. The workflow mode is resolved
+// from repoRoot's .risk-guard.yml (with modeOverride winning); no SARIF path is
+// passed because nothing was written to disk.
+func renderReportSummary(report *sarif.Report, modeOverride string, toGitHub bool, gitlabPath, repoRoot string) error {
+	mode, err := resolveWorkflowMode(modeOverride, repoRoot)
+	if err != nil {
+		return err
+	}
+	levelFilter, err := levelFilterFor(findingLevel)
+	if err != nil {
+		return err
+	}
+	return renderReport(report, mode, toGitHub, gitlabPath, repoRoot, "", levelFilter)
 }
 
 // printRunVerdict ends the run with an explicit verdict so the outcome (and
@@ -148,7 +173,9 @@ func printRunVerdict(mode policy.WorkflowMode, report *sarif.Report, repoPath, o
 	// text/GitHub printer; the verdict just states the outcome and how to
 	// acknowledge. Only spell out -s when the report isn't at the default path.
 	ack := "risk-guard policy add-expected-failures " + repoPath
-	if outPath != defaultUnifiedSARIF {
+	// outPath is empty when the summary was rendered from an in-memory report
+	// (no --sarif); only point -s at a real, non-default file.
+	if outPath != "" && outPath != defaultUnifiedSARIF {
 		ack += " -s " + outPath
 	}
 	ack += " --all"

@@ -17,31 +17,32 @@ import (
 )
 
 var auditPackageCmd = &cobra.Command{
-	Use:   "audit-package <package-key>",
+	Use:   "package <package-key>",
 	Short: "Score a single package by its analysis-identifier key",
-	Long: `Score a single package via the local package DAG and emit SARIF.
+	Long: `Score a single package via the local package DAG.
 
-The argument is an analysis-identifier key produced by the sbom or audit
+The argument is an analysis-identifier key produced by the sbom or 'audit deps'
 commands, e.g. "package/npm/express" or "package/npm/lodash?version=4.17.20".
+
+With --sarif the graded report is written to that path; without it a
+human-readable findings summary is printed to the terminal.
 
 No cache backend is used; every invocation runs the DAG fresh.
 
 Examples:
-  risk-guard audit-package 'package/npm/express' --sarif out.sarif
-  risk-guard audit-package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
+  risk-guard audit package 'package/npm/express'
+  risk-guard audit package 'package/npm/lodash?version=4.17.20' --sarif out.sarif`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAuditPackage,
 }
 
 func init() {
 	registerSharedDAGFlags(auditPackageCmd)
-	auditPackageCmd.Flags().StringVar(&policyOverride, "policy-override", "", "Policy file that completely overrides all policy (YAML)")
-	auditPackageCmd.Flags().StringVar(&policyDefault, "policy-default", "", "Policy file to use as base instead of global default (YAML)")
-	auditPackageCmd.Flags().StringVar(&sarifOutFile, "sarif", "", "Output file for evaluation result (SARIF 2.1.0 JSON)")
-	if err := auditPackageCmd.MarkFlagRequired("sarif"); err != nil {
-		panic(fmt.Errorf("marking --sarif required: %w", err))
-	}
-	rootCmd.AddCommand(auditPackageCmd)
+	auditPackageCmd.Flags().StringVar(&policyOverride, "policy-override", "", flagHelpPolicyOverride)
+	auditPackageCmd.Flags().StringVar(&policyDefault, "policy-default", "", flagHelpPolicyDefault)
+	auditPackageCmd.Flags().StringVar(&sarifOutFile, "sarif", "", flagHelpSARIF)
+	registerSummaryRenderFlags(auditPackageCmd, true)
+	auditCmd.AddCommand(auditPackageCmd)
 }
 
 func runAuditPackage(cmd *cobra.Command, args []string) error {
@@ -54,7 +55,7 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 	}
 
 	// git_clone_content uses the cache backend as its on-disk clone store, so
-	// it must be initialized even though audit-package doesn't memoize results.
+	// it must be initialized even though `audit package` doesn't memoize results.
 	ctx, err = cache.InitializeCacheBackend(ctx)
 	if err != nil {
 		return err
@@ -64,13 +65,9 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctx, overridesHash, err := loadAndSetupOverrides(ctx, overridesFile)
-	if err != nil {
-		return err
-	}
 	cmd.SetContext(ctx)
 
-	input := dag_impl.NewPackageInputWithVersion(eco, name, version, overridesHash)
+	input := dag_impl.NewPackageInputWithVersion(eco, name, version, "")
 
 	logger.Info("auditing package",
 		zap.String("ecosystem", eco),
@@ -83,6 +80,17 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 	}
 
 	analysis := extractAnalysisViolations(input, resp.Checks)
+
+	// No --sarif: grade and print a findings summary to the terminal instead of
+	// requiring an output file, so a bare `audit package <key>` is useful.
+	if sarifOutFile == "" {
+		report, err := assembleReport(ctx, input.AnalysisIdentifier, nil, []*violations.AnalysisViolations{analysis}, nil, nil)
+		if err != nil {
+			return err
+		}
+		return renderReportSummary(report, summaryModeOverride, summaryGitHub, summaryGitLab, resolveRepoRoot(summaryRepoRoot))
+	}
+
 	result, err := gradeViolations(ctx, input.AnalysisIdentifier, nil, []*violations.AnalysisViolations{analysis}, policyOverride, policyDefault)
 	if err != nil {
 		return fmt.Errorf("evaluation failed: %w", err)

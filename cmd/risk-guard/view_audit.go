@@ -14,14 +14,18 @@ var (
 )
 
 var viewAuditCmd = &cobra.Command{
-	Use:   "view-audit <sarif-file>",
+	Use:   "view <sarif-file>",
 	Short: "Render the run's findings from a saved SARIF report",
-	Long: `Read a SARIF 2.1.0 report produced by 'run'/'checks' or 'audit' and render it
-exactly as the run that produced it would: the policy summary, the live findings
-(blocking + warnings; acknowledged and ignored drop to the count), and the
-pass/fail verdict. The only difference from 'run' is that the report is read from
-disk instead of produced by a fresh scan — so view-audit replays a run's output,
-and its exit code reflects the same policy.
+	Long: `Read a SARIF 2.1.0 report produced by 'run'/'checks' or 'audit deps' and render
+it exactly as the run that produced it would: the policy summary, the live
+findings (blocking + warnings by default), and the pass/fail verdict. The only
+difference from 'run' is that the report is read from disk instead of produced by
+a fresh scan — so 'audit view' replays a run's output, and its exit code reflects
+the same policy.
+
+Use --level to lower the display threshold and surface the suppressed findings
+the summary otherwise only counts: --level acknowledged also shows acknowledged
+findings, and --level all shows ignored ones too.
 
 With --github, emit GitHub Actions workflow annotations on stdout instead of the
 text summary. With --gitlab <file>, also write a GitLab Code Quality (CodeClimate)
@@ -30,9 +34,9 @@ findings fail) is read from .risk-guard.yml under --repo-root (default: the
 current directory, or $GITHUB_WORKSPACE/$CI_PROJECT_DIR in CI).
 
 Examples:
-  risk-guard view-audit risk-guard-report.sarif
-  risk-guard view-audit risk-guard-report.sarif --github
-  risk-guard view-audit risk-guard-report.sarif --gitlab gl-code-quality-report.json`,
+  risk-guard audit view risk-guard-report.sarif
+  risk-guard audit view risk-guard-report.sarif --github
+  risk-guard audit view risk-guard-report.sarif --gitlab gl-code-quality-report.json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runViewAudit,
 }
@@ -41,7 +45,8 @@ func init() {
 	viewAuditCmd.Flags().BoolVar(&viewAuditGitHub, "github", false, "Emit GitHub Actions workflow annotations on stdout instead of the text summary")
 	viewAuditCmd.Flags().StringVar(&viewAuditGitLab, "gitlab", "", "Write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	viewAuditCmd.Flags().StringVar(&viewAuditRepoRoot, "repo-root", "", "Repo root: where .risk-guard.yml lives and what file paths are relative to (defaults to $GITHUB_WORKSPACE/$CI_PROJECT_DIR then CWD)")
-	rootCmd.AddCommand(viewAuditCmd)
+	registerLevelFlag(viewAuditCmd)
+	auditCmd.AddCommand(viewAuditCmd)
 }
 
 // runViewAudit reads a report off disk and hands it to the same renderReport the
@@ -56,7 +61,11 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return renderReport(report, mode, viewAuditGitHub, viewAuditGitLab, root, args[0])
+	levelFilter, err := levelFilterFor(findingLevel)
+	if err != nil {
+		return err
+	}
+	return renderReport(report, mode, viewAuditGitHub, viewAuditGitLab, root, args[0], levelFilter)
 }
 
 // auditFinding is one finding extracted from a SARIF result: its level, rule,

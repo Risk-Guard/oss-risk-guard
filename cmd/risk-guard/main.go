@@ -210,6 +210,7 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
 	cmd.Flags().StringVar(&runAllGitLab, "gitlab", "", "After writing SARIF, write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
+	registerLevelFlag(cmd)
 }
 
 // resolveColor maps the --color value (with --no-color back-compat) onto the

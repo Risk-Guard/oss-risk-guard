@@ -153,10 +153,6 @@ func writeEvaluationYAML(ctx context.Context, result *policy.EvaluationResult, o
 func writeSARIF(ctx context.Context, result *policy.EvaluationResult, outputFile string) error {
 	log := ctxutil.GetLogger(ctx)
 
-	if err := os.MkdirAll(filepath.Dir(outputFile), 0o750); err != nil {
-		return fmt.Errorf("creating output directory: %w", err)
-	}
-
 	checkMetadata, _ := dag_builder.GetAllCheckMetadata(localdag.Builder)
 	report, err := sarif.FromEvaluationResult(result, checkMetadata)
 	if err != nil {
@@ -167,8 +163,10 @@ func writeSARIF(ctx context.Context, result *policy.EvaluationResult, outputFile
 	// results that carry only a logical location, e.g. source findings).
 	sarif.EnsurePhysicalLocations(report)
 
-	if err := report.WriteFile(outputFile); err != nil {
-		return fmt.Errorf("writing SARIF report: %w", err)
+	// Route through writeReportFile so the file is truncated first; report.WriteFile
+	// would leave stale trailing bytes when overwriting a longer existing file.
+	if err := writeReportFile(report, outputFile); err != nil {
+		return err
 	}
 
 	log.Info("wrote SARIF report", zap.String("path", outputFile))

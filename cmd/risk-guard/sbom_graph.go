@@ -5,15 +5,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/unsupported"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/fatih/color"
 	"go.uber.org/zap"
 )
+
+// supportRequestURL is where users can ask for an unsupported package manager to
+// be parsed. Printed beneath the unsupported-manifest inventory.
+const supportRequestURL = "https://github.com/Risk-Guard/oss-risk-guard/issues"
 
 // sourceKey mirrors dag_impl.NewSourceInputWithOverrides's analysis-identifier
 // formatting so the rootKey is consistent across local CLI commands.
@@ -170,6 +176,33 @@ func printManifestLine(r manifestReport) {
 	} else {
 		fmt.Fprintf(os.Stderr, "      %s\n", color.YellowString("↳ %s not parsed; direct deps only", lock))
 	}
+}
+
+// printUnsupportedManifests lists the manifest files whose package manager Risk
+// Guard cannot parse for dependencies — the same set behind the
+// SOURCE_UNSUPPORTED_MANIFEST_FILE finding — so the inventory shows what the SBOM
+// could not reach, with a link to request support. Each line mirrors that
+// check's evidence format: "<path> (<package manager>[, OSV ecosystem: <eco>])".
+func printUnsupportedManifests(manifests []unsupported.DetectedManifest) {
+	if len(manifests) == 0 {
+		return
+	}
+	sorted := make([]unsupported.DetectedManifest, len(manifests))
+	copy(sorted, manifests)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].RelPath < sorted[j].RelPath })
+
+	orange := color.New(color.FgYellow, color.Bold).FprintfFunc()
+	fmt.Fprintln(os.Stderr)
+	orange(os.Stderr, "unsupported:\n")
+	for _, m := range sorted {
+		osvInfo := ""
+		if m.OSVEcosystem != "" {
+			osvInfo = ", OSV ecosystem: " + m.OSVEcosystem
+		}
+		fmt.Fprintf(os.Stderr, "  %s %s\n", m.RelPath, color.HiBlackString("(%s%s)", m.PackageManager, osvInfo))
+	}
+	fmt.Fprintf(os.Stderr, "\n  %s %s\n",
+		color.HiBlackString("file a support request"), color.CyanString(supportRequestURL))
 }
 
 // countPackages counts SBOM nodes that resolved to an actual package, excluding
