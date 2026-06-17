@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -74,8 +75,8 @@ func extractGitErrorLine(output string) string {
 		}
 	}
 
-	for i := len(lines) - 1; i >= 0; i-- {
-		if trimmed := strings.TrimSpace(lines[i]); trimmed != "" {
+	for _, v := range slices.Backward(lines) {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
 			return trimmed
 		}
 	}
