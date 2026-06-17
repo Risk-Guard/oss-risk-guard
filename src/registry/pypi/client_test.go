@@ -1,6 +1,7 @@
 package pypi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -334,7 +335,7 @@ func TestFetchProjectStatus(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient(server.URL)
-			got, err := client.FetchProjectStatus("test-package")
+			got, err := client.FetchProjectStatus(context.Background(), "test-package")
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("Expected error, got status %q", got)

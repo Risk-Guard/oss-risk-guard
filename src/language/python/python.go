@@ -101,7 +101,7 @@ func (p *Python) resolveProjectStatus(ctx context.Context, statusCode int, pkgNa
 	if statusCode != 404 {
 		return ""
 	}
-	status, err := p.client.FetchProjectStatus(pkgName)
+	status, err := p.client.FetchProjectStatus(ctx, pkgName)
 	if err != nil {
 		ctxutil.GetLogger(ctx).Debug("failed to fetch PyPI project status",
 			zap.String("package", pkgName), zap.Error(err))

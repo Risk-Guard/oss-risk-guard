@@ -123,7 +123,7 @@ type pypiSimpleResponse struct {
 //   - the status string on success (may be "" if the registry omits the marker, meaning active)
 //   - ("", nil) when the package is genuinely absent (HTTP 404)
 //   - ("", error) on other failures
-func (c *Client) FetchProjectStatus(packageName string) (string, error) {
+func (c *Client) FetchProjectStatus(ctx context.Context, packageName string) (string, error) {
 	// The detail base (e.g. https://pypi.org/pypi) and the simple index (https://pypi.org/simple)
 	// share scheme+host but differ in path, so derive the simple URL from the host rather than
 	// string-replacing the path (which also keeps httptest base URLs working).
@@ -133,7 +133,7 @@ func (c *Client) FetchProjectStatus(packageName string) (string, error) {
 	}
 	simpleURL := fmt.Sprintf("%s://%s/simple/%s/", parsed.Scheme, parsed.Host, packageName)
 
-	req, err := http.NewRequest(http.MethodGet, simpleURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, simpleURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("building simple index request for %s: %w", packageName, err)
 	}
