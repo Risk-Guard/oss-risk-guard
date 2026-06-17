@@ -1,10 +1,48 @@
 package python
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// TestFetchPackageFromRegistry_Quarantined exercises the real fetch path: a quarantined
+// project 404s on the detail endpoint but the secondary simple-index lookup surfaces the
+// PEP 792 project-status, which must land on RegistryResponse.ProjectStatus.
+func TestFetchPackageFromRegistry_Quarantined(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/simple/") {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"name":"datacamp-light","project-status":{"status":"quarantined"},"files":[],"versions":[]}`))
+			return
+		}
+		// Detail endpoint (/{name}/json) 404s for a quarantined project.
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	}))
+	defer server.Close()
+
+	log, err := logger.NewLogger("error")
+	assert.NoError(t, err)
+	ctx := ctxutil.SetLogger(context.Background(), log)
+
+	p := New(&metadata.Metadata{Ecosystem: "pypi", Source: executiondag.Source{URL: server.URL}})
+
+	resp, err := p.FetchPackageFromRegistry(ctx, models.PackageInfo{Ecosystem: "pypi", Name: "datacamp-light"})
+	assert.NoError(t, err)
+	assert.Equal(t, 404, resp.StatusCode)
+	assert.Equal(t, "quarantined", resp.ProjectStatus)
+}
 
 func TestExtractExtraMarker(t *testing.T) {
 	tests := []struct {

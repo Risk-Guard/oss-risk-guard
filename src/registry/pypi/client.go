@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -100,6 +101,69 @@ func (c *Client) FetchPackage(ctx context.Context, packageName string) (*PyPIPac
 	}
 
 	return pypiResp, nil
+}
+
+// pypiSimpleResponse is the JSON form of the Simple Repository API project page
+// (/simple/{name}/ with Accept: application/vnd.pypi.simple.v1+json). We only need the
+// project-status marker standardized in PEP 792 ("Project status markers in the simple index").
+type pypiSimpleResponse struct {
+	Name          string `json:"name"`
+	ProjectStatus struct {
+		Status string `json:"status"` // "active" (default), "archived", "deprecated", "quarantined"
+	} `json:"project-status"`
+}
+
+// FetchProjectStatus reports the PEP 792 project-status of a package from the Simple
+// Repository API (e.g. "quarantined" when PyPI has frozen the project pending review).
+// The JSON detail endpoint returns 404 for both quarantined and never-published packages,
+// so this secondary endpoint is what distinguishes them. Mirrors the raw-GET style of
+// FetchPackageWithMetadata (the detail call it follows), which is likewise uncached.
+//
+// Returns:
+//   - the status string on success (may be "" if the registry omits the marker, meaning active)
+//   - ("", nil) when the package is genuinely absent (HTTP 404)
+//   - ("", error) on other failures
+func (c *Client) FetchProjectStatus(packageName string) (string, error) {
+	// The detail base (e.g. https://pypi.org/pypi) and the simple index (https://pypi.org/simple)
+	// share scheme+host but differ in path, so derive the simple URL from the host rather than
+	// string-replacing the path (which also keeps httptest base URLs working).
+	parsed, err := url.Parse(c.baseURL)
+	if err != nil {
+		return "", fmt.Errorf("parsing registry base URL %q: %w", c.baseURL, err)
+	}
+	simpleURL := fmt.Sprintf("%s://%s/simple/%s/", parsed.Scheme, parsed.Host, packageName)
+
+	req, err := http.NewRequest(http.MethodGet, simpleURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("building simple index request for %s: %w", packageName, err)
+	}
+	req.Header.Set("Accept", "application/vnd.pypi.simple.v1+json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching simple index for %s: %w", packageName, err)
+	}
+
+	bodyBytes, err := httputil.ReadResponseBody(resp)
+	if err != nil {
+		return "", err
+	}
+
+	// A 404 means the project does not exist on the index at all (not quarantined).
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		bodyPreview := httputil.TruncateBodyPreview(bodyBytes, 200)
+		return "", fmt.Errorf("simple index returned HTTP %d for %s: %s", resp.StatusCode, packageName, bodyPreview)
+	}
+
+	var simpleResp pypiSimpleResponse
+	if err := json.Unmarshal(bodyBytes, &simpleResp); err != nil {
+		return "", fmt.Errorf("decoding simple index JSON for %s: %w", packageName, err)
+	}
+
+	return simpleResp.ProjectStatus.Status, nil
 }
 
 // FetchPackageWithMetadata fetches package data and returns both the response and HTTP metadata.

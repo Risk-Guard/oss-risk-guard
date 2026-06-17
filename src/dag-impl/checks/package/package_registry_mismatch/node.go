@@ -7,6 +7,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/fetcher"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/registry"
 
@@ -60,6 +61,12 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 
 		switch registryResp.StatusCode {
 		case 404:
+			// A quarantined package 404s here but does exist; the dedicated
+			// PACKAGE_REGISTRY_QUARANTINED check reports it accurately, so don't
+			// also flag it as a "package does not exist" registry mismatch.
+			if registryResp.ProjectStatus == language.ProjectStatusQuarantined {
+				continue
+			}
 			if pkg.Private {
 				compliant := fmt.Sprintf(
 					"%s/%s: Private package correctly not in public registry",

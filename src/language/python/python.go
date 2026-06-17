@@ -66,10 +66,11 @@ func (p *Python) FetchPackageFromRegistry(ctx context.Context, pkg models.Packag
 			zap.Duration("duration", time.Since(fetchedAt)))
 
 		return &language.RegistryResponse{
-			Data:        versionResp,
-			ReleaseData: fullResp,
-			StatusCode:  fetchMeta.StatusCode,
-			Headers:     fetchMeta.Headers,
+			Data:          versionResp,
+			ReleaseData:   fullResp,
+			StatusCode:    fetchMeta.StatusCode,
+			Headers:       fetchMeta.Headers,
+			ProjectStatus: p.resolveProjectStatus(ctx, fetchMeta.StatusCode, pkg.Name),
 		}, nil
 	}
 
@@ -84,11 +85,29 @@ func (p *Python) FetchPackageFromRegistry(ctx context.Context, pkg models.Packag
 		zap.Duration("duration", time.Since(fetchedAt)))
 
 	return &language.RegistryResponse{
-		Data:        fullResp,
-		ReleaseData: fullResp,
-		StatusCode:  fetchMeta.StatusCode,
-		Headers:     fetchMeta.Headers,
+		Data:          fullResp,
+		ReleaseData:   fullResp,
+		StatusCode:    fetchMeta.StatusCode,
+		Headers:       fetchMeta.Headers,
+		ProjectStatus: p.resolveProjectStatus(ctx, fetchMeta.StatusCode, pkg.Name),
 	}, nil
+}
+
+// resolveProjectStatus disambiguates a 404 from the detail endpoint: a quarantined project
+// returns 404 there but is still listed on the simple index with a PEP 792 project-status
+// marker. Only consulted on 404 (the rare path) so the common case adds no extra request.
+// Degrades to "" on any error — a failed secondary lookup must not fail the whole fetch.
+func (p *Python) resolveProjectStatus(ctx context.Context, statusCode int, pkgName string) string {
+	if statusCode != 404 {
+		return ""
+	}
+	status, err := p.client.FetchProjectStatus(pkgName)
+	if err != nil {
+		ctxutil.GetLogger(ctx).Debug("failed to fetch PyPI project status",
+			zap.String("package", pkgName), zap.Error(err))
+		return ""
+	}
+	return status
 }
 
 func (p *Python) ExtractPackageMetadata(ctx context.Context, pkg models.PackageInfo, registryData any) (*models.PackageMetadata, *string, *string, error) {

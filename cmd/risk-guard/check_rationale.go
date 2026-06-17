@@ -95,6 +95,10 @@ var checkRationales = map[string]checkRationale{
 		why:  "Catches dependency confusion — a package missing from the registry it claims, or public while claiming to be private.",
 		stat: "Dependency confusion hit 35+ firms (Apple, Microsoft, PayPal); 49% of orgs were vulnerable — Birsan/Orca",
 	},
+	"PACKAGE_REGISTRY_QUARANTINED": {
+		why:  "Flags packages the registry has frozen — present but blocked from install pending a malware/abuse review — so an active takedown is treated as a security event, not mistaken for a typo'd or never-published name.",
+		stat: "PyPI introduced project quarantine in 2024 (standardized as the PEP 792 project-status marker) to freeze suspected-malicious projects pending admin review",
+	},
 	"PACKAGE_UNSAFE_SOURCE_URL": {
 		why: "Catches invalid or unsafe source URLs in metadata that can redirect tooling to attacker-controlled locations.",
 	},
