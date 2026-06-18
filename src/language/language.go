@@ -30,6 +30,10 @@ func ConvertToType[T any](data any) (*T, error) {
 	return &result, nil
 }
 
+// ProjectStatusQuarantined is the RegistryResponse.ProjectStatus value indicating the registry
+// has frozen the project (it exists but is blocked from install pending a malware/abuse review).
+const ProjectStatusQuarantined = "quarantined"
+
 // RegistryResponse contains the parsed API response and metadata from a package registry fetch.
 type RegistryResponse struct {
 	// Data is the parsed response from the registry API (e.g., NPMPackageData, PyPIPackageResponse).
@@ -46,6 +50,12 @@ type RegistryResponse struct {
 
 	// Headers contains selected HTTP response headers.
 	Headers map[string]string `json:"headers,omitempty"`
+
+	// ProjectStatus is the registry's lifecycle status for the project when it exists but is
+	// not normally installable — e.g. "quarantined" (frozen by the registry pending a
+	// malware/abuse review). Currently only populated for PyPI via the PEP 792 project-status
+	// marker; empty for ecosystems that expose no such signal.
+	ProjectStatus string `json:"project_status,omitempty"`
 }
 
 type Language interface {

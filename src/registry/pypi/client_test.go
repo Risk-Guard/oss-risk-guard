@@ -1,6 +1,7 @@
 package pypi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -273,5 +274,80 @@ func TestFetchPackageWithMetadata_NotFound(t *testing.T) {
 	}
 	if resp != nil {
 		t.Error("Expected nil response for 404")
+	}
+}
+
+func TestFetchProjectStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "quarantined project",
+			statusCode: http.StatusOK,
+			body:       `{"name":"datacamp-light","project-status":{"status":"quarantined"},"files":[],"versions":[]}`,
+			want:       "quarantined",
+		},
+		{
+			name:       "active project (explicit status)",
+			statusCode: http.StatusOK,
+			body:       `{"name":"requests","project-status":{"status":"active"},"files":[],"versions":[]}`,
+			want:       "active",
+		},
+		{
+			name:       "active project (marker omitted)",
+			statusCode: http.StatusOK,
+			body:       `{"name":"requests","files":[],"versions":[]}`,
+			want:       "",
+		},
+		{
+			name:       "not found on index",
+			statusCode: http.StatusNotFound,
+			body:       `<!DOCTYPE html><html><body>404</body></html>`,
+			want:       "",
+		},
+		{
+			name:       "server error",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"error":"boom"}`,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// The simple-index URL is derived from the base host; the path is /simple/{name}/.
+				if !strings.HasPrefix(r.URL.Path, "/simple/") {
+					t.Errorf("Expected /simple/ path, got %s", r.URL.Path)
+				}
+				if got := r.Header.Get("Accept"); got != "application/vnd.pypi.simple.v1+json" {
+					t.Errorf("Expected PEP 691 Accept header, got %q", got)
+				}
+				w.WriteHeader(tt.statusCode)
+				if _, err := w.Write([]byte(tt.body)); err != nil {
+					t.Errorf("Failed to write response body: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			client := NewClient(server.URL)
+			got, err := client.FetchProjectStatus(context.Background(), "test-package")
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Expected error, got status %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("Expected status %q, got %q", tt.want, got)
+			}
+		})
 	}
 }

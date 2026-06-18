@@ -11,6 +11,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_name_mismatch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_no_license"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_registry_mismatch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_registry_quarantined"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_release_cooldown"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_source_url_mismatch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_stale_release"
@@ -58,6 +59,7 @@ func PackageBuilder(
 	executiondag.AddNode(dag, source_malformed_metadata.NewNode())
 	executiondag.AddNode(dag, package_no_license.NewNode())
 	executiondag.AddNode(dag, package_registry_mismatch.NewNode())
+	executiondag.AddNode(dag, package_registry_quarantined.NewNode())
 	executiondag.AddNode(dag, package_unsafe_source_url.NewNode())
 	executiondag.AddNode(dag, package_source_url_mismatch.NewNode())
 	executiondag.AddNode(dag, package_name_mismatch.NewNode(langs))
