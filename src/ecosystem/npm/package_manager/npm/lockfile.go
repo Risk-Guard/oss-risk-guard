@@ -103,7 +103,7 @@ func parsePackagesV2V3(packages map[string]packageLockPkg) ([]models.DepsTreeEdg
 
 		for depName := range pkg.Dependencies {
 			if dep, ok := resolvePackageByName(pkgPath, depName, packages); ok {
-				addEdge(childKey, makeKey(depName, dep.Version), dep.Dev)
+				addEdge(childKey, makeKey(canonicalName(depName, dep), dep.Version), dep.Dev)
 			}
 		}
 	}
@@ -146,9 +146,23 @@ func findRoots(packages map[string]packageLockPkg) []string {
 
 func extractName(pkgPath string, pkg packageLockPkg) string {
 	if idx := strings.LastIndex(pkgPath, "node_modules/"); idx != -1 {
-		return pkgPath[idx+len("node_modules/"):]
+		return canonicalName(pkgPath[idx+len("node_modules/"):], pkg)
 	}
 	return pkg.Name
+}
+
+// canonicalName resolves an npm alias to its real package name. An aliased
+// dependency ("react-is-18": "npm:react-is@18.3.1") installs under the alias
+// label but npm records the real name in the entry's "name" field. The
+// registry and source-repo checks must key off the real name, not the label,
+// or they query a non-existent package and 404. Non-aliased entries omit "name"
+// (or set it equal to the label), so they fall through unchanged — a genuinely
+// absent / typosquatted name keeps its identity and still flags as not-found.
+func canonicalName(label string, pkg packageLockPkg) string {
+	if pkg.Name != "" && pkg.Name != label {
+		return pkg.Name
+	}
+	return label
 }
 
 func isDirectDep(pkgPath string, roots []string, packages map[string]packageLockPkg) bool {
