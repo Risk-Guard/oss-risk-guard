@@ -197,6 +197,11 @@ func validateOverrides(overrides map[string][]PolicyOverride, source string) err
 			if override.Reason == "" {
 				return fmt.Errorf("%s: override %q[%d]: reason is required (E&O compliance)", source, key, i)
 			}
+			switch override.Precedence {
+			case "", "force", "fallback":
+			default:
+				return fmt.Errorf("%s: override %q[%d]: precedence must be %q or %q (got %q)", source, key, i, "force", "fallback", override.Precedence)
+			}
 		}
 	}
 	return nil

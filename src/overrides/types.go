@@ -19,9 +19,10 @@ type FieldInfo struct {
 
 // Override represents a single field override request.
 type Override struct {
-	Path   string `json:"path"`   // e.g., "source_url"
-	Value  any    `json:"value"`  // replacement value
-	Reason string `json:"reason"` // E&O audit trail
+	Path       string `json:"path"`                 // e.g., "source_url"
+	Value      any    `json:"value"`                // replacement value
+	Reason     string `json:"reason"`               // E&O audit trail
+	Precedence string `json:"precedence,omitempty"` // "force" (default) always sets; "fallback" sets only when no value resolved
 }
 
 // AppliedOverride records what was actually changed during execution.

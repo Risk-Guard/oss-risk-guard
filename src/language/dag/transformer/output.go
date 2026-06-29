@@ -102,6 +102,16 @@ func (o *Output) ApplyOverridesV2(overrideList []overrides.Override) ([]override
 			if len(o.Outputs) != 1 {
 				return nil, fmt.Errorf("source_url override requires exactly 1 package, got %d", len(o.Outputs))
 			}
+			// A "fallback" override gap-fills only: if a source was already
+			// resolved (from metadata or propagated to the downstream Input), leave
+			// it untouched so a package's own declaration always wins.
+			if override.Precedence == "fallback" {
+				metaResolved := o.Outputs[0].Metadata != nil && o.Outputs[0].Metadata.SourceURL != nil && *o.Outputs[0].Metadata.SourceURL != ""
+				outResolved := o.Output != nil && o.Output.SourceURL != nil && *o.Output.SourceURL != ""
+				if metaResolved || outResolved {
+					continue
+				}
+			}
 			if o.Outputs[0].Metadata != nil {
 				o.Outputs[0].Metadata.SourceURL = &sourceURL
 			}

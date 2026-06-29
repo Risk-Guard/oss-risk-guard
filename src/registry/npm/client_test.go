@@ -338,6 +338,66 @@ func TestFetchPackageWithMetadata_NotFound(t *testing.T) {
 	}
 }
 
+// TestFetchPackage_VersionLevelRepository verifies the packument's per-version
+// repository field is deserialized into NPMVersionDetails, even when the
+// top-level repository (hoisted from latest) is null.
+func TestFetchPackage_VersionLevelRepository(t *testing.T) {
+	responseBody := `{
+		"name": "@types/json5",
+		"dist-tags": { "latest": "2.2.0" },
+		"repository": null,
+		"versions": {
+			"0.0.29": {
+				"license": "MIT",
+				"dependencies": {},
+				"repository": { "type": "git", "url": "https://www.github.com/DefinitelyTyped/DefinitelyTyped.git" }
+			},
+			"2.2.0": {
+				"license": "MIT",
+				"dependencies": {}
+			}
+		}
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(responseBody)); err != nil {
+			t.Errorf("Failed to write response body: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	resp, _, err := client.FetchPackageWithMetadata("@types/json5")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("Expected response, got nil")
+	}
+
+	if resp.Repository != nil {
+		t.Errorf("Expected top-level repository nil, got %v", resp.Repository)
+	}
+
+	vd, ok := resp.Versions["0.0.29"]
+	if !ok {
+		t.Fatal("Expected version 0.0.29 in versions map")
+	}
+	repo, ok := vd.Repository.(map[string]any)
+	if !ok {
+		t.Fatalf("Expected version repository to be an object, got %T", vd.Repository)
+	}
+	if repo["url"] != "https://www.github.com/DefinitelyTyped/DefinitelyTyped.git" {
+		t.Errorf("Unexpected version repository url: %v", repo["url"])
+	}
+
+	if vd2 := resp.Versions["2.2.0"]; vd2.Repository != nil {
+		t.Errorf("Expected stub version 2.2.0 repository nil, got %v", vd2.Repository)
+	}
+}
+
 func TestGetPackageData_LicenseFromVersionMetadata(t *testing.T) {
 	responseBody := `{
 		"name": "text-table",

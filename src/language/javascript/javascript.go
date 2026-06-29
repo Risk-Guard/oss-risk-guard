@@ -101,7 +101,14 @@ func (j *JavaScript) ExtractPackageMetadata(ctx context.Context, pkg models.Pack
 		}, nil, nil, nil
 	}
 
-	sourceURL, rejectedURL, rejectionReason := j.extractSourceURL(ctx, npmResp.Repository, pkg.Name)
+	// The top-level repository is hoisted by npm from the latest version, so it
+	// reflects latest, not the version under analysis. Prefer this version's own
+	// manifest value, falling back to top-level (mirrors the License handling below).
+	repository := npmResp.Repository
+	if versionData, ok := npmResp.Versions[targetVersion]; ok && versionData.Repository != nil {
+		repository = versionData.Repository
+	}
+	sourceURL, rejectedURL, rejectionReason := j.extractSourceURL(ctx, repository, pkg.Name)
 	rawLicense := npmResp.License
 	if versionData, ok := npmResp.Versions[targetVersion]; ok && versionData.License != nil {
 		rawLicense = versionData.License

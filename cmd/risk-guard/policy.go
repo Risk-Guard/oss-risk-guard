@@ -75,7 +75,7 @@ description. Categories are colored to mirror how the default policy grades them
 
 func init() {
 	addExpectedFailuresCmd.Flags().BoolVar(&addEFAll, "all", false, "Add all findings without prompting")
-	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from")
+	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from (with --risk-guard: where to save the fetched SARIF)")
 	addExpectedFailuresCmd.Flags().BoolVar(&addEFRiskGuard, "risk-guard", false, "Fetch findings from the Risk Guard server for the current repo+commit instead of a local SARIF file")
 	addExpectedFailuresCmd.Flags().StringVar(&addEFRiskGuardCommit, "commit", "", "Commit SHA to look up (default: HEAD); only with --risk-guard")
 	addExpectedFailuresCmd.Flags().StringVar(&addEFRiskGuardToken, "token", "", "GitHub token for the Risk Guard server (default: $RISK_GUARD_TOKEN, $GITHUB_TOKEN, or 'gh auth token'); only with --risk-guard")

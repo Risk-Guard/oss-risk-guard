@@ -49,15 +49,31 @@ func packageOverrideContext(ctx context.Context, key, baseHash string) (context.
 // translating policy overrides into the engine's override form. Policy override
 // paths are namespaced under the output object (e.g. "output.source_url"); the
 // nodes that consume them key on the bare field name ("source_url"), so the
-// leading "output." is stripped here. Matches the exact key and, failing that,
-// the version-stripped key (init writes bare package keys).
+// leading "output." is stripped here.
+//
+// Override keys are matched as patterns via policy.MatchesPattern (supporting the
+// same `*` wildcard as severity/expected_failures), against both the full key and
+// the version-stripped key (init writes bare package keys). Built-in
+// knownOverrides are merged in as well: user overrides win per target path, so a
+// built-in fallback only fills a path the user has not already addressed.
 func packageOverridesFor(polOverrides map[string][]policy.PolicyOverride, key string) []overrides.Override {
-	entries := polOverrides[key]
-	if len(entries) == 0 {
-		if stripped := stripVersionQuery(key); stripped != key {
-			entries = polOverrides[stripped]
-		}
+	userEntries := matchOverrideEntries(polOverrides, key)
+
+	userPaths := make(map[string]bool, len(userEntries))
+	for _, e := range userEntries {
+		userPaths[strings.TrimPrefix(e.Path, "output.")] = true
 	}
+
+	// Built-ins first, then user entries: with per-path dedupe there is at most
+	// one override per path, but ordering keeps the gap-filler intent explicit.
+	var entries []policy.PolicyOverride
+	for _, e := range matchOverrideEntries(knownOverrides, key) {
+		if userPaths[strings.TrimPrefix(e.Path, "output.")] {
+			continue
+		}
+		entries = append(entries, e)
+	}
+	entries = append(entries, userEntries...)
 	if len(entries) == 0 {
 		return nil
 	}
@@ -65,10 +81,25 @@ func packageOverridesFor(polOverrides map[string][]policy.PolicyOverride, key st
 	out := make([]overrides.Override, 0, len(entries))
 	for _, e := range entries {
 		out = append(out, overrides.Override{
-			Path:   strings.TrimPrefix(e.Path, "output."),
-			Value:  e.Value,
-			Reason: e.Reason,
+			Path:       strings.TrimPrefix(e.Path, "output."),
+			Value:      e.Value,
+			Reason:     e.Reason,
+			Precedence: e.Precedence,
 		})
+	}
+	return out
+}
+
+// matchOverrideEntries collects every override whose key pattern matches the
+// package key, testing both the full key and its version-stripped form so that
+// non-wildcard keys keep matching versioned keys exactly as before.
+func matchOverrideEntries(table map[string][]policy.PolicyOverride, key string) []policy.PolicyOverride {
+	stripped := stripVersionQuery(key)
+	var out []policy.PolicyOverride
+	for pattern, items := range table {
+		if policy.MatchesPattern(pattern, key) || (stripped != key && policy.MatchesPattern(pattern, stripped)) {
+			out = append(out, items...)
+		}
 	}
 	return out
 }

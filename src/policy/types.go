@@ -51,6 +51,11 @@ type PolicyOverride struct {
 	Path   string `json:"path" jsonschema:"description=Dot-separated path to override (e.g. output.source_url)"`
 	Value  any    `json:"value" jsonschema:"description=Value to set at the path"`
 	Reason string `json:"reason" jsonschema:"description=E&O required: explanation for the override"`
+	// Precedence controls when the override applies. "force" (the default when
+	// empty) always sets the value — a deliberate correction. "fallback" sets the
+	// value only when the field resolved no value from metadata, so it gap-fills
+	// without clobbering a package's own declaration.
+	Precedence string `json:"precedence,omitempty" jsonschema:"enum=force,enum=fallback,description=When to apply: force (default) always sets; fallback sets only when no value resolved"`
 }
 
 type SeverityValue struct {
