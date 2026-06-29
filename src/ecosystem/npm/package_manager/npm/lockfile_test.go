@@ -2,6 +2,7 @@ package npm
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -76,6 +77,138 @@ func TestParseLockfileV3(t *testing.T) {
 	// bytes should NOT be a direct dep (it's hoisted but transitive)
 	if directDeps["package/npm/bytes?version=3.1.2"] {
 		t.Error("bytes should not be a direct dep")
+	}
+}
+
+func TestParseLockfileNpmAliasDirect(t *testing.T) {
+	// npm aliases ("react-is-18": "npm:react-is@18.3.1") install under the alias
+	// label but record the real package name in "name". Identity must resolve to
+	// the real name (react-is), otherwise registry/source-repo lookups query the
+	// alias label, 404, and produce false PACKAGE_REGISTRY_MISMATCH /
+	// SOURCE_REPO_NOT_FOUND findings.
+	content := []byte(`{
+		"name": "alias-test",
+		"lockfileVersion": 3,
+		"packages": {
+			"": {
+				"name": "alias-test",
+				"dependencies": {
+					"react-is-18": "npm:react-is@18.3.1"
+				}
+			},
+			"node_modules/react-is-18": {
+				"name": "react-is",
+				"version": "18.3.1",
+				"resolved": "https://registry.npmjs.org/react-is/-/react-is-18.3.1.tgz",
+				"integrity": "sha512-AAAA"
+			}
+		}
+	}`)
+
+	edges, err := ParseLockfile(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	directDeps := make(map[string]bool)
+	for _, edge := range edges {
+		if edge.ParentKey == "" {
+			directDeps[edge.ChildKey] = true
+		}
+	}
+
+	if !directDeps["package/npm/react-is?version=18.3.1"] {
+		t.Errorf("alias should resolve to real name react-is@18.3.1; got direct deps: %v", directDeps)
+	}
+	if directDeps["package/npm/react-is-18?version=18.3.1"] {
+		t.Error("alias label react-is-18 must not be used as the package identity")
+	}
+}
+
+func TestParseLockfileNpmAliasTransitive(t *testing.T) {
+	// The *-cjs aliases (string-width-cjs -> string-width) are pulled in
+	// transitively via @isaacs/cliui. Transitive identity must dereference the
+	// alias too, otherwise SOURCE_REPO_NOT_FOUND fires on string-width-cjs.
+	content := []byte(`{
+		"name": "cjs-alias-test",
+		"lockfileVersion": 3,
+		"packages": {
+			"": {
+				"name": "cjs-alias-test",
+				"dependencies": {
+					"@isaacs/cliui": "^8.0.2"
+				}
+			},
+			"node_modules/@isaacs/cliui": {
+				"version": "8.0.2",
+				"dependencies": {
+					"string-width-cjs": "npm:string-width@^4.2.0"
+				}
+			},
+			"node_modules/@isaacs/cliui/node_modules/string-width-cjs": {
+				"name": "string-width",
+				"version": "4.2.3",
+				"resolved": "https://registry.npmjs.org/string-width/-/string-width-4.2.3.tgz",
+				"integrity": "sha512-BBBB"
+			}
+		}
+	}`)
+
+	edges, err := ParseLockfile(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	edgeMap := make(map[string][]string) // child -> parents
+	for _, edge := range edges {
+		edgeMap[edge.ChildKey] = append(edgeMap[edge.ChildKey], edge.ParentKey)
+		if strings.Contains(edge.ChildKey, "string-width-cjs") {
+			t.Errorf("alias label string-width-cjs leaked into identity: %s", edge.ChildKey)
+		}
+	}
+
+	cliuiKey := "package/npm/@isaacs/cliui?version=8.0.2"
+	stringWidthKey := "package/npm/string-width?version=4.2.3"
+	if !slices.Contains(edgeMap[stringWidthKey], cliuiKey) {
+		t.Errorf("expected @isaacs/cliui -> string-width@4.2.3 edge, got parents: %v", edgeMap[stringWidthKey])
+	}
+}
+
+func TestParseLockfileNonAliasNameUntouched(t *testing.T) {
+	// Regression guard: a genuinely absent / typosquatted name has no "name"
+	// override, so its identity stays as-is and the registry check still 404s on
+	// it. The alias fix must not suppress legitimate not-found findings.
+	content := []byte(`{
+		"name": "typo-test",
+		"lockfileVersion": 3,
+		"packages": {
+			"": {
+				"name": "typo-test",
+				"dependencies": {
+					"expresss": "^4.18.0"
+				}
+			},
+			"node_modules/expresss": {
+				"version": "4.18.2",
+				"resolved": "https://registry.npmjs.org/expresss/-/expresss-4.18.2.tgz"
+			}
+		}
+	}`)
+
+	edges, err := ParseLockfile(content)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	directDeps := make(map[string]bool)
+	for _, edge := range edges {
+		if edge.ParentKey == "" {
+			directDeps[edge.ChildKey] = true
+		}
+	}
+
+	if !directDeps["package/npm/expresss?version=4.18.2"] {
+		t.Errorf("non-alias name must be preserved verbatim; got direct deps: %v", directDeps)
 	}
 }
 
