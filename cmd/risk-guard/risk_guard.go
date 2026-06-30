@@ -38,12 +38,12 @@ func fetchRiskGuardReport(ctx context.Context, repoPath string) (*sarif.Report, 
 		}
 	}
 
-	token, tokenSource, err := resolveRiskGuardToken()
+	token, tokenSource, err := resolveRiskGuardToken(addEFRiskGuardToken)
 	if err != nil {
 		return nil, err
 	}
 
-	server := resolveRiskGuardServer()
+	server := resolveRiskGuardServer(addEFRiskGuardServer)
 	endpoint := fmt.Sprintf("%s/api/cli/v1/runs/%s/%s/%s/sarif", server, owner, repo, commit)
 	dashboard := fmt.Sprintf("%s/%s/%s/%s/statuses/%s", server, host, owner, repo, commit)
 
@@ -87,9 +87,9 @@ func fetchRiskGuardReport(ctx context.Context, repoPath string) (*sarif.Report, 
 	return report, nil
 }
 
-func resolveRiskGuardServer() string {
-	if addEFRiskGuardServer != "" {
-		return strings.TrimRight(addEFRiskGuardServer, "/")
+func resolveRiskGuardServer(serverFlag string) string {
+	if serverFlag != "" {
+		return strings.TrimRight(serverFlag, "/")
 	}
 	if v := strings.TrimSpace(os.Getenv("RISK_GUARD_URL")); v != "" {
 		return strings.TrimRight(v, "/")
@@ -100,9 +100,9 @@ func resolveRiskGuardServer() string {
 // resolveRiskGuardToken finds a GitHub token from, in order, --token, RISK_GUARD_TOKEN, GITHUB_TOKEN,
 // GH_TOKEN, then `gh auth token`, returning the token and a human label for where it came from. The
 // server verifies it against github.com.
-func resolveRiskGuardToken() (token, source string, err error) {
-	if addEFRiskGuardToken != "" {
-		return addEFRiskGuardToken, "--token", nil
+func resolveRiskGuardToken(tokenFlag string) (token, source string, err error) {
+	if tokenFlag != "" {
+		return tokenFlag, "--token", nil
 	}
 	for _, name := range []string{"RISK_GUARD_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"} {
 		if v := strings.TrimSpace(os.Getenv(name)); v != "" {
