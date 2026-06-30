@@ -84,8 +84,16 @@ func (s *Store) WarnUnconsumed(ctx context.Context) {
 
 	log := ctxutil.GetLogger(ctx)
 	for _, o := range s.overrides {
-		if !appliedPaths[o.Path] {
-			log.Warn("override was not applied by any node", zap.String("path", o.Path), zap.String("reason", o.Reason))
+		if appliedPaths[o.Path] {
+			continue
 		}
+		// A "fallback" override is a gap-filler: it intentionally does nothing
+		// when a value was already resolved, so an unapplied fallback is the
+		// expected outcome, not a misconfiguration. Only force/default overrides
+		// warn when unapplied, where a no-op usually means a wrong path.
+		if o.Precedence == "fallback" {
+			continue
+		}
+		log.Warn("override was not applied by any node", zap.String("path", o.Path), zap.String("reason", o.Reason))
 	}
 }

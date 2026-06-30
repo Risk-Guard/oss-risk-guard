@@ -86,6 +86,39 @@ func TestPackageOverridesFor_UserOverrideWinsOverBuiltin(t *testing.T) {
 	}
 }
 
+func TestPackageOverridesFor_OverlappingPatternsDeterministicExactWins(t *testing.T) {
+	// Two user patterns both match the package and both target source_url: an
+	// exact key and an overlapping wildcard. The exact (more specific) key must
+	// win every time, regardless of map-iteration order.
+	polOverrides := map[string][]policy.PolicyOverride{
+		"package/npm/react": {
+			{Path: "output.source_url", Value: "https://github.com/facebook/react", Reason: "exact"},
+		},
+		"package/npm/re*": {
+			{Path: "output.source_url", Value: "https://example.com/wildcard", Reason: "wildcard"},
+		},
+	}
+
+	// Run repeatedly to surface any dependence on Go map ordering.
+	for i := 0; i < 50; i++ {
+		entries := toEntries(t, "package/npm/react?version=18.0.0", polOverrides)
+
+		count := 0
+		for _, e := range entries {
+			if e.Path == "source_url" {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Fatalf("iter %d: expected exactly 1 source_url override, got %d: %+v", i, count, entries)
+		}
+		o, _ := findOverride(entries, "source_url")
+		if o.Value != "https://github.com/facebook/react" {
+			t.Fatalf("iter %d: expected exact key to win deterministically, got %v", i, o.Value)
+		}
+	}
+}
+
 func TestPackageOverridesFor_NonWildcardKeyMatchesVersionedKey(t *testing.T) {
 	polOverrides := map[string][]policy.PolicyOverride{
 		"package/npm/lodash": {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
@@ -53,35 +54,37 @@ func packageOverrideContext(ctx context.Context, key, baseHash string) (context.
 //
 // Override keys are matched as patterns via policy.MatchesPattern (supporting the
 // same `*` wildcard as severity/expected_failures), against both the full key and
-// the version-stripped key (init writes bare package keys). Built-in
-// knownOverrides are merged in as well: user overrides win per target path, so a
+// the version-stripped key (init writes bare package keys). Each table is first
+// collapsed to a single winner per target path (see dedupeByPath) so overlapping
+// patterns resolve deterministically rather than by map-iteration order. Built-in
+// knownOverrides are then merged in: user overrides win per target path, so a
 // built-in fallback only fills a path the user has not already addressed.
 func packageOverridesFor(polOverrides map[string][]policy.PolicyOverride, key string) []overrides.Override {
-	userEntries := matchOverrideEntries(polOverrides, key)
+	userByPath := dedupeByPath(matchOverrideEntries(polOverrides, key))
+	builtinByPath := dedupeByPath(matchOverrideEntries(knownOverrides, key))
 
-	userPaths := make(map[string]bool, len(userEntries))
-	for _, e := range userEntries {
-		userPaths[strings.TrimPrefix(e.Path, "output.")] = true
+	merged := make(map[string]policy.PolicyOverride, len(userByPath)+len(builtinByPath))
+	for path, e := range builtinByPath {
+		merged[path] = e
 	}
-
-	// Built-ins first, then user entries: with per-path dedupe there is at most
-	// one override per path, but ordering keeps the gap-filler intent explicit.
-	var entries []policy.PolicyOverride
-	for _, e := range matchOverrideEntries(knownOverrides, key) {
-		if userPaths[strings.TrimPrefix(e.Path, "output.")] {
-			continue
-		}
-		entries = append(entries, e)
+	for path, e := range userByPath {
+		merged[path] = e
 	}
-	entries = append(entries, userEntries...)
-	if len(entries) == 0 {
+	if len(merged) == 0 {
 		return nil
 	}
 
-	out := make([]overrides.Override, 0, len(entries))
-	for _, e := range entries {
+	paths := make([]string, 0, len(merged))
+	for path := range merged {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+
+	out := make([]overrides.Override, 0, len(paths))
+	for _, path := range paths {
+		e := merged[path]
 		out = append(out, overrides.Override{
-			Path:       strings.TrimPrefix(e.Path, "output."),
+			Path:       path,
 			Value:      e.Value,
 			Reason:     e.Reason,
 			Precedence: e.Precedence,
@@ -90,18 +93,61 @@ func packageOverridesFor(polOverrides map[string][]policy.PolicyOverride, key st
 	return out
 }
 
+// matchedOverride pairs an override with the table key (pattern) it matched
+// through, so dedupeByPath can rank overlapping matches by pattern specificity.
+type matchedOverride struct {
+	pattern  string
+	override policy.PolicyOverride
+}
+
 // matchOverrideEntries collects every override whose key pattern matches the
 // package key, testing both the full key and its version-stripped form so that
 // non-wildcard keys keep matching versioned keys exactly as before.
-func matchOverrideEntries(table map[string][]policy.PolicyOverride, key string) []policy.PolicyOverride {
+func matchOverrideEntries(table map[string][]policy.PolicyOverride, key string) []matchedOverride {
 	stripped := stripVersionQuery(key)
-	var out []policy.PolicyOverride
+	var out []matchedOverride
 	for pattern, items := range table {
 		if policy.MatchesPattern(pattern, key) || (stripped != key && policy.MatchesPattern(pattern, stripped)) {
-			out = append(out, items...)
+			for _, e := range items {
+				out = append(out, matchedOverride{pattern: pattern, override: e})
+			}
 		}
 	}
 	return out
+}
+
+// dedupeByPath collapses overrides that target the same output path to a single
+// winner, keyed by the bare (output.-stripped) path. When more than one pattern
+// matches the package key for the same path, the most specific pattern wins (see
+// moreSpecific), so the applied override never depends on map-iteration order.
+func dedupeByPath(matched []matchedOverride) map[string]policy.PolicyOverride {
+	best := make(map[string]matchedOverride, len(matched))
+	for _, m := range matched {
+		path := strings.TrimPrefix(m.override.Path, "output.")
+		if cur, ok := best[path]; !ok || moreSpecific(m.pattern, cur.pattern) {
+			best[path] = m
+		}
+	}
+	out := make(map[string]policy.PolicyOverride, len(best))
+	for path, m := range best {
+		out[path] = m.override
+	}
+	return out
+}
+
+// moreSpecific reports whether pattern a should win over pattern b when both
+// match the same key and target the same path. An exact (wildcard-free) pattern
+// beats a wildcard; otherwise the longer literal pattern wins, with a
+// lexicographic tiebreak so the result is fully deterministic.
+func moreSpecific(a, b string) bool {
+	aWild, bWild := strings.Contains(a, "*"), strings.Contains(b, "*")
+	if aWild != bWild {
+		return !aWild
+	}
+	if len(a) != len(b) {
+		return len(a) > len(b)
+	}
+	return a < b
 }
 
 // stripVersionQuery drops a trailing "?version=..." (or any query) from a
