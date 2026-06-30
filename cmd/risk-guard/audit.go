@@ -15,6 +15,11 @@ var (
 	auditJobs     int
 	auditMaxAge   string
 	auditNoCache  bool
+
+	auditRiskGuard bool
+	auditRGCommit  string
+	auditRGToken   string
+	auditRGServer  string
 )
 
 // auditCmd is a help-only parent grouping the source/deps/package scoring
@@ -60,6 +65,10 @@ func init() {
 	auditDepsCmd.Flags().StringVar(&policyDefault, "policy-default", "", flagHelpPolicyDefault)
 	auditDepsCmd.Flags().StringVar(&auditMaxAge, "max-age", "48h", flagHelpMaxAge)
 	auditDepsCmd.Flags().BoolVar(&auditNoCache, "no-cache", false, flagHelpNoCache)
+	auditDepsCmd.Flags().BoolVar(&auditRiskGuard, "risk-guard", false, "Offload the audit: upload the SBOM to the Risk Guard server to score its dependencies")
+	auditDepsCmd.Flags().StringVar(&auditRGCommit, "commit", "", "Commit SHA to associate the run with (default: HEAD); only with --risk-guard")
+	auditDepsCmd.Flags().StringVar(&auditRGToken, "token", "", "GitHub token for the Risk Guard server (default: $RISK_GUARD_TOKEN, $GITHUB_TOKEN, or 'gh auth token'); only with --risk-guard")
+	auditDepsCmd.Flags().StringVar(&auditRGServer, "server", "", "Risk Guard server base URL (default: $RISK_GUARD_URL or https://ossriskguard.app); only with --risk-guard")
 	if err := auditDepsCmd.MarkFlagRequired("sbom"); err != nil {
 		panic(fmt.Errorf("marking --sbom required: %w", err))
 	}
@@ -85,6 +94,11 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 		}
 		return nil
 	}
+
+	if auditRiskGuard {
+		return uploadAuditToRiskGuard(cmd.Context(), resolveRepoRoot(summaryRepoRoot), raw)
+	}
+
 	if auditJobs < 1 {
 		return fmt.Errorf("--jobs must be >= 1")
 	}
