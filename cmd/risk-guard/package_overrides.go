@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"maps"
 	"sort"
 	"strings"
 
@@ -64,12 +65,8 @@ func packageOverridesFor(polOverrides map[string][]policy.PolicyOverride, key st
 	builtinByPath := dedupeByPath(matchOverrideEntries(knownOverrides, key))
 
 	merged := make(map[string]policy.PolicyOverride, len(userByPath)+len(builtinByPath))
-	for path, e := range builtinByPath {
-		merged[path] = e
-	}
-	for path, e := range userByPath {
-		merged[path] = e
-	}
+	maps.Copy(merged, builtinByPath)
+	maps.Copy(merged, userByPath)
 	if len(merged) == 0 {
 		return nil
 	}

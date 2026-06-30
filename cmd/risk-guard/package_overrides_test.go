@@ -100,7 +100,7 @@ func TestPackageOverridesFor_OverlappingPatternsDeterministicExactWins(t *testin
 	}
 
 	// Run repeatedly to surface any dependence on Go map ordering.
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		entries := toEntries(t, "package/npm/react?version=18.0.0", polOverrides)
 
 		count := 0
