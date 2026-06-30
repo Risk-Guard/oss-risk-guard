@@ -23,10 +23,10 @@ import (
 //
 // Returns (ctx, baseHash) unchanged when there are no overrides for this package.
 func packageOverrideContext(ctx context.Context, key, baseHash string) (context.Context, string) {
-	_, _, polOverrides, ok := policy.GetRootPolicy(ctx)
-	if !ok || len(polOverrides) == 0 {
-		return ctx, baseHash
-	}
+	// polOverrides may be nil/empty when there is no .risk-guard.yml override
+	// table; built-in knownOverrides are still merged in by packageOverridesFor,
+	// so do not bail out here on an empty user table.
+	_, _, polOverrides, _ := policy.GetRootPolicy(ctx)
 
 	ovs := packageOverridesFor(polOverrides, key)
 	if len(ovs) == 0 {
