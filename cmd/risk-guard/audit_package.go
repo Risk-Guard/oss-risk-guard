@@ -65,9 +65,13 @@ func runAuditPackage(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Apply built-in knownOverrides and any policy overrides (e.g. the @types/*
+	// source-URL gap-fill) before the DAG runs, so a single-package audit
+	// resolves sources the same way a repo scan does.
+	ctx, overridesHash := packageOverrideContext(ctx, args[0], "")
 	cmd.SetContext(ctx)
 
-	input := dag_impl.NewPackageInputWithVersion(eco, name, version, "")
+	input := dag_impl.NewPackageInputWithVersion(eco, name, version, overridesHash)
 
 	logger.Info("auditing package",
 		zap.String("ecosystem", eco),

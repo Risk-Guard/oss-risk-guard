@@ -64,6 +64,7 @@ type NPMVersionDetails struct {
 	Dependencies map[string]string `json:"dependencies"`
 	Dist         *NPMDist          `json:"dist,omitempty"`
 	NpmUser      *NPMUser          `json:"_npmUser,omitempty"`
+	Repository   any               `json:"repository"` // string or {type,url}; this version's own manifest value
 }
 
 // FetchPackage fetches package data from NPM registry with caching

@@ -1,0 +1,20 @@
+# Built-in, reviewable table of source-URL gap-fillers for packages whose
+# registry metadata declares no repository even though their source is
+# well-known. Entries use precedence "fallback", so they apply only when
+# metadata resolved no source and never clobber a package's own declaration.
+# Keys support the same `*` wildcard matching as user overrides.
+#
+# This file is embedded into the binary and loaded at startup (see
+# known_overrides.go). It is validated with the same rules as a user
+# .risk-guard.yml overrides table, so keep paths/reasons populated and
+# precedence values valid.
+
+# The @types/* scope is registry-locked on npm (only DefinitelyTyped automation
+# can publish) and every package is published from the DefinitelyTyped monorepo.
+# Graduated/deprecated stub versions ship repository: null, which otherwise
+# triggers SOURCE_REPO_NOT_FOUND.
+package/npm/@types/*:
+  - path: output.source_url
+    value: https://github.com/DefinitelyTyped/DefinitelyTyped
+    precedence: fallback
+    reason: "@types scope is registry-locked; published from the DefinitelyTyped monorepo"

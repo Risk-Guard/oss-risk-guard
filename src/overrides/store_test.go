@@ -88,6 +88,24 @@ func TestWarnUnconsumed(t *testing.T) {
 		}
 	})
 
+	t.Run("does not warn on unapplied fallback override", func(t *testing.T) {
+		core, logs := observer.New(zap.WarnLevel)
+		log := zap.New(core)
+		ctx := ctxutil.SetLogger(context.Background(), log)
+
+		store := NewStore([]Override{
+			{Path: "source_url", Value: "https://a.com", Reason: "gap-fill", Precedence: "fallback"},
+		})
+		// Intentionally record nothing applied: the fallback gap-filled nothing
+		// because a source was already resolved.
+
+		store.WarnUnconsumed(ctx)
+
+		if logs.Len() != 0 {
+			t.Errorf("expected no warning for unapplied fallback, got %d", logs.Len())
+		}
+	})
+
 	t.Run("no warnings when all consumed", func(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		log := zap.New(core)

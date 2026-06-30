@@ -185,6 +185,14 @@ func parseSeverityRules(severity map[string]SeverityValue) ([]SeverityRule, erro
 	return rules, nil
 }
 
+// ValidateOverrides checks an override table for valid keys, required fields,
+// and precedence values. Exported so built-in override tables loaded outside the
+// .risk-guard.yml path (e.g. the CLI's embedded known_overrides.yml) can enforce
+// the same rules instead of bypassing validation.
+func ValidateOverrides(overrides map[string][]PolicyOverride, source string) error {
+	return validateOverrides(overrides, source)
+}
+
 func validateOverrides(overrides map[string][]PolicyOverride, source string) error {
 	for key, items := range overrides {
 		if !hasValidOverrideKeyPrefix(key) {
@@ -196,6 +204,11 @@ func validateOverrides(overrides map[string][]PolicyOverride, source string) err
 			}
 			if override.Reason == "" {
 				return fmt.Errorf("%s: override %q[%d]: reason is required (E&O compliance)", source, key, i)
+			}
+			switch override.Precedence {
+			case "", "force", "fallback":
+			default:
+				return fmt.Errorf("%s: override %q[%d]: precedence must be %q or %q (got %q)", source, key, i, "force", "fallback", override.Precedence)
 			}
 		}
 	}

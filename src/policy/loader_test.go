@@ -278,6 +278,44 @@ func TestSeverity_Validate(t *testing.T) {
 	}
 }
 
+func TestLoadFromBytes_OverridePrecedenceValid(t *testing.T) {
+	yamlData := `
+version: 2
+overrides:
+  package/npm/foo:
+    - path: output.source_url
+      value: https://github.com/foo/foo
+      reason: "force correction"
+      precedence: force
+  package/npm/bar:
+    - path: output.source_url
+      value: https://github.com/bar/bar
+      reason: "gap fill"
+      precedence: fallback
+  package/npm/baz:
+    - path: output.source_url
+      value: https://github.com/baz/baz
+      reason: "default precedence"
+`
+	_, err := LoadFromBytes([]byte(yamlData), "test.yml")
+	require.NoError(t, err)
+}
+
+func TestLoadFromBytes_OverridePrecedenceInvalid(t *testing.T) {
+	yamlData := `
+version: 2
+overrides:
+  package/npm/foo:
+    - path: output.source_url
+      value: https://github.com/foo/foo
+      reason: "bad precedence"
+      precedence: always
+`
+	_, err := LoadFromBytes([]byte(yamlData), "test.yml")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "precedence")
+}
+
 func TestDefaultPolicy(t *testing.T) {
 	pol := DefaultPolicy()
 	require.NotNil(t, pol)

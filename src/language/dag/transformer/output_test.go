@@ -182,3 +182,116 @@ func TestApplyOverridesV2(t *testing.T) {
 		}
 	})
 }
+
+// newTestOutputNoSource builds an Output with no resolved source on either the
+// package metadata or the downstream Input.
+func newTestOutputNoSource() *Output {
+	return NewOutput(
+		executiondag.StatusSuccess,
+		"ok",
+		[]PackageOutput{
+			{Ecosystem: "npm", Name: "express", Metadata: &models.PackageMetadata{SourceURL: nil}},
+		},
+		dag_impl.Input{},
+		&dag_impl.Input{SourceURL: nil},
+	)
+}
+
+func TestApplyOverridesV2Precedence(t *testing.T) {
+	t.Run("fallback applies when no source resolved", func(t *testing.T) {
+		out := newTestOutputNoSource()
+
+		applied, err := out.ApplyOverridesV2([]overrides.Override{
+			{Path: "source_url", Value: "https://fb.com", Reason: "gap", Precedence: "fallback"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(applied) != 1 {
+			t.Fatalf("expected 1 applied, got %d", len(applied))
+		}
+		if out.Outputs[0].Metadata.SourceURL == nil || *out.Outputs[0].Metadata.SourceURL != "https://fb.com" {
+			t.Errorf("expected metadata source_url set to fallback, got %v", out.Outputs[0].Metadata.SourceURL)
+		}
+		if out.Output.SourceURL == nil || *out.Output.SourceURL != "https://fb.com" {
+			t.Errorf("expected downstream source_url set to fallback, got %v", out.Output.SourceURL)
+		}
+	})
+
+	t.Run("fallback skips when metadata source already set", func(t *testing.T) {
+		out := newTestOutput("https://declared.com")
+
+		applied, err := out.ApplyOverridesV2([]overrides.Override{
+			{Path: "source_url", Value: "https://fb.com", Reason: "gap", Precedence: "fallback"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(applied) != 0 {
+			t.Errorf("expected 0 applied (fallback should skip), got %d", len(applied))
+		}
+		if *out.Outputs[0].Metadata.SourceURL != "https://declared.com" {
+			t.Errorf("declared metadata source must be preserved, got %s", *out.Outputs[0].Metadata.SourceURL)
+		}
+	})
+
+	t.Run("fallback skips when only downstream input source set", func(t *testing.T) {
+		declared := "https://declared.com"
+		out := NewOutput(
+			executiondag.StatusSuccess,
+			"ok",
+			[]PackageOutput{
+				{Ecosystem: "npm", Name: "express", Metadata: &models.PackageMetadata{SourceURL: nil}},
+			},
+			dag_impl.Input{},
+			&dag_impl.Input{SourceURL: &declared},
+		)
+
+		applied, err := out.ApplyOverridesV2([]overrides.Override{
+			{Path: "source_url", Value: "https://fb.com", Reason: "gap", Precedence: "fallback"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(applied) != 0 {
+			t.Errorf("expected 0 applied (fallback should skip), got %d", len(applied))
+		}
+		if *out.Output.SourceURL != "https://declared.com" {
+			t.Errorf("declared downstream source must be preserved, got %s", *out.Output.SourceURL)
+		}
+	})
+
+	t.Run("force overrides even when source already set", func(t *testing.T) {
+		out := newTestOutput("https://declared.com")
+
+		applied, err := out.ApplyOverridesV2([]overrides.Override{
+			{Path: "source_url", Value: "https://fb.com", Reason: "correction", Precedence: "force"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(applied) != 1 {
+			t.Fatalf("expected 1 applied, got %d", len(applied))
+		}
+		if *out.Outputs[0].Metadata.SourceURL != "https://fb.com" {
+			t.Errorf("force must override, got %s", *out.Outputs[0].Metadata.SourceURL)
+		}
+	})
+
+	t.Run("empty precedence behaves like force", func(t *testing.T) {
+		out := newTestOutput("https://declared.com")
+
+		applied, err := out.ApplyOverridesV2([]overrides.Override{
+			{Path: "source_url", Value: "https://fb.com", Reason: "correction"},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(applied) != 1 {
+			t.Fatalf("expected 1 applied, got %d", len(applied))
+		}
+		if *out.Outputs[0].Metadata.SourceURL != "https://fb.com" {
+			t.Errorf("empty precedence must override, got %s", *out.Outputs[0].Metadata.SourceURL)
+		}
+	})
+}

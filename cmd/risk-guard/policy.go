@@ -17,6 +17,11 @@ import (
 var (
 	addEFAll   bool
 	addEFSarif string
+
+	addEFRiskGuard       bool
+	addEFRiskGuardCommit string
+	addEFRiskGuardToken  string
+	addEFRiskGuardServer string
 )
 
 // policyCmd is a help-only parent group for commands that read or edit the
@@ -70,7 +75,11 @@ description. Categories are colored to mirror how the default policy grades them
 
 func init() {
 	addExpectedFailuresCmd.Flags().BoolVar(&addEFAll, "all", false, "Add all findings without prompting")
-	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from")
+	addExpectedFailuresCmd.Flags().StringVarP(&addEFSarif, "sarif", "s", defaultUnifiedSARIF, "SARIF report to read findings from (with --risk-guard: where to save the fetched SARIF)")
+	addExpectedFailuresCmd.Flags().BoolVar(&addEFRiskGuard, "risk-guard", false, "Fetch findings from the Risk Guard server for the current repo+commit instead of a local SARIF file")
+	addExpectedFailuresCmd.Flags().StringVar(&addEFRiskGuardCommit, "commit", "", "Commit SHA to look up (default: HEAD); only with --risk-guard")
+	addExpectedFailuresCmd.Flags().StringVar(&addEFRiskGuardToken, "token", "", "GitHub token for the Risk Guard server (default: $RISK_GUARD_TOKEN, $GITHUB_TOKEN, or 'gh auth token'); only with --risk-guard")
+	addExpectedFailuresCmd.Flags().StringVar(&addEFRiskGuardServer, "server", "", "Risk Guard server base URL (default: $RISK_GUARD_URL or https://ossriskguard.app); only with --risk-guard")
 
 	policyCmd.AddCommand(policyShowCmd)
 	policyCmd.AddCommand(addExpectedFailuresCmd)
@@ -117,7 +126,7 @@ func runPolicyShow(_ *cobra.Command, args []string) error {
 	return err
 }
 
-func runAddExpectedFailures(_ *cobra.Command, args []string) error {
+func runAddExpectedFailures(cmd *cobra.Command, args []string) error {
 	// Resolve the target the same way init/run do so we read and write the exact
 	// .risk-guard.yml the rest of the tool uses at the named path.
 	repoPath, err := resolveScanPath(repoArg(args))
@@ -125,16 +134,24 @@ func runAddExpectedFailures(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	if _, statErr := os.Stat(addEFSarif); statErr != nil {
-		sarifUnusableHint(repoPath, addEFSarif,
-			fmt.Sprintf("No SARIF report at %s", addEFSarif))
-		return errReported
-	}
-	report, err := sarif.Open(addEFSarif)
-	if err != nil {
-		sarifUnusableHint(repoPath, addEFSarif,
-			fmt.Sprintf("SARIF report %s could not be read: %v", addEFSarif, err))
-		return errReported
+	var report *sarif.Report
+	if addEFRiskGuard {
+		report, err = fetchRiskGuardReport(cmd.Context(), repoPath)
+		if err != nil {
+			return err
+		}
+	} else {
+		if _, statErr := os.Stat(addEFSarif); statErr != nil {
+			sarifUnusableHint(repoPath, addEFSarif,
+				fmt.Sprintf("No SARIF report at %s", addEFSarif))
+			return errReported
+		}
+		report, err = sarif.Open(addEFSarif)
+		if err != nil {
+			sarifUnusableHint(repoPath, addEFSarif,
+				fmt.Sprintf("SARIF report %s could not be read: %v", addEFSarif, err))
+			return errReported
+		}
 	}
 
 	findings := collectInitFindings(report, levelError)
