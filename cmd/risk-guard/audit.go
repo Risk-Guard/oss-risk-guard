@@ -96,7 +96,7 @@ func runAudit(cmd *cobra.Command, _ []string) error {
 	}
 
 	if auditRiskGuard {
-		return uploadAuditToRiskGuard(cmd.Context(), resolveRepoRoot(summaryRepoRoot), raw)
+		return uploadSBOMToRiskGuard(cmd.Context(), resolveRepoRoot(summaryRepoRoot), raw, nil, auditRGCommit, auditRGToken, auditRGServer)
 	}
 
 	if auditJobs < 1 {

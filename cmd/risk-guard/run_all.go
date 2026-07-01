@@ -23,6 +23,11 @@ var (
 	runAllGitHub          bool
 	runAllGitLab          string
 	runAllModeOverride    string
+
+	runAllRiskGuard bool
+	runAllRGCommit  string
+	runAllRGToken   string
+	runAllRGServer  string
 )
 
 // runAll is the unified pipeline: score the local source repo, build an SBOM
@@ -83,6 +88,12 @@ func runAll(cmd *cobra.Command, args []string) error {
 		if err := persistSBOM(runAllSBOMOut, sbomBytes, logger); err != nil {
 			return err
 		}
+	}
+
+	// Offload: source checks were run locally above; hand the SBOM + source findings to the server,
+	// which scores the dependencies and records the run (no local dep audit or SARIF).
+	if runAllRiskGuard {
+		return uploadSBOMToRiskGuard(ctx, repoPath, sbomBytes, violationsToChecks(localViolations), runAllRGCommit, runAllRGToken, runAllRGServer)
 	}
 
 	deps, err := sbom.ReadDirectDepsWithLocations(sbomBytes)
