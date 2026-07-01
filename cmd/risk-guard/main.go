@@ -210,6 +210,10 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
 	cmd.Flags().StringVar(&runAllGitLab, "gitlab", "", "After writing SARIF, write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
+	cmd.Flags().BoolVar(&runAllRiskGuard, "risk-guard", false, "Offload the audit: run source checks locally, then upload the SBOM + source findings to the Risk Guard server to score the dependencies")
+	cmd.Flags().StringVar(&runAllRGCommit, "commit", "", "Commit SHA to associate the run with (default: HEAD); only with --risk-guard")
+	cmd.Flags().StringVar(&runAllRGToken, "token", "", "GitHub token for the Risk Guard server (default: $RISK_GUARD_TOKEN, $GITHUB_TOKEN, or 'gh auth token'); only with --risk-guard")
+	cmd.Flags().StringVar(&runAllRGServer, "server", "", "Risk Guard server base URL (default: $RISK_GUARD_URL or https://ossriskguard.app); only with --risk-guard")
 	registerLevelFlag(cmd)
 }
 
