@@ -47,8 +47,8 @@ ecosystem. Ecosystems with a working lockfile parser (npm, uv) get full
 transitives; ecosystems without one (yarn/pnpm/bun, bundler, poetry, pipenv,
 pdm) get manifest-declared direct deps only.
 
-Writes to sbom.<format>.json in the current directory unless --output is set
-(use --output - for stdout).
+Writes to sbom.spdx.json (or sbom.cdx.json for CycloneDX) in the current
+directory unless --output is set (use --output - for stdout).
 
 Examples:
   risk-guard sbom .
@@ -60,7 +60,7 @@ Examples:
 
 func init() {
 	sbomCmd.Flags().StringVar(&sbomFormat, "format", "", "SBOM format: spdx or cyclonedx (inferred from --output extension when unset)")
-	sbomCmd.Flags().StringVarP(&sbomOutput, "output", "o", "", "Output file path, or - for stdout (default: sbom.<format>.json)")
+	sbomCmd.Flags().StringVarP(&sbomOutput, "output", "o", "", "Output file path, or - for stdout (default: sbom.spdx.json / sbom.cdx.json)")
 	rootCmd.AddCommand(sbomCmd)
 }
 
@@ -80,7 +80,7 @@ func runSBOM(command *cobra.Command, args []string) error {
 
 	output := sbomOutput
 	if output == "" {
-		output = fmt.Sprintf("sbom.%s.json", format)
+		output = defaultSBOMFilename(format)
 	}
 
 	data, err := buildSBOMBytes(command.Context(), args[0], format)
@@ -97,6 +97,19 @@ func runSBOM(command *cobra.Command, args []string) error {
 			zap.String("format", format))
 	}
 	return nil
+}
+
+// defaultSBOMFilename returns the output filename used when --output is omitted.
+// It uses the conventional double-extension for each format (.spdx.json,
+// .cdx.json) so the name round-trips through inferSBOMFormat and matches the
+// examples in the command help.
+func defaultSBOMFilename(format string) string {
+	switch format {
+	case sbomFormatCycloneDX:
+		return "sbom.cdx.json"
+	default:
+		return "sbom.spdx.json"
+	}
 }
 
 // inferSBOMFormat guesses the SBOM format from an output filename, using the
