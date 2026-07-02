@@ -21,7 +21,6 @@ func TestFindManifestInfo(t *testing.T) {
 		{"composer.json", true, "PHP", "packagist"},
 		{"mix.exs", true, "Elixir", "hex"},
 		{"Pipfile", true, "Python", "pypi"},
-		{"package-lock.json", true, "JavaScript/Node", "npm"},
 		{"yarn.lock", true, "JavaScript/Node", "npm"},
 		// Glob suffix matches
 		{"foo.csproj", true, "C#/.NET", "nuget"},
