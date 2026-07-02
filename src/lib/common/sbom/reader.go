@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
@@ -68,6 +69,123 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	default:
 		return nil, fmt.Errorf("unrecognized SBOM format (expected SPDX 3.0 or CycloneDX 1.6)")
 	}
+}
+
+// Package is one enumerated SBOM package, format-agnostic, for display. The
+// ecosystem is recovered from the analysis-identifier key so it matches the
+// names used elsewhere in the tool (npm, pypi, rubygems…) rather than a purl
+// type (gem, golang…). Deps holds the analysis keys of this package's own
+// dependencies, so callers can walk the graph as a tree.
+type Package struct {
+	Key       string
+	Ecosystem string
+	Name      string
+	Version   string
+	PURL      string
+	Location  *models.LocationInfo
+	Deps      []string
+}
+
+// Summary is a format-agnostic, human-readable view of a parsed SBOM: the
+// format and spec version, the generating tool, the root component, the root's
+// direct dependency keys (RootDeps), and every enumerated package (root
+// excluded). RootDeps plus each package's Deps form the dependency graph.
+type Summary struct {
+	Format      string // "CycloneDX" or "SPDX"
+	SpecVersion string
+	Tool        string
+	RootName    string
+	RootDeps    []string
+	Packages    []Package
+}
+
+// ReadSummary sniffs the SBOM format from the JSON payload and returns a
+// format-agnostic Summary: metadata, the dependency graph, and every enumerated
+// package (excluding the root), sorted by ecosystem then name then version.
+func ReadSummary(raw []byte) (*Summary, error) {
+	var probe struct {
+		BOMFormat string `json:"bomFormat"`
+		Context   string `json:"@context"`
+	}
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return nil, fmt.Errorf("not valid JSON: %w", err)
+	}
+
+	switch {
+	case probe.BOMFormat == "CycloneDX":
+		ov, err := cdx16.ReadOverview(raw)
+		if err != nil {
+			return nil, err
+		}
+		s := &Summary{Format: "CycloneDX", SpecVersion: ov.SpecVersion, Tool: ov.Tool, RootName: ov.RootName, RootDeps: ov.RootDeps}
+		for _, p := range ov.Packages {
+			s.Packages = append(s.Packages, toPackage(p.Key, p.Name, p.Version, p.PURL, p.Location, p.Deps))
+		}
+		sortPackages(s.Packages)
+		return s, nil
+	case probe.Context != "":
+		ov, err := spdx30.ReadOverview(raw)
+		if err != nil {
+			return nil, err
+		}
+		s := &Summary{Format: "SPDX", SpecVersion: ov.SpecVersion, Tool: ov.Tool, RootName: ov.RootName, RootDeps: ov.RootDeps}
+		for _, p := range ov.Packages {
+			s.Packages = append(s.Packages, toPackage(p.Key, p.Name, p.Version, p.PURL, p.Location, p.Deps))
+		}
+		sortPackages(s.Packages)
+		return s, nil
+	default:
+		return nil, fmt.Errorf("unrecognized SBOM format (expected SPDX 3.0 or CycloneDX 1.6)")
+	}
+}
+
+// toPackage builds a format-agnostic Package, deriving the ecosystem from the
+// analysis-identifier key ("package/{eco}/{name}"). Falls back to the purl type
+// when the key carries no ecosystem.
+func toPackage(key, name, version, purlStr string, loc *models.LocationInfo, deps []string) Package {
+	eco := ecosystemFromKey(key)
+	if eco == "" {
+		eco = ecosystemFromPURL(purlStr)
+	}
+	return Package{Key: key, Ecosystem: eco, Name: name, Version: version, PURL: purlStr, Location: loc, Deps: deps}
+}
+
+// ecosystemFromKey extracts the ecosystem from an analysis-identifier key of
+// the form "package/{eco}/{name}". Returns "" for non-package keys (e.g. the
+// "source/..." root).
+func ecosystemFromKey(key string) string {
+	rest, found := strings.CutPrefix(key, "package/")
+	if !found {
+		return ""
+	}
+	if i := strings.Index(rest, "/"); i > 0 {
+		return rest[:i]
+	}
+	return ""
+}
+
+// ecosystemFromPURL extracts the type from a purl of the form "pkg:{type}/…".
+func ecosystemFromPURL(purlStr string) string {
+	rest, found := strings.CutPrefix(purlStr, "pkg:")
+	if !found {
+		return ""
+	}
+	if i := strings.Index(rest, "/"); i > 0 {
+		return rest[:i]
+	}
+	return ""
+}
+
+func sortPackages(pkgs []Package) {
+	sort.Slice(pkgs, func(i, j int) bool {
+		if pkgs[i].Ecosystem != pkgs[j].Ecosystem {
+			return pkgs[i].Ecosystem < pkgs[j].Ecosystem
+		}
+		if pkgs[i].Name != pkgs[j].Name {
+			return pkgs[i].Name < pkgs[j].Name
+		}
+		return pkgs[i].Version < pkgs[j].Version
+	})
 }
 
 func dedupeAndSort(in []DirectDep) []DirectDep {

@@ -43,10 +43,22 @@ type spdxSnippet struct {
 	LineRange       *PositiveIntegerRange `json:"software_lineRange"`
 }
 
+// spdxPkg is a software_Package node reduced to the fields needed for display.
+type spdxPkg struct {
+	SpdxID  string
+	Name    string
+	Version string
+	PURL    string
+}
+
 type spdxGraph struct {
 	rels        []spdxRel
 	files       map[string]string // spdxId -> file name
 	snippets    map[string]spdxSnippet
+	packages    []spdxPkg
+	pkgByID     map[string]spdxPkg // spdxId -> package
+	specVersion string
+	toolName    string
 	rootElement string
 }
 
@@ -61,6 +73,7 @@ func parseSPDXGraph(raw []byte) (*spdxGraph, error) {
 	g := &spdxGraph{
 		files:    make(map[string]string),
 		snippets: make(map[string]spdxSnippet),
+		pkgByID:  make(map[string]spdxPkg),
 	}
 	for _, node := range doc.Graph {
 		var head struct {
@@ -100,6 +113,32 @@ func (g *spdxGraph) ingestNode(typ string, node json.RawMessage) {
 		var s spdxSnippet
 		if err := json.Unmarshal(node, &s); err == nil && s.SpdxID != "" {
 			g.snippets[s.SpdxID] = s
+		}
+	case "software_Package":
+		var p struct {
+			SpdxID  string `json:"spdxId"`
+			Name    string `json:"name"`
+			Version string `json:"software_packageVersion"`
+			PURL    string `json:"software_packageUrl"`
+		}
+		if err := json.Unmarshal(node, &p); err == nil && p.SpdxID != "" {
+			pkg := spdxPkg{SpdxID: p.SpdxID, Name: p.Name, Version: p.Version, PURL: p.PURL}
+			g.packages = append(g.packages, pkg)
+			g.pkgByID[p.SpdxID] = pkg
+		}
+	case "CreationInfo":
+		var ci struct {
+			SpecVersion string `json:"specVersion"`
+		}
+		if err := json.Unmarshal(node, &ci); err == nil && ci.SpecVersion != "" {
+			g.specVersion = ci.SpecVersion
+		}
+	case "Tool":
+		var t struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(node, &t); err == nil && g.toolName == "" {
+			g.toolName = t.Name
 		}
 	}
 }
@@ -147,6 +186,47 @@ func (g *spdxGraph) directDepIDs() []string {
 	return ids
 }
 
+// dependsChildrenByFrom collects every dependsOn relationship into a map from
+// the source element's spdxId to the spdxIds it depends on — the full
+// dependency graph, root included.
+func (g *spdxGraph) dependsChildrenByFrom() map[string][]string {
+	out := make(map[string][]string)
+	for _, r := range g.rels {
+		if r.RelationshipType != RelationshipDependsOn {
+			continue
+		}
+		out[r.From] = append(out[r.From], r.To...)
+	}
+	return out
+}
+
+// decodeSpdxID recovers the analysis-identifier key from a package spdxId by
+// base64-decoding the suffix after the last '#'. Reports false when it does not
+// decode.
+func decodeSpdxID(id string) (string, bool) {
+	suffix := id
+	if i := strings.LastIndex(id, "#"); i >= 0 {
+		suffix = id[i+1:]
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(suffix)
+	if err != nil {
+		return "", false
+	}
+	return string(decoded), true
+}
+
+// decodeSpdxIDs decodes a list of spdxIds to analysis keys, dropping any that
+// do not decode.
+func decodeSpdxIDs(ids []string) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if key, ok := decodeSpdxID(id); ok {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
 // ReadDirectDepsWithLocations is the same as ReadDirectDeps but also returns
 // each direct dep's manifest-file provenance, parsed from hasDependencyManifest
 // relationships. The target is either a software_File (file-only) or a
@@ -177,6 +257,71 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 		out = append(out, DirectDep{Key: string(decoded), Location: locByPkgID[id]})
 	}
 	return out, nil
+}
+
+// PackageInfo is one software package enumerated from an SPDX document for
+// display: its analysis-identifier key (decoded from the spdxId suffix), the
+// stored name/version, its purl, manifest provenance, and the decoded keys of
+// its own dependencies (Deps) from the document's dependsOn relationships.
+type PackageInfo struct {
+	Key      string
+	Name     string
+	Version  string
+	PURL     string
+	Location *models.LocationInfo
+	Deps     []string
+}
+
+// Overview is a read-only, display-oriented view of an SPDX document: its spec
+// version, generating tool, root package name, the root's direct dependency
+// keys (RootDeps), and every enumerated package (the root package is excluded).
+// Together RootDeps and each package's Deps form the dependency graph needed to
+// render a tree.
+type Overview struct {
+	SpecVersion string
+	Tool        string
+	RootName    string
+	RootDeps    []string
+	Packages    []PackageInfo
+}
+
+// ReadOverview parses an SPDX 3.0.1 document and returns its metadata, the
+// dependency graph, and the full software_Package set minus the root, each with
+// its decoded analysis key and manifest provenance. Packages whose spdxId
+// suffix does not decode are skipped.
+func ReadOverview(raw []byte) (*Overview, error) {
+	g, err := parseSPDXGraph(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	ov := &Overview{SpecVersion: g.specVersion, Tool: g.toolName}
+	if root, ok := g.pkgByID[g.rootElement]; ok {
+		ov.RootName = root.Name
+	}
+
+	childIDsByFrom := g.dependsChildrenByFrom()
+	ov.RootDeps = decodeSpdxIDs(childIDsByFrom[g.rootElement])
+
+	locByPkgID := g.locationsByPkgID()
+	for _, p := range g.packages {
+		if p.SpdxID == g.rootElement {
+			continue
+		}
+		key, ok := decodeSpdxID(p.SpdxID)
+		if !ok {
+			continue
+		}
+		ov.Packages = append(ov.Packages, PackageInfo{
+			Key:      key,
+			Name:     p.Name,
+			Version:  p.Version,
+			PURL:     p.PURL,
+			Deps:     decodeSpdxIDs(childIDsByFrom[p.SpdxID]),
+			Location: locByPkgID[p.SpdxID],
+		})
+	}
+	return ov, nil
 }
 
 func strPtr(s string) *string { return &s }
