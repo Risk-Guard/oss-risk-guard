@@ -133,8 +133,7 @@ var Manifests = []ManifestInfo{
 	{Filename: "Pipfile", Language: "Python", Ecosystem: "pypi", OSVEcosystem: "PyPI", GHSAEcosystem: "pip", PackageManager: "pipenv"},
 	{Filename: "Pipfile.lock", Language: "Python", Ecosystem: "pypi", OSVEcosystem: "PyPI", GHSAEcosystem: "pip", PackageManager: "pipenv"},
 
-	// JavaScript (unsupported formats only - lock files are not parsed)
-	{Filename: "package-lock.json", Language: "JavaScript/Node", Ecosystem: "npm", OSVEcosystem: "npm", GHSAEcosystem: "npm", PackageManager: "npm"},
+	// JavaScript (lock files with only a stub parser; package-lock.json is parsed)
 	{Filename: "yarn.lock", Language: "JavaScript/Node", Ecosystem: "npm", OSVEcosystem: "npm", GHSAEcosystem: "npm", PackageManager: "yarn"},
 	{Filename: "pnpm-lock.yaml", Language: "JavaScript/Node", Ecosystem: "npm", OSVEcosystem: "npm", GHSAEcosystem: "npm", PackageManager: "pnpm"},
 	{Filename: "bun.lockb", Language: "JavaScript/Node", Ecosystem: "npm", OSVEcosystem: "npm", GHSAEcosystem: "npm", PackageManager: "bun"},
@@ -252,7 +251,6 @@ var SparseCheckoutPatterns = []string{
 	"**/Pipfile",
 	"**/Pipfile.lock",
 	// JavaScript (unsupported)
-	"**/package-lock.json",
 	"**/yarn.lock",
 	"**/pnpm-lock.yaml",
 	"**/bun.lockb",
