@@ -27,7 +27,7 @@ commands, e.g. "package/npm/express" or "package/npm/lodash?version=4.17.20".
 With --sarif the graded report is written to that path; without it a
 human-readable findings summary is printed to the terminal.
 
-No cache backend is used; every invocation runs the DAG fresh.
+No audit-result cache is used; every invocation runs the DAG fresh.
 
 Examples:
   risk-guard audit package 'package/npm/express'

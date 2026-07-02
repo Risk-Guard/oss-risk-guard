@@ -20,16 +20,16 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "risk-guard <path>",
+	Use:   "risk-guard [path]",
 	Short: "Run the full pipeline: source scoring + SBOM + dep audit → one SARIF",
 	Long: `Run the complete risk-guard pipeline against an on-disk git repository:
 score the local source, build an SBOM in memory, audit each direct dependency,
 and emit a single merged SARIF report containing the local-source Run plus one
 Run per audited package.
 
-The single argument must be a path to an existing git repository.
+The argument is a path to an existing git repository; omit it to print help.
 
-For source-only scoring (no dependency audit) use the "scan" subcommand.
+For source-only scoring (no dependency audit) use the "audit source" subcommand.
 
 Cache outputs (DAG results, clones, audit cache, network cache) are written
 under a single cache root, resolved in this order:
@@ -209,7 +209,7 @@ func registerRunAllFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&runAllContinueOnError, "continue-on-error", true, "Continue and emit a partial SARIF when SBOM/audit steps fail")
 	cmd.Flags().BoolVar(&runAllGitHub, "github", false, "After writing SARIF, render GitHub Actions workflow annotations to stdout")
 	cmd.Flags().StringVar(&runAllGitLab, "gitlab", "", "After writing SARIF, write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
-	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking findings), silent (never fail), disabled (refuse to run)")
+	cmd.Flags().StringVar(&runAllModeOverride, "mode", "", "Override workflow.mode from .risk-guard.yml: active (fail on blocking), no-fail (annotate, never fail), silent/disabled (never fail, no annotations)")
 	cmd.Flags().BoolVar(&runAllRiskGuard, "risk-guard", false, "Offload the audit: run source checks locally, then upload the SBOM + source findings to the Risk Guard server to score the dependencies")
 	cmd.Flags().StringVar(&runAllRGCommit, "commit", "", "Commit SHA to associate the run with (default: HEAD); only with --risk-guard")
 	cmd.Flags().StringVar(&runAllRGToken, "token", "", "GitHub token for the Risk Guard server (default: $RISK_GUARD_TOKEN, $GITHUB_TOKEN, or 'gh auth token'); only with --risk-guard")

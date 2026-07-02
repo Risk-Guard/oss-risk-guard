@@ -43,21 +43,24 @@ Reads lockfiles and manifests on disk and emits an SBOM. Fully offline: no
 registry calls, no artifact downloads, no scoring checks.
 
 Coverage of the transitive dep tree depends on the lockfile parser for each
-ecosystem. Ecosystems with a working lockfile parser (npm/yarn/pnpm/bun, uv,
-bundler) get full transitives; ecosystems without one (poetry, pipenv, pdm)
-get manifest-declared direct deps only.
+ecosystem. Ecosystems with a working lockfile parser (npm, uv) get full
+transitives; ecosystems without one (yarn/pnpm/bun, bundler, poetry, pipenv,
+pdm) get manifest-declared direct deps only.
+
+Writes to sbom.<format>.json in the current directory unless --output is set
+(use --output - for stdout).
 
 Examples:
-  risk-guard sbom . --format spdx
-  risk-guard sbom . --format cyclonedx --output sbom.cdx.json`,
+  risk-guard sbom .
+  risk-guard sbom . --format cyclonedx --output sbom.cdx.json
+  risk-guard sbom . --format spdx --output -`,
 	Args: cobra.ExactArgs(1),
 	RunE: runSBOM,
 }
 
 func init() {
 	sbomCmd.Flags().StringVar(&sbomFormat, "format", "", "SBOM format: spdx or cyclonedx (inferred from --output extension when unset)")
-	sbomCmd.Flags().StringVarP(&sbomOutput, "output", "o", "", "Output file path, or - for stdout")
-	_ = sbomCmd.MarkFlagRequired("output")
+	sbomCmd.Flags().StringVarP(&sbomOutput, "output", "o", "", "Output file path, or - for stdout (default: sbom.<format>.json)")
 	rootCmd.AddCommand(sbomCmd)
 }
 
@@ -66,9 +69,18 @@ func runSBOM(command *cobra.Command, args []string) error {
 
 	format := sbomFormat
 	if format == "" {
-		format = inferSBOMFormat(sbomOutput)
+		if sbomOutput != "" {
+			format = inferSBOMFormat(sbomOutput)
+		} else {
+			format = sbomFormatSPDX
+		}
 		logger.Debug("inferred SBOM format",
 			zap.String("format", format), zap.String("output", sbomOutput))
+	}
+
+	output := sbomOutput
+	if output == "" {
+		output = fmt.Sprintf("sbom.%s.json", format)
 	}
 
 	data, err := buildSBOMBytes(command.Context(), args[0], format)
@@ -76,12 +88,12 @@ func runSBOM(command *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := writeSBOMOutput(sbomOutput, data); err != nil {
+	if err := writeSBOMOutput(output, data); err != nil {
 		return err
 	}
-	if sbomOutput != "-" {
+	if output != "-" {
 		logger.Info("wrote SBOM",
-			zap.String("path", sbomOutput),
+			zap.String("path", output),
 			zap.String("format", format))
 	}
 	return nil

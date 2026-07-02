@@ -13,7 +13,7 @@ const (
 	flagHelpMaxAge         = "Maximum audit cache age (e.g. 30m, 48h, 2d). 0 disables caching"
 	flagHelpNoCache        = "Force fresh audit scoring; do not read or write the audit cache"
 
-	flagHelpMode     = "Override workflow.mode from .risk-guard.yml: active (fail on blocking), no-fail/silent (never fail), disabled (refuse to run)"
+	flagHelpMode     = "Override workflow.mode from .risk-guard.yml: active (fail on blocking), no-fail (annotate, never fail), silent/disabled (never fail, no annotations)"
 	flagHelpGitHub   = "Emit GitHub Actions workflow annotations on stdout instead of the text summary"
 	flagHelpGitLab   = "Write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)"
 	flagHelpRepoRoot = "Repo root: where .risk-guard.yml lives and what file paths are relative to (defaults to $GITHUB_WORKSPACE/$CI_PROJECT_DIR then CWD)"
