@@ -12,6 +12,10 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
+// utf8BOM is the UTF-8 byte-order-mark (U+FEFF) that some editors prepend to
+// package.json. npm/Node ignore it; encoding/json treats it as invalid input.
+const utf8BOM = "\xef\xbb\xbf"
+
 type DepsMap map[string]string
 
 func (d *DepsMap) UnmarshalJSON(data []byte) error {
@@ -65,6 +69,9 @@ func FindPackageJSONFiles(root string, skipDirs []string) ([]string, error) {
 }
 
 func ParsePackageJSON(content string, sourceFile string) ([]models.Dependency, *PackageJSON, error) {
+	// npm and Node ignore a leading UTF-8 BOM; encoding/json does not, so strip it first.
+	content = strings.TrimPrefix(content, utf8BOM)
+
 	var pkg PackageJSON
 
 	if err := json.Unmarshal([]byte(content), &pkg); err != nil {

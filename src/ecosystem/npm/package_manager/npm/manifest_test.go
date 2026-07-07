@@ -4,6 +4,29 @@ import (
 	"testing"
 )
 
+func TestParsePackageJSON_UTF8BOM(t *testing.T) {
+	// A leading UTF-8 BOM (as shipped by e.g. vite's utf8-bom-package fixture)
+	// is valid to npm/Node and must not be reported as malformed metadata.
+	content := "\xef\xbb\xbf" + `{
+		"name": "@vitejs/test-utf8-bom-package",
+		"private": true,
+		"dependencies": {
+			"express": "^4.18.0"
+		}
+	}`
+
+	deps, pkg, err := ParsePackageJSON(content, "package.json")
+	if err != nil {
+		t.Fatalf("unexpected error parsing BOM-prefixed package.json: %v", err)
+	}
+	if pkg.Name != "@vitejs/test-utf8-bom-package" {
+		t.Errorf("expected name to parse, got %q", pkg.Name)
+	}
+	if len(deps) != 1 {
+		t.Errorf("expected 1 dependency, got %d", len(deps))
+	}
+}
+
 func TestParsePackageJSON_PrivateTrue(t *testing.T) {
 	content := `{
 		"name": "my-private-app",
