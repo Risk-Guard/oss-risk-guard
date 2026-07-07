@@ -200,10 +200,8 @@ func (t *sbomTree) sortedChildren(keys []string) []string {
 	return out
 }
 
-// sortKey is the ordering key for a child: its display label when known, else
-// the raw analysis key.
 func (t *sbomTree) sortKey(key string) string {
-	if p, ok := t.byKey[key]; ok {
+	if p, ok := t.byKey[key]; ok && p.Name != "" {
 		return sbomPackageLabel(p)
 	}
 	return key
