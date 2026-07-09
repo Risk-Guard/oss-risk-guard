@@ -9,7 +9,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 	"github.com/Risk-Guard/oss-risk-guard/src/registry"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -44,7 +44,7 @@ func NewNode(extractors map[string]registry.ArtifactInstallScriptExtractor) *Nod
 
 func (n *Node) GetDependencies() []any {
 	return []any{
-		executiondag.DependsOn[*package_detector.Node](),
+		executiondag.DependsOn[*package_detector_published.Node](),
 		executiondag.DependsOn[*artifact_fetch.Node](),
 	}
 }
@@ -55,7 +55,7 @@ func (n *Node) AllowAutoSkip() bool {
 
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	if input.HasSourceKey() {
-		detectorOut, ok := executiondag.TryGetOutput[*package_detector.Node](ctx)
+		detectorOut, ok := executiondag.TryGetOutput[*package_detector_published.Node](ctx)
 		if ok && detectorOut.(executiondag.StatusProvider).GetStatus() == executiondag.StatusSuccess {
 			return n.checkFromSource(ctx, input)
 		}
@@ -135,7 +135,7 @@ func (n *Node) checkFromArtifacts(ctx context.Context, artifactOut *artifact_fet
 func (n *Node) checkFromSource(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
-	detectorOut := executiondag.GetOutput[*package_detector.Node](ctx).(*package_detector.Output)
+	detectorOut := executiondag.GetOutput[*package_detector_published.Node](ctx).(*package_detector_published.Output)
 	manifests := detectorOut.DetectedManifests
 
 	if len(manifests) == 0 {
@@ -162,9 +162,12 @@ func (n *Node) checkFromSource(ctx context.Context, input dag_impl.Input) (*chec
 		log.Debug("PACKAGE_INSTALL_SCRIPTS check: violation",
 			zap.Int("count", len(evidence)))
 
-		if len(evidence) > checks.MaxEvidenceItems {
-			evidence = evidence[:checks.MaxEvidenceItems]
+		// Reserve the last evidence slot for the source-ref disclosure. This is the
+		// source-tree path (gitHead/HEAD); the artifact path never adds it.
+		if len(evidence) > checks.MaxEvidenceItems-1 {
+			evidence = evidence[:checks.MaxEvidenceItems-1]
 		}
+		evidence = append(evidence, checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)))
 
 		return checks.NewViolationOutput(n.Code, rationale, evidence, input), nil
 	}

@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	prettyconsole "github.com/thessem/zap-prettyconsole"
@@ -11,42 +12,41 @@ import (
 )
 
 func NewLogger(level string) (*zap.Logger, error) {
-	var zapLevel zapcore.Level
-	switch strings.ToLower(level) {
-	case "debug":
-		zapLevel = zapcore.DebugLevel
-	case "info":
-		zapLevel = zapcore.InfoLevel
-	case "warn", "warning":
-		zapLevel = zapcore.WarnLevel
-	case "error":
-		zapLevel = zapcore.ErrorLevel
-	default:
-		return nil, fmt.Errorf("invalid log level: %s (must be debug, info, warn, or error)", level)
-	}
-
-	config := prettyconsole.NewConfig()
-	config.Level = zap.NewAtomicLevelAt(zapLevel)
-	config.DisableCaller = true
-	config.DisableStacktrace = true
-	config.OutputPaths = []string{"stderr"}
-	config.ErrorOutputPaths = []string{"stderr"}
-
-	logger, err := config.Build()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build logger: %w", err)
-	}
-
-	return logger, nil
+	return NewLoggerWithWriter(level, zapcore.Lock(zapcore.AddSync(os.Stderr)))
 }
 
-func NewLoggerWithFile(level, filepath string) (*zap.Logger, error) {
+// NewLoggerWithWriter builds the console logger against a caller-supplied
+// writer (e.g. a progress.Line's LogWriter) instead of raw stderr, so log
+// output can be coordinated with a live status line. The writer is expected to
+// be concurrency-safe.
+func NewLoggerWithWriter(level string, console zapcore.WriteSyncer) (*zap.Logger, error) {
 	consoleLevel, err := parseLevel(level)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := os.Create(filepath) //nolint:gosec // user-provided logfile path from CLI
+	encoder := prettyconsole.NewEncoder(prettyconsole.NewEncoderConfig())
+	core := zapcore.NewCore(encoder, console, consoleLevel)
+	return zap.New(core), nil
+}
+
+func NewLoggerWithFile(level, logPath string) (*zap.Logger, error) {
+	return NewLoggerWithFileAndWriter(level, logPath, zapcore.Lock(zapcore.AddSync(os.Stderr)))
+}
+
+// NewLoggerWithFileAndWriter tees the console core (against the supplied writer)
+// with a JSON file core, so a live status line and a debug logfile can coexist.
+func NewLoggerWithFileAndWriter(level, logPath string, console zapcore.WriteSyncer) (*zap.Logger, error) {
+	consoleLevel, err := parseLevel(level)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	file, err := os.Create(logPath) //nolint:gosec // user-provided logfile path from CLI
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
@@ -55,7 +55,7 @@ func NewLoggerWithFile(level, filepath string) (*zap.Logger, error) {
 	consoleEncoder := prettyconsole.NewEncoder(consoleConfig)
 	consoleCore := zapcore.NewCore(
 		consoleEncoder,
-		zapcore.AddSync(os.Stderr),
+		console,
 		consoleLevel,
 	)
 

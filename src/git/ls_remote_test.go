@@ -5,9 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestGetRemoteHeadSHA_NotFound_ReturnsCloneError(t *testing.T) {
@@ -15,6 +17,7 @@ func TestGetRemoteHeadSHA_NotFound_ReturnsCloneError(t *testing.T) {
 	cfg := &environment.Config{SecureGit: true}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 
 	_, err := GetRemoteHeadSHA(ctx, "https://github.com/nonexistent-owner-abc123/nonexistent-repo-xyz789")
 	require.Error(t, err)
@@ -37,6 +40,7 @@ func TestGetRemoteRefSHA_Tag(t *testing.T) {
 	cfg := &environment.Config{SecureGit: true}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 
 	sha, err := GetRemoteRefSHA(ctx, "https://github.com/expressjs/express", "v4.22.1")
 	require.NoError(t, err)
@@ -48,6 +52,7 @@ func TestGetRemoteRefSHA_NotFound(t *testing.T) {
 	cfg := &environment.Config{SecureGit: true}
 	ctx = environment.SetConfig(ctx, cfg)
 	ctx = environment.SetSharedConfig(ctx, cfg)
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 
 	_, err := GetRemoteRefSHA(ctx, "https://github.com/expressjs/express", "v999.999.999-nonexistent")
 	require.Error(t, err)

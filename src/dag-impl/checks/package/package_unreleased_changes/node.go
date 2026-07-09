@@ -34,6 +34,7 @@ func NewNode() *Node {
 				"Bot commits are excluded.",
 				fmt.Sprintf("Default threshold is %d days.", oneYearInDays),
 				"Uses the release date of the registry-designated latest version.",
+				"For monorepo-hosted packages, skew is measured against the newest commit anywhere in the repository, not just the package's subdirectory, and may be overstated.",
 			},
 			Categories: map[category.RiskCategory]string{
 				category.RiskCategorySecurityVulnerability: "Source improvements including security fixes are not being published to the package registry.",
@@ -68,10 +69,11 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	}
 
 	if gitMeta.LatestHumanCommit == nil {
-		return nil, fmt.Errorf("latest human commit is nil despite git_clone_metadata success")
+		return checks.NewSkippedOutput(n.Code, "No human commit history available", input), nil
 	}
 
 	var violations []string
+	var caveats []string
 	var compliantPackages []string
 	hasViolation := false
 
@@ -113,7 +115,15 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			versionSuffix = "@" + latestVersion
 		}
 
-		skew := gitMeta.LatestHumanCommit.Sub(*releaseDate)
+		// Whole-repo latest commit. The metadata clone is treeless, so a
+		// path-scoped "latest commit in the package's subdirectory" cannot be
+		// derived cheaply; for a monorepo-hosted package this comparison uses the
+		// newest commit anywhere in the repo and the caveat is recorded separately.
+		latestCommit := gitMeta.LatestHumanCommit
+
+		isMonorepo := pkgMeta.SourceDirectory != nil && *pkgMeta.SourceDirectory != ""
+
+		skew := latestCommit.Sub(*releaseDate)
 		daysAhead := int(skew.Hours() / 24)
 
 		if daysAhead > skewDays {
@@ -122,10 +132,22 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 				"%s/%s%s: Source is %d days ahead of last release (committed %s, released %s)",
 				pkg.Ecosystem, pkg.Name, versionSuffix,
 				daysAhead,
-				gitMeta.LatestHumanCommit.Format("2006-01-02"),
+				latestCommit.Format("2006-01-02"),
 				releaseDate.Format("2006-01-02"),
 			)
 			violations = append(violations, item)
+
+			// A monorepo-hosted package is measured against the newest commit
+			// anywhere in the repo, not its subdirectory, so the skew above may be
+			// overstated. Record that caveat as its own package-tagged evidence
+			// line, held apart from violations so it never inflates the count of
+			// violating packages that drives the rationale.
+			if isMonorepo {
+				caveats = append(caveats, fmt.Sprintf(
+					"%s/%s%s: monorepo package under %s; skew measured against whole repository and may be overstated",
+					pkg.Ecosystem, pkg.Name, versionSuffix, *pkgMeta.SourceDirectory,
+				))
+			}
 
 			log.Debug("PACKAGE_UNRELEASED_CHANGES check: violation",
 				zap.String("ecosystem", pkg.Ecosystem),
@@ -147,7 +169,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 
 	if hasViolation {
 		rationale := checks.BuildViolationRationale(violations, "", "")
-		evidence := checks.TruncateEvidence(violations)
+		evidence := append(checks.TruncateEvidence(violations), caveats...)
 		return checks.NewViolationOutput(n.Code, rationale, evidence, input).WithThresholds(n.Thresholds), nil
 	}
 

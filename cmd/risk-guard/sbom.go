@@ -158,12 +158,14 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 
 	rootKey := sourceKey(repoPath)
 
+	fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("scanning for manifests…"))
 	manifests, err := package_detection.DetectPackages(repoPath, def.All())
 	if err != nil {
 		return nil, nil, fmt.Errorf("detecting packages: %w", err)
 	}
 	manifests = filterIgnoredManifests(ctx, repoPath, manifests)
 	logger.Info("detected manifests", zap.Int("count", len(manifests)))
+	fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("found %d manifest(s)", len(manifests)))
 
 	edges, reports := collectEdges(rootKey, manifests, repoPath)
 	printManifestReports(logger, reports)

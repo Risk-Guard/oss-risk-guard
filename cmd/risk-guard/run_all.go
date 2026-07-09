@@ -7,6 +7,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
+	"github.com/Risk-Guard/oss-risk-guard/src/progress"
 
 	"github.com/fatih/color"
 	"github.com/owenrumney/go-sarif/v2/sarif"
@@ -75,7 +76,18 @@ func runAll(cmd *cobra.Command, args []string) error {
 
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "Scoring local source: %s\n", repoPath)
-	localViolations, sourceInput, err := scoreLocalSource(ctx, repoPath, overridesHash)
+	disp := progress.FromContext(ctx)
+
+	// A ticking row so the early work (git resolve, package detection, checks)
+	// isn't silent; the source DAG's registry prefetch adds its own per-package
+	// rows underneath while this one runs. The SBOM phase is NOT wrapped in a
+	// row on purpose — it prints manifest reports and counts straight to stderr,
+	// and a live row would erase them on repaint.
+	srcTask := disp.StartPhase("scoring local source")
+	// Scope the task to this call so the DAG executor can reflect its current
+	// node onto the row, without leaking the (finished) task into later phases.
+	localViolations, sourceInput, err := scoreLocalSource(progress.WithTask(ctx, srcTask), repoPath, overridesHash)
+	srcTask.Done()
 	if err != nil {
 		return fmt.Errorf("scoring local source: %w", err)
 	}

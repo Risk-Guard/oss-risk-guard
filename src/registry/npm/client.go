@@ -65,6 +65,11 @@ type NPMVersionDetails struct {
 	Dist         *NPMDist          `json:"dist,omitempty"`
 	NpmUser      *NPMUser          `json:"_npmUser,omitempty"`
 	Repository   any               `json:"repository"` // string or {type,url}; this version's own manifest value
+	// GitHead is the source commit SHA this version was published from, recorded
+	// by npm at publish time from the publisher's git working tree. Often absent
+	// (publisher not in a git repo) and never validated against the repository,
+	// so treat it as a provenance hint, not a guarantee.
+	GitHead string `json:"gitHead,omitempty"`
 }
 
 // FetchPackage fetches package data from NPM registry with caching

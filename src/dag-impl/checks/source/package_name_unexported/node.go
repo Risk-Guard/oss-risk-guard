@@ -8,7 +8,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
@@ -36,15 +36,24 @@ func NewNode() *Node {
 
 func (n *Node) GetDependencies() []any {
 	return []any{
-		executiondag.DependsOn[*package_detector.Node](),
+		executiondag.DependsOn[*package_detector_published.Node](),
 	}
 }
 
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
-	detectorOut := executiondag.GetOutput[*package_detector.Node](ctx).(*package_detector.Output)
+	detectorOut := executiondag.GetOutput[*package_detector_published.Node](ctx).(*package_detector_published.Output)
 	manifests := detectorOut.DetectedManifests
+
+	if len(manifests) == 0 {
+		log.Debug("SOURCE_PACKAGE_NAME_UNEXPORTED check: skipped - no package definitions found")
+		return checks.NewSkippedOutput(
+			n.Code,
+			"No package definitions found in source code",
+			input,
+		), nil
+	}
 
 	var exported []string
 	for _, m := range manifests {
@@ -56,10 +65,14 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 
 	if len(exported) == 0 {
 		log.Debug("SOURCE_PACKAGE_NAME_UNEXPORTED check: violation")
+		evidence := []string{
+			fmt.Sprintf("Found %d manifest(s) but none declare a package name", len(manifests)),
+			checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)),
+		}
 		return checks.NewViolationOutput(
 			n.Code,
 			"No package names exported in source code manifests",
-			[]string{fmt.Sprintf("Found %d manifest(s) but none declare a package name", len(manifests))},
+			evidence,
 			input,
 		), nil
 	}

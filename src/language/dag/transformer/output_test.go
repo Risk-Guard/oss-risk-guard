@@ -10,6 +10,54 @@ import (
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
+func TestGetSingleSourceDirectory(t *testing.T) {
+	dir := func(s string) *models.PackageMetadata { return &models.PackageMetadata{SourceDirectory: &s} }
+
+	tests := []struct {
+		name    string
+		outputs []PackageOutput
+		want    string // "" means expect nil
+	}{
+		{
+			name:    "single package with directory",
+			outputs: []PackageOutput{{Metadata: dir("types/canvas-confetti")}},
+			want:    "types/canvas-confetti",
+		},
+		{
+			name:    "no directory yields nil",
+			outputs: []PackageOutput{{Metadata: &models.PackageMetadata{}}},
+			want:    "",
+		},
+		{
+			name:    "matching directories collapse to one",
+			outputs: []PackageOutput{{Metadata: dir("types/foo")}, {Metadata: dir("types/foo")}},
+			want:    "types/foo",
+		},
+		{
+			// Sibling packages in one monorepo have different subpaths, so a single
+			// clone can't be scoped to all of them — fall back to whole-repo (nil).
+			name:    "conflicting directories yield nil",
+			outputs: []PackageOutput{{Metadata: dir("types/foo")}, {Metadata: dir("types/bar")}},
+			want:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getSingleSourceDirectory(tt.outputs)
+			if tt.want == "" {
+				if got != nil {
+					t.Fatalf("expected nil directory, got %q", *got)
+				}
+				return
+			}
+			if got == nil || *got != tt.want {
+				t.Fatalf("getSingleSourceDirectory = %v, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func newTestOutput(sourceURL string) *Output {
 	url := sourceURL
 	nextInput := &dag_impl.Input{SourceURL: nil}

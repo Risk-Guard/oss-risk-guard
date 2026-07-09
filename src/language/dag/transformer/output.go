@@ -58,6 +58,27 @@ func getSingleSourceURL(outputs []PackageOutput) (*string, error) {
 	return sourceURL, nil
 }
 
+// getSingleSourceDirectory returns the repository subpath shared by the analyzed
+// packages, to scope git-history analysis for monorepo-hosted packages. It
+// mirrors getSingleSourceURL: with a single package it returns that package's
+// directory; if packages disagree (e.g. sibling packages in the same monorepo)
+// the subpath is ambiguous, so it returns nil and analysis falls back to the
+// whole repository. Callers pair this with a resolved single source URL.
+func getSingleSourceDirectory(outputs []PackageOutput) *string {
+	var directory *string
+	for _, output := range outputs {
+		if output.Metadata == nil || output.Metadata.SourceDirectory == nil || *output.Metadata.SourceDirectory == "" {
+			continue
+		}
+		if directory == nil {
+			directory = output.Metadata.SourceDirectory
+		} else if *directory != *output.Metadata.SourceDirectory {
+			return nil
+		}
+	}
+	return directory
+}
+
 func NewOutput(status executiondag.Status, statusReason string, outputs []PackageOutput, input dag_impl.Input, nextInput *dag_impl.Input) *Output {
 	baseOutput := dag_impl.NewBaseOutput(status, statusReason, input)
 	baseOutput.Output = nextInput

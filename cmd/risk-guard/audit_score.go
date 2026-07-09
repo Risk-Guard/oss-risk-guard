@@ -3,13 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/progress"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
@@ -52,12 +52,19 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	var totals auditTotals
 	var done int
 
+	disp := progress.FromContext(ctx)
+
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(jobs)
 
 	for _, key := range keys {
 		g.Go(func() error {
-			analysis, cachedAge, scoreErr := scoreOneCached(gctx, key, overridesHash, checkMetadata, cc)
+			// Register the row in the DAG's context so the executor reflects
+			// each running node onto it (fetcher, git_clone_metadata, …), same
+			// as the source-phase row — instead of a frozen static label.
+			task := disp.StartPhase(key)
+			analysis, cachedAge, scoreErr := scoreOneCached(progress.WithTask(gctx, task), key, overridesHash, checkMetadata, cc)
+			task.Done()
 
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
@@ -75,7 +82,7 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 			if cachedAge >= 0 {
 				totals.cached++
 			}
-			printProgress(done, len(keys), key, fcount, scoreErr, cachedAge, locByKey[key])
+			printProgress(disp, done, len(keys), key, fcount, scoreErr, cachedAge, locByKey[key])
 			mu.Unlock()
 			return nil
 		})
@@ -103,7 +110,10 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	return analyses, failures, totals, nil
 }
 
-func printProgress(done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
+// printProgress writes one completed-audit line through the live Display so it
+// scrolls cleanly above the in-flight "auditing" rows; when progress is
+// disabled the Display passes it straight through to stderr.
+func printProgress(disp *progress.Display, done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
 	prefix := color.HiBlackString("[%d/%d]", done, total)
 	var prov string
 	if p := manifestProvenance(loc); p != "" {
@@ -113,15 +123,16 @@ func printProgress(done, total int, key string, findingCount int, scoreErr error
 	if cachedAge >= 0 {
 		suffix = "  " + color.HiBlackString("(cached, %s ago)", roundDuration(cachedAge))
 	}
+	var status string
 	switch {
 	case scoreErr != nil:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.RedString("FAILED"), prov, suffix)
+		status = color.RedString("FAILED")
 	case findingCount > 0:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key,
-			color.YellowString("%d findings", findingCount), prov, suffix)
+		status = color.YellowString("%d findings", findingCount)
 	default:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.GreenString("ok"), prov, suffix)
+		status = color.GreenString("ok")
 	}
+	disp.Print(fmt.Sprintf("%s %s  %s%s%s\n", prefix, key, status, prov, suffix))
 }
 
 // manifestProvenance renders the manifest file (and line) a dependency was

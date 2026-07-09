@@ -88,3 +88,70 @@ func TestExtractPackageMetadata_RepositoryPrecedence(t *testing.T) {
 		})
 	}
 }
+
+// TestExtractPackageMetadata_SourceDirectory verifies that npm's
+// repository.directory subpath is captured into SourceDirectory. This is the
+// monorepo case (e.g. @types/canvas-confetti lives in DefinitelyTyped under
+// types/canvas-confetti) that lets git-history analysis scope to the package.
+func TestExtractPackageMetadata_SourceDirectory(t *testing.T) {
+	ctx := ctxutil.SetLogger(context.Background(), zap.NewNop())
+	j := &JavaScript{}
+
+	tests := []struct {
+		name    string
+		repo    any
+		wantDir string // "" means expect nil SourceDirectory
+	}{
+		{
+			name:    "object with directory",
+			repo:    map[string]any{"type": "git", "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git", "directory": "types/canvas-confetti"},
+			wantDir: "types/canvas-confetti",
+		},
+		{
+			name:    "directory with surrounding slashes is trimmed",
+			repo:    map[string]any{"type": "git", "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git", "directory": "/types/canvas-confetti/"},
+			wantDir: "types/canvas-confetti",
+		},
+		{
+			name:    "object without directory yields nil",
+			repo:    map[string]any{"type": "git", "url": "https://github.com/user/repo.git"},
+			wantDir: "",
+		},
+		{
+			name:    "string repository has no directory",
+			repo:    "https://github.com/user/repo.git",
+			wantDir: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := &npmregistry.NPMPackageData{
+				Name:     "@types/canvas-confetti",
+				DistTags: map[string]string{"latest": "1.9.0"},
+				Versions: map[string]npmregistry.NPMVersionDetails{
+					"1.9.0": {Repository: tt.repo},
+				},
+			}
+			pkg := models.PackageInfo{Name: "@types/canvas-confetti", Version: "1.9.0"}
+
+			meta, _, _, err := j.ExtractPackageMetadata(ctx, pkg, data)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if tt.wantDir == "" {
+				if meta.SourceDirectory != nil {
+					t.Fatalf("expected nil SourceDirectory, got %q", *meta.SourceDirectory)
+				}
+				return
+			}
+			if meta.SourceDirectory == nil {
+				t.Fatalf("expected SourceDirectory %q, got nil", tt.wantDir)
+			}
+			if *meta.SourceDirectory != tt.wantDir {
+				t.Errorf("SourceDirectory = %q, want %q", *meta.SourceDirectory, tt.wantDir)
+			}
+		})
+	}
+}

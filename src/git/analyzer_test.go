@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+
+	"go.uber.org/zap"
 )
 
 // An init'd repo with no commits is a valid state (`git init` then nothing
@@ -26,6 +29,7 @@ func TestAnalyzeRepository_EmptyRepoNoCommits(t *testing.T) {
 
 	cfg := &environment.Config{}
 	ctx := environment.SetSharedConfig(context.Background(), cfg)
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 
 	meta, err := AnalyzeRepository(ctx, dir)
 	if err != nil {

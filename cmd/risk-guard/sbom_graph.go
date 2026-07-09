@@ -51,7 +51,7 @@ func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot 
 	var edges []models.DepsTreeEdge
 	reports := make([]manifestReport, 0, len(manifests))
 
-	for _, m := range manifests {
+	for i, m := range manifests {
 		rep := manifestReport{
 			Ecosystem:      m.Ecosystem,
 			PackageManager: m.PackageManager,
@@ -59,6 +59,7 @@ func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot 
 			Lockfile:       m.Lockfile,
 		}
 
+		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("parsing %s (%d/%d)", strings.Join(m.Paths, ", "), i+1, len(manifests)))
 		result, err := ecosystem.ParseManifest(m, repoRoot)
 		if err != nil {
 			rep.Err = err

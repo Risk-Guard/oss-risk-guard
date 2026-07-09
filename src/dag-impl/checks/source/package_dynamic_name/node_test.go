@@ -1,12 +1,15 @@
 package package_dynamic_name
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -16,6 +19,61 @@ import (
 
 func strPtr(s string) *string { return &s }
 
+func makeTestCtxRef(t *testing.T, manifests []models.ManifestResult, sourceRef, sourceCommit string) context.Context {
+	t.Helper()
+	log, err := logger.NewLogger("error")
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+	ctx := ctxutil.SetLogger(context.Background(), log)
+	detectorOut := &package_detector_published.Output{
+		BaseOutput:        dag_impl.NewBaseOutput(executiondag.StatusSuccess, "test", dag_impl.Input{}),
+		DetectedManifests: manifests,
+		SourceRef:         sourceRef,
+		SourceCommit:      sourceCommit,
+	}
+	return context.WithValue(ctx, executiondag.DependsOn[*package_detector_published.Node](), detectorOut)
+}
+
+func evidenceContains(evidence []string, substr string) bool {
+	for _, e := range evidence {
+		if strings.Contains(e, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestExecute_Violation_DisclosesSourceRef(t *testing.T) {
+	manifests := []models.ManifestResult{{
+		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
+		IsDynamic:        true,
+		DynamicReason:    strPtr("name computed from process.env"),
+	}}
+	input := dag_impl.Input{Packages: []models.PackageInfo{{Ecosystem: "npm", Name: "some-pkg", Version: "2.1.0"}}}
+
+	ctxHead := makeTestCtxRef(t, manifests, package_detector_published.SourceRefHead, "")
+	outHead, err := NewNode().Execute(ctxHead, input)
+	if err != nil {
+		t.Fatalf("Execute (HEAD) returned error: %v", err)
+	}
+	if outHead.Check.CheckStatus != storage.StatusViolation {
+		t.Fatalf("expected violation, got %s", outHead.Check.CheckStatus)
+	}
+	if !evidenceContains(outHead.Check.Evidence, "Scanned repository HEAD — no gitHead recorded for npm/some-pkg@2.1.0") {
+		t.Errorf("HEAD evidence %q missing provenance disclosure", outHead.Check.Evidence)
+	}
+
+	ctxGH := makeTestCtxRef(t, manifests, package_detector_published.SourceRefGitHead, "deadbeef1234567890abcdef1234567890abcdef")
+	outGH, err := NewNode().Execute(ctxGH, input)
+	if err != nil {
+		t.Fatalf("Execute (gitHead) returned error: %v", err)
+	}
+	if !evidenceContains(outGH.Check.Evidence, "Scanned source as published (gitHead deadbee)") {
+		t.Errorf("gitHead evidence %q missing provenance disclosure", outGH.Check.Evidence)
+	}
+}
+
 func TestNode_GetDependencies(t *testing.T) {
 	node := NewNode()
 	deps := node.GetDependencies()
@@ -24,9 +82,9 @@ func TestNode_GetDependencies(t *testing.T) {
 		t.Fatalf("Expected 1 dependency, got %d", len(deps))
 	}
 
-	expectedDep := executiondag.DependsOn[*package_detector.Node]()
+	expectedDep := executiondag.DependsOn[*package_detector_published.Node]()
 	if deps[0] != expectedDep {
-		t.Error("Node should depend on *package_detector.Node")
+		t.Error("Node should depend on *package_detector_published.Node")
 	}
 }
 

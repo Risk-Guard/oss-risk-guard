@@ -7,7 +7,7 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
@@ -35,9 +35,9 @@ func TestNode_GetDependencies(t *testing.T) {
 		t.Error("First dependency should be *git_clone_metadata.Node")
 	}
 
-	expectedDetectorDep := executiondag.DependsOn[*package_detector.Node]()
+	expectedDetectorDep := executiondag.DependsOn[*package_detector_published.Node]()
 	if deps[1] != expectedDetectorDep {
-		t.Error("Second dependency should be *package_detector.Node")
+		t.Error("Second dependency should be *package_detector_published.Node")
 	}
 
 	expectedTransformerDep := executiondag.DependsOn[*transformer.Node]()
@@ -375,6 +375,11 @@ func TestRationaleMessages(t *testing.T) {
 
 func makeTestCtx(t *testing.T, gitMeta *models.GitMetadata, manifests []models.ManifestResult) context.Context {
 	t.Helper()
+	return makeTestCtxRef(t, gitMeta, manifests, package_detector_published.SourceRefHead, "")
+}
+
+func makeTestCtxRef(t *testing.T, gitMeta *models.GitMetadata, manifests []models.ManifestResult, sourceRef, sourceCommit string) context.Context {
+	t.Helper()
 	log, err := logger.NewLogger("error")
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -387,11 +392,13 @@ func makeTestCtx(t *testing.T, gitMeta *models.GitMetadata, manifests []models.M
 	}
 	ctx = context.WithValue(ctx, executiondag.DependsOn[*git_clone_metadata.Node](), metaOut)
 
-	detectorOut := &package_detector.Output{
+	detectorOut := &package_detector_published.Output{
 		BaseOutput:        dag_impl.NewBaseOutput(executiondag.StatusSuccess, "test", dag_impl.Input{}),
 		DetectedManifests: manifests,
+		SourceRef:         sourceRef,
+		SourceCommit:      sourceCommit,
 	}
-	ctx = context.WithValue(ctx, executiondag.DependsOn[*package_detector.Node](), detectorOut)
+	ctx = context.WithValue(ctx, executiondag.DependsOn[*package_detector_published.Node](), detectorOut)
 
 	transformerOut := &transformer.Output{}
 	ctx = context.WithValue(ctx, executiondag.DependsOn[*transformer.Node](), transformerOut)
@@ -455,4 +462,91 @@ func TestExecute_NoMatchingEcosystem_ShouldSkip(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func evidenceContains(evidence []string, substr string) bool {
+	for _, e := range evidence {
+		if strings.Contains(e, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestExecute_SourceRefDisclosure covers the 4-state grid: {mismatch, match} x
+// {gitHead used, HEAD fallback}. Each cell must disclose which source ref the
+// comparison was made against.
+func TestExecute_SourceRefDisclosure(t *testing.T) {
+	const gitHeadSHA = "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+	gitMeta := &models.GitMetadata{SourceURL: "https://github.com/clauderic/dnd-kit"}
+
+	analyzed := models.PackageInfo{Ecosystem: "npm", Name: "@dnd-kit/core", Version: "6.3.1"}
+	input := dag_impl.Input{Packages: []models.PackageInfo{analyzed}}
+
+	mismatchManifests := []models.ManifestResult{{
+		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
+		Name:             strPtr("dnd-kit-experimental"),
+	}}
+	matchManifests := []models.ManifestResult{{
+		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/core/package.json"}},
+		Name:             strPtr("@dnd-kit/core"),
+	}}
+
+	tests := []struct {
+		name         string
+		manifests    []models.ManifestResult
+		sourceRef    string
+		sourceCommit string
+		wantStatus   storage.CheckStatus
+		wantEvidence string
+	}{
+		{
+			name:         "mismatch with gitHead",
+			manifests:    mismatchManifests,
+			sourceRef:    package_detector_published.SourceRefGitHead,
+			sourceCommit: gitHeadSHA,
+			wantStatus:   storage.StatusViolation,
+			wantEvidence: "Scanned source as published (gitHead a1b2c3d) — name is absent from the exact published commit",
+		},
+		{
+			name:         "mismatch with HEAD fallback",
+			manifests:    mismatchManifests,
+			sourceRef:    package_detector_published.SourceRefHead,
+			wantStatus:   storage.StatusViolation,
+			wantEvidence: "Scanned repository HEAD — no gitHead recorded for npm/@dnd-kit/core@6.3.1, so source may differ from the published artifact",
+		},
+		{
+			name:         "match with gitHead",
+			manifests:    matchManifests,
+			sourceRef:    package_detector_published.SourceRefGitHead,
+			sourceCommit: gitHeadSHA,
+			wantStatus:   storage.StatusCompliant,
+			wantEvidence: "Matched at source as published (gitHead a1b2c3d)",
+		},
+		{
+			name:         "match with HEAD fallback",
+			manifests:    matchManifests,
+			sourceRef:    package_detector_published.SourceRefHead,
+			wantStatus:   storage.StatusCompliant,
+			wantEvidence: "Matched against repository HEAD — no gitHead recorded; not verified against the exact published commit",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := makeTestCtxRef(t, gitMeta, tt.manifests, tt.sourceRef, tt.sourceCommit)
+			node := NewNode(languageregistry.Languages())
+
+			output, err := node.Execute(ctx, input)
+			if err != nil {
+				t.Fatalf("Execute returned error: %v", err)
+			}
+			if output.Check.CheckStatus != tt.wantStatus {
+				t.Fatalf("status = %s, want %s (rationale: %s)", output.Check.CheckStatus, tt.wantStatus, output.Check.Rationale)
+			}
+			if !evidenceContains(output.Check.Evidence, tt.wantEvidence) {
+				t.Errorf("evidence %q\n  does not contain %q", output.Check.Evidence, tt.wantEvidence)
+			}
+		})
+	}
 }

@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -48,11 +51,34 @@ func isolatedGitEnv() []string {
 // or passphrase prompt: an inaccessible repo fails fast (and is recorded as
 // skipped) instead of hanging the whole run.
 func applyGitEnv(ctx context.Context, cmd *exec.Cmd) {
+	logGitCommand(ctx, cmd)
 	if environment.GetSharedConfig(ctx).GetSecureGit() {
 		cmd.Env = isolatedGitEnv()
 		return
 	}
 	cmd.Env = withNonInteractiveGit(cmd.Env)
+}
+
+// logGitCommand records the exact git invocation at debug level, so the run's
+// debug log shows which git commands ran — and which one failed — even when the
+// pretty-console error tree truncates git's own stderr.
+func logGitCommand(ctx context.Context, cmd *exec.Cmd) {
+	ctxutil.GetLogger(ctx).Debug("executing git command", zap.String("command", gitCommandString(cmd)))
+}
+
+// gitCommandString renders a git invocation for logs and error messages, with
+// any credentials embedded in a clone URL stripped first so tokens never leak
+// into output.
+func gitCommandString(cmd *exec.Cmd) string {
+	safe := make([]string, len(cmd.Args))
+	for i, arg := range cmd.Args {
+		if strings.Contains(arg, "://") && strings.Contains(arg, "@") {
+			safe[i] = stripURLCredentials(arg)
+		} else {
+			safe[i] = arg
+		}
+	}
+	return strings.Join(safe, " ")
 }
 
 // withNonInteractiveGit returns env with interactive git/ssh credential prompts
@@ -181,7 +207,7 @@ func embedTokenInURL(sourceURL, token string) (string, error) {
 }
 
 func configureSparseCheckoutNative(ctx context.Context, destDir string, patterns []string) error {
-	initCmd := exec.Command("git", "-C", destDir, "sparse-checkout", "init", "--no-cone") //nolint:gosec // Args are hardcoded git subcommands
+	initCmd := exec.CommandContext(ctx, "git", "-C", destDir, "sparse-checkout", "init", "--no-cone") //nolint:gosec // Args are hardcoded git subcommands
 	applyGitEnv(ctx, initCmd)
 	applyGitCeiling(initCmd, destDir)
 	if output, err := initCmd.CombinedOutput(); err != nil {
