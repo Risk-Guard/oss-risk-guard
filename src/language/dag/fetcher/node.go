@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"github.com/Risk-Guard/oss-risk-guard/src/progress"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/registry"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -22,6 +21,16 @@ import (
 // fetchConcurrency bounds how many packages are fetched from registries at once
 // during the bulk prefetch. Modest so npm/PyPI don't rate-limit the burst.
 const fetchConcurrency = 10
+
+// fetchStatus reports a package fetch as observed. A non-200 response is a
+// skipped package, not a failure, and is not distinguished here: the fetch
+// itself succeeded.
+func fetchStatus(err error) observe.Status {
+	if err != nil {
+		return observe.StatusError
+	}
+	return observe.StatusOK
+}
 
 type Node struct {
 	Description string                         `json:"description,omitempty"`
@@ -61,63 +70,55 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 	total := len(packages)
 	log.Debug("fetching registry data for packages", zap.Int("count", total))
 
-	// Show live per-package rows only for the bulk prefetch. A per-package
-	// audit DAG fetches exactly one package and already shows its own audit
-	// row, so there we stay sequential and quiet.
-	showProgress := total > 1
-	disp := progress.FromContext(ctx)
-	if showProgress {
-		disp.Print(fmt.Sprintf("Fetching metadata for %d packages…\n", total))
-	}
-
-	limit := fetchConcurrency
-	if !showProgress {
-		limit = 1
-	}
-
 	var (
 		mu           sync.Mutex
 		outputs      []RegistryOutput
 		lastError    error
 		successCount int
 		skipCount    int
-		done         int
-		pos          atomic.Int64
 	)
 
+	// Announce the prefetch as a batch. Whether a batch of this size is worth
+	// showing, and what a finished package looks like on screen, is the
+	// observer's business — a per-package audit DAG fetches exactly one package
+	// and the CLI stays quiet for it.
+	ctx, batch := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind:  observe.KindBatch,
+		Name:  "registry metadata",
+		Total: total,
+	})
+	// lastError is settled by the time this runs: every writer holds mu and has
+	// been joined by g.Wait().
+	defer func() { batch.End(fetchStatus(lastError), lastError) }()
+
 	g := new(errgroup.Group)
-	g.SetLimit(limit)
+	g.SetLimit(fetchConcurrency)
 	for _, pkg := range packages {
 		g.Go(func() error {
-			// Each row is one package: "[idx/total] eco/name  M:SS  (node)".
-			var task *progress.Task
-			if showProgress {
-				idx := pos.Add(1)
-				task = disp.Start(fmt.Sprintf("[%d/%d] %s/%s", idx, total, pkg.Ecosystem, pkg.Name), "fetching registry metadata")
-			}
+			_, span := observe.From(ctx).Begin(ctx, observe.Event{
+				Kind: observe.KindPackage,
+				Name: pkg.Ecosystem + "/" + pkg.Name,
+			})
+			var (
+				response *language.RegistryResponse
+				fetchErr error
+			)
+			defer func() { span.End(fetchStatus(fetchErr), fetchErr) }()
+
 			log.Debug("fetching package",
 				zap.String("ecosystem", pkg.Ecosystem),
 				zap.String("name", pkg.Name))
 
-			response, err := registry.MustGetFetcher(n.fetchers, pkg.Ecosystem).FetchPackageFromRegistry(ctx, pkg)
-			if task != nil {
-				task.Done()
-			}
+			response, fetchErr = registry.MustGetFetcher(n.fetchers, pkg.Ecosystem).FetchPackageFromRegistry(ctx, pkg)
 
 			mu.Lock()
-			done++
-			n := done
-			if err != nil {
-				lastError = err
-				mu.Unlock()
+			defer mu.Unlock()
+			if fetchErr != nil {
+				lastError = fetchErr
 				log.Error("failed to fetch package",
 					zap.String("ecosystem", pkg.Ecosystem),
 					zap.String("name", pkg.Name),
-					zap.Error(err))
-				// Lock the failure in above the live rows so it stays visible.
-				if showProgress {
-					disp.Print(fmt.Sprintf("✗ %s/%s  (%d/%d)\n", pkg.Ecosystem, pkg.Name, n, total))
-				}
+					zap.Error(fetchErr))
 				return nil
 			}
 			outputs = append(outputs, RegistryOutput{
@@ -129,10 +130,6 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 				successCount++
 			} else {
 				skipCount++
-			}
-			mu.Unlock()
-			if showProgress {
-				disp.Print(fmt.Sprintf("✓ %s/%s  (%d/%d)\n", pkg.Ecosystem, pkg.Name, n, total))
 			}
 			return nil
 		})

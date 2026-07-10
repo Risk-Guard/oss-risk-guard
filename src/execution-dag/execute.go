@@ -4,42 +4,26 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
-	"github.com/Risk-Guard/oss-risk-guard/src/progress"
 
 	"go.uber.org/zap"
 )
 
-// nodeDisplayNames gives friendly labels for the notable nodes shown in a phase
-// progress row (e.g. "scoring local source (fetching registry metadata)"). Any
-// node not listed falls back to its package name with underscores spaced out.
-var nodeDisplayNames = map[string]string{
-	"fetcher":             "fetching registry metadata",
-	"package_detector":    "detecting packages",
-	"git_resolve":         "resolving repository",
-	"git_clone_content":   "reading source tree",
-	"git_clone_metadata":  "reading git history",
-	"transformer":         "processing registry data",
-	"version_transformer": "resolving versions",
-	"license_files":       "scanning licenses",
-}
-
-// nodeDisplayName turns a reflected node type like "*fetcher.Node" into a
-// human-readable current-activity label.
-func nodeDisplayName(nodeType string) string {
-	pkg := strings.TrimPrefix(nodeType, "*")
-	if i := strings.LastIndex(pkg, "."); i >= 0 {
-		pkg = pkg[:i]
+// spanStatus maps a node's outcome onto the vocabulary an observer understands.
+func spanStatus(out StatusProvider, err error) observe.Status {
+	switch {
+	case err != nil:
+		return observe.StatusError
+	case out != nil && out.GetStatus() == StatusSkipped:
+		return observe.StatusSkipped
+	default:
+		return observe.StatusOK
 	}
-	if name, ok := nodeDisplayNames[pkg]; ok {
-		return name
-	}
-	return strings.ReplaceAll(pkg, "_", " ")
 }
 
 // NoFetchProvider is satisfied by Input types whose --no-fetch flag should be
@@ -107,9 +91,20 @@ func (d *DAG[TInput]) executeNode(
 
 	nodeType := reflect.TypeOf(entry.GetNodeForReflection()).String()
 
-	// Reflect the running node onto the phase row (e.g. "scoring local source
-	// (fetching registry metadata)"). No-op unless a phase task is in ctx.
-	progress.TaskFromContext(ctx).SetNode(nodeDisplayName(nodeType))
+	// Announce the node to whatever is observing this run. Nothing here knows
+	// or cares whether that draws a spinner row; with no reporter installed
+	// (the server, tests, library callers) Begin and End cost nothing.
+	//
+	// ctx is rebound locally, so the sibling goroutines the stage loop hands
+	// the same parent context to each derive their own span without racing.
+	// The deferred End reads the named results, so it reports the true outcome
+	// on every return path — including a panic, which would otherwise strand
+	// the row on screen.
+	ctx, span := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: entry.GetKind(),
+		Type: nodeType,
+	})
+	defer func() { span.End(spanStatus(output, err), err) }()
 
 	var nodeOutput StatusProvider
 	var execErr error

@@ -13,8 +13,8 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
-	"github.com/Risk-Guard/oss-risk-guard/src/progress"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 	"github.com/Risk-Guard/oss-risk-guard/src/version"
 
 	"github.com/fatih/color"
@@ -91,9 +91,9 @@ Examples:
 			logPath = defaultLogPath(resolvedCacheDir)
 		}
 
-		// Live progress goes to stderr, gated on stderr being a terminal so
-		// piped/CI output is unaffected. The logger's console output is routed
-		// through it so log lines and the status rows don't collide.
+		// The UI owns stderr from here on. Live rows are gated on stderr being a
+		// terminal so piped/CI output is unaffected, and the logger's console
+		// output is routed through it so log lines and the rows don't collide.
 		//nolint:gosec // Stderr Fd() is 2; no overflow risk.
 		stderrFd := int(os.Stderr.Fd())
 		interactive := term.IsTerminal(stderrFd)
@@ -103,10 +103,10 @@ Examples:
 				termWidth = w
 			}
 		}
-		prog := progress.New(os.Stderr, interactive, termWidth)
+		display := ui.New(os.Stderr, interactive, termWidth)
 
 		var log *zap.Logger
-		log, err = logger.NewLoggerWithFileAndWriter(logLevel, logPath, prog.LogWriter())
+		log, err = logger.NewLoggerWithFileAndWriter(logLevel, logPath, display.LogWriter())
 		if err != nil {
 			if logfile != "" {
 				// An explicit --logfile that can't be created is a user error.
@@ -114,9 +114,9 @@ Examples:
 			}
 			// The default log location must never block a run (e.g. a read-only
 			// cache dir): warn and fall back to console-only logging.
-			fmt.Fprintln(os.Stderr, color.YellowString("warning: could not open debug log %s: %v", logPath, err))
+			display.Printf("%s\n", color.YellowString("warning: could not open debug log %s: %v", logPath, err))
 			logPath = ""
-			log, err = logger.NewLoggerWithWriter(logLevel, prog.LogWriter())
+			log, err = logger.NewLoggerWithWriter(logLevel, display.LogWriter())
 			if err != nil {
 				return fmt.Errorf("failed to create logger: %w", err)
 			}
@@ -160,7 +160,9 @@ Examples:
 		ctx = runpath.SetCacheDir(ctx, resolvedCacheDir)
 
 		ctx = ctxutil.SetLogger(ctx, log)
-		ctx = progress.NewContext(ctx, prog)
+		// Installs the UI and, with it, the observe.Reporter that turns DAG
+		// spans into rows. Commands that never reach this stay silent.
+		ctx = ui.NewContext(ctx, display)
 
 		tmpDir, err := os.MkdirTemp("", "risk-guard-")
 		if err != nil {
@@ -180,8 +182,8 @@ Examples:
 
 		log := ctxutil.GetLogger(cmd.Context())
 
-		// Clear any lingering live status line before final output.
-		progress.FromContext(cmd.Context()).Stop()
+		// Clear any lingering live status rows before final output.
+		ui.FromContext(cmd.Context()).Stop()
 
 		backend := cache.GetCacheBackend(cmd.Context())
 		if backend != nil {

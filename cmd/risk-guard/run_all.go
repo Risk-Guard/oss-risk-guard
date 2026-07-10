@@ -6,8 +6,9 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
-	"github.com/Risk-Guard/oss-risk-guard/src/progress"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 
 	"github.com/fatih/color"
 	"github.com/owenrumney/go-sarif/v2/sarif"
@@ -74,25 +75,33 @@ func runAll(cmd *cobra.Command, args []string) error {
 		outPath = defaultUnifiedSARIF
 	}
 
-	bold := color.New(color.Bold).FprintfFunc()
-	bold(os.Stderr, "Scoring local source: %s\n", repoPath)
-	disp := progress.FromContext(ctx)
+	bold := color.New(color.Bold).SprintfFunc()
+	disp := ui.FromContext(ctx)
+	disp.Printf("%s", bold("Scoring local source: %s\n", repoPath))
 
 	// A ticking row so the early work (git resolve, package detection, checks)
-	// isn't silent; the source DAG's registry prefetch adds its own per-package
-	// rows underneath while this one runs. The SBOM phase is NOT wrapped in a
-	// row on purpose — it prints manifest reports and counts straight to stderr,
-	// and a live row would erase them on repaint.
-	srcTask := disp.StartPhase("scoring local source")
-	// Scope the task to this call so the DAG executor can reflect its current
-	// node onto the row, without leaking the (finished) task into later phases.
-	localViolations, sourceInput, err := scoreLocalSource(progress.WithTask(ctx, srcTask), repoPath, overridesHash)
-	srcTask.Done()
+	// isn't silent. The DAG executor reports each node it runs under this span,
+	// so the row names the current activity, and the registry prefetch adds its
+	// own per-package rows underneath while this one runs.
+	sctx, srcPhase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: "scoring local source",
+	})
+	localViolations, sourceInput, err := scoreLocalSource(sctx, repoPath, overridesHash)
+	srcPhase.End(phaseStatus(err), err)
 	if err != nil {
 		return fmt.Errorf("scoring local source: %w", err)
 	}
 
-	sbomBytes, err := buildSBOMBytes(ctx, repoPath, runAllSBOMFormat)
+	// The SBOM phase prints its manifest inventory as it goes. That is safe to
+	// do underneath a live row now only because every one of those lines goes
+	// through the UI, which erases the rows before printing and repaints after.
+	bctx, sbomPhase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: "building SBOM",
+	})
+	sbomBytes, err := buildSBOMBytes(bctx, repoPath, runAllSBOMFormat)
+	sbomPhase.End(phaseStatus(err), err)
 	if err != nil {
 		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "building SBOM", err, logger)
 	}
@@ -121,7 +130,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		logger.Warn("audit failed; continuing with partial report", zap.Error(err))
-		fmt.Fprintf(os.Stderr, "  %s\n", color.YellowString("audit failed: %v", err))
+		disp.Printf("  %s\n", color.YellowString("audit failed: %v", err))
 	}
 
 	report, err := assembleReport(ctx, sourceInput.AnalysisIdentifier, localViolations, depViolations, failures, locByKey)

@@ -17,6 +17,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/package_detection"
 	"github.com/Risk-Guard/oss-risk-guard/src/riskguardignore"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -148,8 +149,9 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 	}
 
 	logger := ctxutil.GetLogger(ctx)
-	bold := color.New(color.Bold).FprintfFunc()
-	bold(os.Stderr, "Building SBOM (%s)…\n", format)
+	disp := ui.FromContext(ctx)
+	bold := color.New(color.Bold).SprintfFunc()
+	disp.Printf("%s", bold("Building SBOM (%s)…\n", format))
 
 	repoPath, err := resolveScanPath(path)
 	if err != nil {
@@ -158,21 +160,21 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 
 	rootKey := sourceKey(repoPath)
 
-	fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("scanning for manifests…"))
+	disp.Printf("  %s\n", color.HiBlackString("scanning for manifests…"))
 	manifests, err := package_detection.DetectPackages(repoPath, def.All())
 	if err != nil {
 		return nil, nil, fmt.Errorf("detecting packages: %w", err)
 	}
 	manifests = filterIgnoredManifests(ctx, repoPath, manifests)
 	logger.Info("detected manifests", zap.Int("count", len(manifests)))
-	fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("found %d manifest(s)", len(manifests)))
+	disp.Printf("  %s\n", color.HiBlackString("found %d manifest(s)", len(manifests)))
 
-	edges, reports := collectEdges(rootKey, manifests, repoPath)
-	printManifestReports(logger, reports)
+	edges, reports := collectEdges(disp, rootKey, manifests, repoPath)
+	printManifestReports(disp, logger, reports)
 
 	nodes := buildSBOMNodes(rootKey, edges)
 	logger.Info("collected SBOM nodes", zap.Int("count", len(nodes)))
-	fmt.Fprintf(os.Stderr, "\n  %s\n", color.HiBlackString("%d unique packages", countPackages(nodes)))
+	disp.Printf("\n  %s\n", color.HiBlackString("%d unique packages", countPackages(nodes)))
 
 	// Surface the manifests the SBOM could not reach (CMake, Docker, Gradle, …) —
 	// the set behind SOURCE_UNSUPPORTED_MANIFEST_FILE — so they are visible here,
@@ -181,7 +183,7 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 	if unsup, derr := unsupported.DetectUnsupportedManifests(repoPath); derr != nil {
 		logger.Warn("detecting unsupported manifests", zap.Error(derr))
 	} else {
-		printUnsupportedManifests(unsup)
+		printUnsupportedManifests(disp, unsup)
 	}
 
 	data, err := buildSBOMJSON(format, rootKey, nodes)
@@ -198,6 +200,7 @@ func buildSBOMBytesWithManifests(ctx context.Context, path, format string) ([]by
 // manifests it excluded rather than dropping them silently.
 func filterIgnoredManifests(ctx context.Context, repoPath string, manifests []models.DetectedManifest) []models.DetectedManifest {
 	logger := ctxutil.GetLogger(ctx)
+	disp := ui.FromContext(ctx)
 	matcher, err := riskguardignore.NewMatcher(repoPath)
 	if err != nil {
 		logger.Warn("reading .riskguardignore; auditing all manifests", zap.Error(err))
@@ -218,7 +221,7 @@ func filterIgnoredManifests(ctx context.Context, repoPath string, manifests []mo
 		kept = append(kept, m)
 	}
 	if dropped > 0 {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("excluded %d manifest(s) via .riskguardignore", dropped))
+		disp.Printf("  %s\n", color.HiBlackString("excluded %d manifest(s) via .riskguardignore", dropped))
 	}
 	return kept
 }

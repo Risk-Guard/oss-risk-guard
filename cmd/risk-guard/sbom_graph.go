@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/unsupported"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 
 	"github.com/fatih/color"
 	"go.uber.org/zap"
@@ -47,7 +47,7 @@ type manifestReport struct {
 	Err             error
 }
 
-func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot string) ([]models.DepsTreeEdge, []manifestReport) {
+func collectEdges(disp *ui.UI, rootKey string, manifests []models.DetectedManifest, repoRoot string) ([]models.DepsTreeEdge, []manifestReport) {
 	var edges []models.DepsTreeEdge
 	reports := make([]manifestReport, 0, len(manifests))
 
@@ -59,7 +59,7 @@ func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot 
 			Lockfile:       m.Lockfile,
 		}
 
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("parsing %s (%d/%d)", strings.Join(m.Paths, ", "), i+1, len(manifests)))
+		disp.Printf("  %s\n", color.HiBlackString("parsing %s (%d/%d)", strings.Join(m.Paths, ", "), i+1, len(manifests)))
 		result, err := ecosystem.ParseManifest(m, repoRoot)
 		if err != nil {
 			rep.Err = err
@@ -119,9 +119,9 @@ func collectEdges(rootKey string, manifests []models.DetectedManifest, repoRoot 
 // transitives. The intent is a calm inventory: "no lockfile" is the normal state
 // for ecosystems like pip and is left uncolored, while only genuine problems — a
 // parse failure or a detected-but-unparsed lockfile — are highlighted in yellow.
-func printManifestReports(logger *zap.Logger, reports []manifestReport) {
+func printManifestReports(disp *ui.UI, logger *zap.Logger, reports []manifestReport) {
 	if len(reports) == 0 {
-		fmt.Fprintf(os.Stderr, "  %s\n", color.HiBlackString("no supported manifests detected"))
+		disp.Printf("  %s\n", color.HiBlackString("no supported manifests detected"))
 		return
 	}
 
@@ -140,12 +140,12 @@ func printManifestReports(logger *zap.Logger, reports []manifestReport) {
 		}
 	}
 
-	bold := color.New(color.Bold).FprintfFunc()
+	bold := color.New(color.Bold).SprintfFunc()
 	for _, eco := range order {
-		fmt.Fprintln(os.Stderr)
-		bold(os.Stderr, "  %s\n", eco)
+		disp.Printf("\n")
+		disp.Printf("%s", bold("  %s\n", eco))
 		for _, r := range byEco[eco] {
-			printManifestLine(r)
+			printManifestLine(disp, r)
 		}
 	}
 }
@@ -154,11 +154,11 @@ func printManifestReports(logger *zap.Logger, reports []manifestReport) {
 // (prefixed with the package manager when it differs from the ecosystem), then a
 // nested lockfile line — dim "(+N transitive)" when the lockfile was parsed, or a
 // yellow "not parsed" note when it was detected but unsupported.
-func printManifestLine(r manifestReport) {
+func printManifestLine(disp *ui.UI, r manifestReport) {
 	paths := strings.Join(r.Paths, ", ")
 
 	if r.Err != nil {
-		fmt.Fprintf(os.Stderr, "    %s %s\n", paths, color.YellowString("(⚠ parse failed: %v)", r.Err))
+		disp.Printf("    %s %s\n", paths, color.YellowString("(⚠ parse failed: %v)", r.Err))
 		return
 	}
 
@@ -166,16 +166,16 @@ func printManifestLine(r manifestReport) {
 	if pm := r.PackageManager; pm != nil && *pm != "" && *pm != r.Ecosystem {
 		meta = *pm + " · " + meta
 	}
-	fmt.Fprintf(os.Stderr, "    %s %s\n", paths, color.HiBlackString("(%s)", meta))
+	disp.Printf("    %s %s\n", paths, color.HiBlackString("(%s)", meta))
 
 	if r.Lockfile == nil {
 		return
 	}
 	lock := filepath.Base(*r.Lockfile)
 	if r.UsedLockfile {
-		fmt.Fprintf(os.Stderr, "      %s\n", color.HiBlackString("↳ %s (+%d transitive)", lock, r.TransitiveCount))
+		disp.Printf("      %s\n", color.HiBlackString("↳ %s (+%d transitive)", lock, r.TransitiveCount))
 	} else {
-		fmt.Fprintf(os.Stderr, "      %s\n", color.YellowString("↳ %s not parsed; direct deps only", lock))
+		disp.Printf("      %s\n", color.YellowString("↳ %s not parsed; direct deps only", lock))
 	}
 }
 
@@ -184,7 +184,7 @@ func printManifestLine(r manifestReport) {
 // SOURCE_UNSUPPORTED_MANIFEST_FILE finding — so the inventory shows what the SBOM
 // could not reach, with a link to request support. Each line mirrors that
 // check's evidence format: "<path> (<package manager>[, OSV ecosystem: <eco>])".
-func printUnsupportedManifests(manifests []unsupported.DetectedManifest) {
+func printUnsupportedManifests(disp *ui.UI, manifests []unsupported.DetectedManifest) {
 	if len(manifests) == 0 {
 		return
 	}
@@ -192,17 +192,17 @@ func printUnsupportedManifests(manifests []unsupported.DetectedManifest) {
 	copy(sorted, manifests)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].RelPath < sorted[j].RelPath })
 
-	orange := color.New(color.FgYellow, color.Bold).FprintfFunc()
-	fmt.Fprintln(os.Stderr)
-	orange(os.Stderr, "unsupported:\n")
+	orange := color.New(color.FgYellow, color.Bold).SprintfFunc()
+	disp.Printf("\n")
+	disp.Printf("%s", orange("unsupported:\n"))
 	for _, m := range sorted {
 		osvInfo := ""
 		if m.OSVEcosystem != "" {
 			osvInfo = ", OSV ecosystem: " + m.OSVEcosystem
 		}
-		fmt.Fprintf(os.Stderr, "  %s %s\n", m.RelPath, color.HiBlackString("(%s%s)", m.PackageManager, osvInfo))
+		disp.Printf("  %s %s\n", m.RelPath, color.HiBlackString("(%s%s)", m.PackageManager, osvInfo))
 	}
-	fmt.Fprintf(os.Stderr, "\n  %s %s\n",
+	disp.Printf("\n  %s %s\n",
 		color.HiBlackString("file a support request"), color.CyanString(supportRequestURL))
 }
 

@@ -9,7 +9,8 @@ import (
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
-	"github.com/Risk-Guard/oss-risk-guard/src/progress"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
@@ -52,19 +53,23 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	var totals auditTotals
 	var done int
 
-	disp := progress.FromContext(ctx)
+	disp := ui.FromContext(ctx)
 
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(jobs)
 
 	for _, key := range keys {
 		g.Go(func() error {
-			// Register the row in the DAG's context so the executor reflects
-			// each running node onto it (fetcher, git_clone_metadata, …), same
-			// as the source-phase row — instead of a frozen static label.
-			task := disp.StartPhase(key)
-			analysis, cachedAge, scoreErr := scoreOneCached(progress.WithTask(gctx, task), key, overridesHash, checkMetadata, cc)
-			task.Done()
+			// A phase span per package. The DAG executor reports each node it
+			// runs underneath it, so the row tracks the real current activity
+			// (fetching registry metadata, reading git history, …) instead of a
+			// frozen label.
+			pctx, phase := observe.From(gctx).Begin(gctx, observe.Event{
+				Kind: observe.KindPhase,
+				Name: key,
+			})
+			analysis, cachedAge, scoreErr := scoreOneCached(pctx, key, overridesHash, checkMetadata, cc)
+			phase.End(phaseStatus(scoreErr), scoreErr)
 
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
@@ -110,10 +115,18 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	return analyses, failures, totals, nil
 }
 
-// printProgress writes one completed-audit line through the live Display so it
-// scrolls cleanly above the in-flight "auditing" rows; when progress is
-// disabled the Display passes it straight through to stderr.
-func printProgress(disp *progress.Display, done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
+// phaseStatus maps a scoring outcome onto the observer's vocabulary.
+func phaseStatus(err error) observe.Status {
+	if err != nil {
+		return observe.StatusError
+	}
+	return observe.StatusOK
+}
+
+// printProgress writes one completed-audit line through the UI so it scrolls
+// cleanly above the in-flight rows; when rows are disabled the UI passes it
+// straight through to stderr.
+func printProgress(disp *ui.UI, done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
 	prefix := color.HiBlackString("[%d/%d]", done, total)
 	var prov string
 	if p := manifestProvenance(loc); p != "" {
@@ -132,7 +145,7 @@ func printProgress(disp *progress.Display, done, total int, key string, findingC
 	default:
 		status = color.GreenString("ok")
 	}
-	disp.Print(fmt.Sprintf("%s %s  %s%s%s\n", prefix, key, status, prov, suffix))
+	disp.Printf("%s %s  %s%s%s\n", prefix, key, status, prov, suffix)
 }
 
 // manifestProvenance renders the manifest file (and line) a dependency was
