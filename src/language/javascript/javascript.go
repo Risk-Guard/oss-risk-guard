@@ -109,11 +109,20 @@ func (j *JavaScript) ExtractPackageMetadata(ctx context.Context, pkg models.Pack
 		repository = versionData.Repository
 	}
 	sourceURL, rejectedURL, rejectionReason := j.extractSourceURL(ctx, repository, pkg.Name)
+	sourceDirectory := extractSourceDirectory(repository)
 	rawLicense := npmResp.License
 	if versionData, ok := npmResp.Versions[targetVersion]; ok && versionData.License != nil {
 		rawLicense = versionData.License
 	}
 	license := j.extractLicense(rawLicense)
+	// gitHead is version-specific: the source commit this exact version was
+	// published from. Only read it from the version's own manifest (never the
+	// hoisted top-level), so provenance checks clone the tree as-published.
+	var gitHead *string
+	if versionData, ok := npmResp.Versions[targetVersion]; ok && versionData.GitHead != "" {
+		gh := versionData.GitHead
+		gitHead = &gh
+	}
 	releaseDate, err := j.findReleaseDate(npmResp.Time, targetVersion)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("extracting release date for %s: %w", pkg.Name, err)
@@ -130,17 +139,19 @@ func (j *JavaScript) ExtractPackageMetadata(ctx context.Context, pkg models.Pack
 
 	now := time.Now()
 	pkgMeta := &models.PackageMetadata{
-		Ecosystem:    "npm",
-		PackageName:  npmResp.Name,
-		Version:      &targetVersion,
-		SourceURL:    sourceURL,
-		License:      license,
-		ReleaseDate:  releaseDate,
-		Dependencies: dependencies,
-		Maintainers:  maintainers,
-		Distribution: distribution,
-		Status:       "success",
-		CollectedAt:  &now,
+		Ecosystem:       "npm",
+		PackageName:     npmResp.Name,
+		Version:         &targetVersion,
+		SourceURL:       sourceURL,
+		SourceDirectory: sourceDirectory,
+		GitHead:         gitHead,
+		License:         license,
+		ReleaseDate:     releaseDate,
+		Dependencies:    dependencies,
+		Maintainers:     maintainers,
+		Distribution:    distribution,
+		Status:          "success",
+		CollectedAt:     &now,
 	}
 
 	log.Debug("transformed NPM data",
@@ -210,6 +221,27 @@ func (j *JavaScript) extractSourceURL(ctx context.Context, repository any, packa
 		return &normalized, &url, finding
 	}
 	return &normalized, nil, nil
+}
+
+// extractSourceDirectory reads npm's repository.directory subpath, which points
+// to a package's source within a monorepo (e.g. "types/canvas-confetti" for
+// @types/canvas-confetti in DefinitelyTyped). Only the object form of
+// repository carries it; a bare string repository has no subpath. Returns nil
+// when absent so history analysis defaults to the whole repository.
+func extractSourceDirectory(repository any) *string {
+	repo, ok := repository.(map[string]any)
+	if !ok {
+		return nil
+	}
+	dir, ok := repo["directory"].(string)
+	if !ok {
+		return nil
+	}
+	dir = strings.Trim(strings.TrimSpace(dir), "/")
+	if dir == "" {
+		return nil
+	}
+	return &dir
 }
 
 func (j *JavaScript) extractLicense(license any) *string {

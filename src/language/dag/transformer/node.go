@@ -147,8 +147,16 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		}
 	}
 
+	// The directory subpath only applies to a source derived from package
+	// metadata; a caller-provided SourceURL is analyzed whole-repo.
+	var sourceDirectory *string
+	if !input.HasSourceURL() {
+		sourceDirectory = getSingleSourceDirectory(outputs)
+	}
+
 	nextInput := &dag_impl.Input{
-		SourceURL: sourceURL,
+		SourceURL:       sourceURL,
+		SourceDirectory: sourceDirectory,
 	}
 
 	// Return output with rejections

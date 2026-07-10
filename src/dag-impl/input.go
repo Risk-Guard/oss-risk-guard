@@ -18,13 +18,17 @@ type MergeableOutput interface {
 }
 
 type Input struct {
-	AnalysisIdentifier string               `json:"analysis_identifier"`
-	SourceURL          *string              `json:"source_url,omitempty"`
-	Commit             *string              `json:"commit,omitempty"`
-	Version            *string              `json:"version,omitempty"`
-	Packages           []models.PackageInfo `json:"packages,omitempty"`
-	Trusted            bool                 `json:"trusted,omitempty"`
-	OverridesHash      string               `json:"overrides_hash,omitempty"`
+	AnalysisIdentifier string  `json:"analysis_identifier"`
+	SourceURL          *string `json:"source_url,omitempty"`
+	// SourceDirectory scopes git-history analysis to a subpath of SourceURL for
+	// monorepo-hosted packages (from npm's repository.directory). Empty means
+	// the whole repository is analyzed.
+	SourceDirectory *string              `json:"source_directory,omitempty"`
+	Commit          *string              `json:"commit,omitempty"`
+	Version         *string              `json:"version,omitempty"`
+	Packages        []models.PackageInfo `json:"packages,omitempty"`
+	Trusted         bool                 `json:"trusted,omitempty"`
+	OverridesHash   string               `json:"overrides_hash,omitempty"`
 
 	// Per-run runtime flags. Kept out of JSON so they don't pollute the
 	// analysis identity / cache key.
@@ -147,6 +151,14 @@ func (i *Input) Merge(output executiondag.StatusProvider) {
 		// If URLs differ, keep the existing URL (user-provided takes priority)
 		// The PACKAGE_SOURCE_URL_MISMATCH check will detect and report this conflict
 		// If URLs are the same, no action needed
+	}
+
+	// Merge source directory alongside the URL it scopes. Set-once, like the URL:
+	// a value already present (e.g. user-provided) is never overwritten.
+	if outputData.SourceDirectory != nil && *outputData.SourceDirectory != "" {
+		if i.SourceDirectory == nil || *i.SourceDirectory == "" {
+			i.SourceDirectory = outputData.SourceDirectory
+		}
 	}
 
 	// Merge packages (accumulate with deduplication)

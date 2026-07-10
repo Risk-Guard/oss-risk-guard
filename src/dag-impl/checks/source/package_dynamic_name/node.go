@@ -7,7 +7,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
@@ -35,14 +35,14 @@ func NewNode() *Node {
 
 func (n *Node) GetDependencies() []any {
 	return []any{
-		executiondag.DependsOn[*package_detector.Node](),
+		executiondag.DependsOn[*package_detector_published.Node](),
 	}
 }
 
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
-	detectorOut := executiondag.GetOutput[*package_detector.Node](ctx).(*package_detector.Output)
+	detectorOut := executiondag.GetOutput[*package_detector_published.Node](ctx).(*package_detector_published.Output)
 	manifests := detectorOut.DetectedManifests
 
 	if len(manifests) == 0 {
@@ -71,10 +71,16 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 
 	if len(dynamicPackages) > 0 {
 		rationale := checks.BuildViolationRationale(dynamicReasons, "has a dynamic name", "have dynamic names")
-		evidence := dynamicReasons
-		if len(evidence) > checks.MaxEvidenceItems {
-			evidence = evidence[:checks.MaxEvidenceItems]
+
+		// Reserve the last evidence slot for the source-ref disclosure so it is
+		// never dropped by truncation.
+		reasons := dynamicReasons
+		if len(reasons) > checks.MaxEvidenceItems-1 {
+			reasons = reasons[:checks.MaxEvidenceItems-1]
 		}
+		evidence := make([]string, 0, len(reasons)+1)
+		evidence = append(evidence, reasons...)
+		evidence = append(evidence, checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)))
 
 		log.Debug("PACKAGE_DYNAMIC_NAME check: violation",
 			zap.Int("dynamic_count", len(dynamicPackages)))

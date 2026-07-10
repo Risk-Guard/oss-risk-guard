@@ -86,6 +86,21 @@ func ResolveRepoRoot(ctx context.Context, path string) (root string, isGit bool,
 	return top, true, nil
 }
 
+// AnalyzeRepository derives commit-history metrics for a cloned repository.
+//
+// Metrics are computed over the whole repository: for governance and health
+// signals (contributor counts, repo age, staleness) the surrounding repo's
+// review process and activity legitimately apply to a package, including one
+// hosted in a subdirectory of a monorepo.
+//
+// History is deliberately never scoped to a package subdirectory. A path-limited
+// `git log -- <subdir>` must diff every commit's tree, and the metadata clone is
+// treeless (--filter=tree:0), so scoping forces a per-commit lazy tree fetch from
+// the promisor remote — pathologically slow and, on large monorepos, prone to
+// GitHub's "in the commit graph file but not in the object database" failure.
+// The per-subdirectory "unreleased changes" comparison was removed for this
+// reason; that check now compares against the whole-repo latest commit and flags
+// monorepo-hosted packages so the possible overstatement is visible.
 func AnalyzeRepository(ctx context.Context, repoPath string) (*models.GitMetadata, error) {
 	if _, err := os.Stat(filepath.Join(repoPath, ".git")); err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
@@ -127,6 +142,7 @@ func AnalyzeRepository(ctx context.Context, repoPath string) (*models.GitMetadat
 		metadata.MaxMonthlyWindowStart = &metrics.MaxMonthlyWindowStart
 		metadata.MaxMonthlyWindowEnd = &metrics.MaxMonthlyWindowEnd
 	}
+
 	return metadata, nil
 }
 
@@ -137,16 +153,17 @@ func getRemoteURL(ctx context.Context, repoPath string) (string, bool, error) {
 	applyGitCeiling(cmd, repoPath)
 	out, err := cmd.Output()
 	if err != nil {
+		gitCmd := gitCommandString(cmd)
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			if exitErr.ExitCode() == 1 {
 				return "", false, nil
 			}
 			if len(exitErr.Stderr) > 0 {
-				return "", false, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+				return "", false, fmt.Errorf("%s: %s: %w", gitCmd, strings.TrimSpace(string(exitErr.Stderr)), err)
 			}
 		}
-		return "", false, err
+		return "", false, fmt.Errorf("%s: %w", gitCmd, err)
 	}
 	url := strings.TrimSpace(string(out))
 	if url == "" {
@@ -170,26 +187,31 @@ type CommitInfo struct {
 }
 
 func extractCommitHistory(ctx context.Context, repoPath string) ([]CommitInfo, error) {
+	args := []string{"-C", repoPath, "log", "--date-order", "--format=%ae%x09%aI"}
 	//nolint:gosec // G204: args are hardcoded git subcommands; repoPath is an internal trusted path
-	cmd := exec.CommandContext(ctx, "git", "-C", repoPath, "log", "--date-order", "--format=%ae%x09%aI")
+	cmd := exec.CommandContext(ctx, "git", args...)
 	applyGitEnv(ctx, cmd)
 	applyGitCeiling(cmd, repoPath)
 	out, err := cmd.Output()
 	if err != nil {
+		// Lead the error with the exact git command so it survives the
+		// pretty-console encoder (which drops any text after the unwrapped
+		// cause) and is visible in the .cause tree, not just the debug log.
+		gitCmd := gitCommandString(cmd)
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			stderr := string(exitErr.Stderr)
+			stderr := strings.TrimSpace(string(exitErr.Stderr))
 			// Unborn branch (`git init` with no commits yet). Valid state —
 			// treat as empty history so callers return GitMetadata with just
 			// SourceURL rather than failing the whole analysis.
 			if strings.Contains(stderr, "does not have any commits yet") {
 				return nil, nil
 			}
-			if len(stderr) > 0 {
-				return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr))
+			if stderr != "" {
+				return nil, fmt.Errorf("%s: %s: %w", gitCmd, stderr, err)
 			}
 		}
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", gitCmd, err)
 	}
 
 	var commits []CommitInfo

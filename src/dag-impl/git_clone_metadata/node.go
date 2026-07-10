@@ -112,6 +112,9 @@ func (n *Node) handleRemote(ctx context.Context, sourceURL string, resolveOut *g
 	return n.cloneAndAnalyze(ctx, sourceURL, input, backend, normalizedURL, commitSHA, useCache)
 }
 
+// metadataCacheKey namespaces cached metadata by repo and commit. Metrics are
+// whole-repo — never scoped to a package subdirectory — so sibling packages in
+// the same monorepo (same URL and commit) legitimately share one cache entry.
 func metadataCacheKey(normalizedURL, commitSHA string) string {
 	urlHash := git.CacheKey(normalizedURL)
 	return fmt.Sprintf("clone-cache/v3/metadata/%s/%s.json", urlHash, commitSHA)

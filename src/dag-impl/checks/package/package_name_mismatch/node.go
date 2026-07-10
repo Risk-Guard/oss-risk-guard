@@ -9,7 +9,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_metadata"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
@@ -56,7 +56,7 @@ func NewNode(languages map[string]language.Language) *Node {
 func (n *Node) GetDependencies() []any {
 	return []any{
 		executiondag.DependsOn[*git_clone_metadata.Node](),
-		executiondag.DependsOn[*package_detector.Node](),
+		executiondag.DependsOn[*package_detector_published.Node](),
 		executiondag.DependsOn[*transformer.Node](),
 	}
 }
@@ -76,7 +76,16 @@ func filterNonDynamicManifests(manifests []models.ManifestResult) ([]models.Mani
 	return nonDynamicManifests, hasDynamicNames
 }
 
-func buildEvidenceForMismatch(pkgInfo models.PackageInfo, matchingManifests []models.ManifestResult, gitMeta *models.GitMetadata) []string {
+// formatPkgRef renders "ecosystem/name@version" (version omitted when unknown).
+func formatPkgRef(pkgInfo models.PackageInfo) string {
+	ref := fmt.Sprintf("%s/%s", pkgInfo.Ecosystem, pkgInfo.Name)
+	if pkgInfo.Version != "" {
+		ref += "@" + pkgInfo.Version
+	}
+	return ref
+}
+
+func buildEvidenceForMismatch(pkgInfo models.PackageInfo, matchingManifests []models.ManifestResult, gitMeta *models.GitMetadata, gitHeadUsed bool, sourceCommit string) []string {
 	var evidence []string
 
 	evidence = append(evidence,
@@ -101,6 +110,14 @@ func buildEvidenceForMismatch(pkgInfo models.PackageInfo, matchingManifests []mo
 			fmt.Sprintf("Packages found in source (%d total): %s%s", len(matchingManifests), strings.Join(allPkgs, ", "), suffix),
 		)
 	}
+
+	// Disclose which source ref this comparison was made against, so a mismatch
+	// against a diverged HEAD isn't mistaken for a scan of the as-published source.
+	provenance := checks.ScannedProvenance(gitHeadUsed, sourceCommit, formatPkgRef(pkgInfo))
+	if gitHeadUsed {
+		provenance += " — name is absent from the exact published commit"
+	}
+	evidence = append(evidence, provenance)
 
 	return evidence
 }
@@ -127,6 +144,8 @@ func (n *Node) checkPackageNameMatch(
 	gitMeta *models.GitMetadata,
 	transformerOut *transformer.Output,
 	allPackages []models.PackageInfo,
+	gitHeadUsed bool,
+	sourceCommit string,
 	log *zap.Logger,
 ) (checkStatus, string, []string, error) {
 	utils := language.MustGetEcosystemUtils(n.ecosystemUtils, pkgInfo.Ecosystem)
@@ -161,7 +180,7 @@ func (n *Node) checkPackageNameMatch(
 		} else {
 			rationale = fmt.Sprintf("%s/%s: Package not found among %d packages in source code %s",
 				pkgInfo.Ecosystem, pkgInfo.Name, len(sourceNames), gitMeta.SourceURL)
-			evidence = buildEvidenceForMismatch(pkgInfo, matchingManifests, gitMeta)
+			evidence = buildEvidenceForMismatch(pkgInfo, matchingManifests, gitMeta, gitHeadUsed, sourceCommit)
 		}
 
 		if transformerOut != nil {
@@ -232,8 +251,10 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	metaOut := executiondag.GetOutput[*git_clone_metadata.Node](ctx).(*git_clone_metadata.Output)
 	gitMeta := metaOut.GitMetadata()
 
-	detectorOut := executiondag.GetOutput[*package_detector.Node](ctx).(*package_detector.Output)
+	detectorOut := executiondag.GetOutput[*package_detector_published.Node](ctx).(*package_detector_published.Output)
 	manifests := detectorOut.DetectedManifests
+	gitHeadUsed := detectorOut.GitHeadUsed()
+	sourceCommit := detectorOut.SourceCommit
 
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
 
@@ -267,7 +288,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	var allEvidence []string
 
 	for _, pkgInfo := range input.Packages {
-		status, rationale, evidence, err := n.checkPackageNameMatch(pkgInfo, nonDynamicManifests, gitMeta, transformerOut, input.Packages, log)
+		status, rationale, evidence, err := n.checkPackageNameMatch(pkgInfo, nonDynamicManifests, gitMeta, transformerOut, input.Packages, gitHeadUsed, sourceCommit, log)
 		if err != nil {
 			return nil, fmt.Errorf("checking package name match for %s/%s: %w", pkgInfo.Ecosystem, pkgInfo.Name, err)
 		}
@@ -296,7 +317,15 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		return checks.NewViolationOutput(n.Code, finalRationale, evidence, input), nil
 	case statusCompliant:
 		log.Debug("PACKAGE_NAME_MISMATCH check: compliant", zap.String("rationale", finalRationale))
-		return checks.NewCompliantOutput(n.Code, finalRationale, input), nil
+		// Disclose the assurance level: a match at the exact published gitHead is
+		// stronger than one merely against current HEAD.
+		var matchEvidence string
+		if gitHeadUsed {
+			matchEvidence = "Matched at " + checks.SourceProvenance(true, sourceCommit, "")
+		} else {
+			matchEvidence = "Matched against repository HEAD — no gitHead recorded; not verified against the exact published commit"
+		}
+		return checks.NewCompliantOutput(n.Code, finalRationale, input).WithEvidence(matchEvidence), nil
 	default:
 		log.Debug("PACKAGE_NAME_MISMATCH check: skipped", zap.String("rationale", finalRationale))
 		return checks.NewSkippedOutput(n.Code, finalRationale, input), nil

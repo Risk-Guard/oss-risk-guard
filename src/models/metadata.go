@@ -31,12 +31,23 @@ type DistributionInfo struct {
 
 // PackageMetadata represents package.yml - ecosystem package data
 type PackageMetadata struct {
-	Ecosystem    string            `json:"ecosystem"`
-	PackageName  string            `json:"package_name"`
-	Version      *string           `json:"version,omitempty"`
-	Description  *string           `json:"description,omitempty"`
-	Homepage     *string           `json:"homepage,omitempty"`
-	SourceURL    *string           `json:"source_url,omitempty"`
+	Ecosystem   string  `json:"ecosystem"`
+	PackageName string  `json:"package_name"`
+	Version     *string `json:"version,omitempty"`
+	Description *string `json:"description,omitempty"`
+	Homepage    *string `json:"homepage,omitempty"`
+	SourceURL   *string `json:"source_url,omitempty"`
+	// SourceDirectory is the subpath within SourceURL that holds this package's
+	// source, from npm's repository.directory. Set for monorepo-hosted packages
+	// (e.g. @types/* in DefinitelyTyped); empty for root-hosted packages. Git
+	// history is deliberately never scoped to this subpath (see AnalyzeRepository);
+	// it marks a package as monorepo-hosted so checks can disclose that whole-repo
+	// metrics may overstate activity for it.
+	SourceDirectory *string `json:"source_directory,omitempty"`
+	// GitHead is the source commit SHA this version was published from, when the
+	// registry records one (npm's per-version gitHead). Used to clone the source
+	// tree as-published for provenance checks; nil when the registry reports none.
+	GitHead      *string           `json:"git_head,omitempty"`
 	License      *string           `json:"license,omitempty"`
 	ReleaseDate  *time.Time        `json:"release_date,omitempty"`
 	Dependencies []Dependency      `json:"dependencies,omitempty"`

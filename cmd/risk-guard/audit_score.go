@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 	"github.com/Risk-Guard/oss-risk-guard/src/violations"
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
@@ -52,12 +53,20 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	var totals auditTotals
 	var done int
 
+	disp := ui.FromContext(ctx)
+
 	g, gctx := errgroup.WithContext(ctx)
 	g.SetLimit(jobs)
 
 	for _, key := range keys {
 		g.Go(func() error {
-			analysis, cachedAge, scoreErr := scoreOneCached(gctx, key, overridesHash, checkMetadata, cc)
+			// A phase span per package. The DAG executor reports each node it
+			// runs underneath it, so the row tracks the real current activity
+			// (fetching registry metadata, reading git history, …) instead of a
+			// frozen label.
+			analysis, cachedAge, scoreErr := withPhase2(gctx, key, func(pctx context.Context) (*violations.AnalysisViolations, time.Duration, error) {
+				return scoreOneCached(pctx, key, overridesHash, checkMetadata, cc)
+			})
 
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
@@ -75,7 +84,7 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 			if cachedAge >= 0 {
 				totals.cached++
 			}
-			printProgress(done, len(keys), key, fcount, scoreErr, cachedAge, locByKey[key])
+			printProgress(disp, done, len(keys), key, fcount, scoreErr, cachedAge, locByKey[key])
 			mu.Unlock()
 			return nil
 		})
@@ -103,7 +112,52 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 	return analyses, failures, totals, nil
 }
 
-func printProgress(done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
+// phaseStatus maps a scoring outcome onto the observer's vocabulary.
+func phaseStatus(err error) observe.Status {
+	if err != nil {
+		return observe.StatusError
+	}
+	return observe.StatusOK
+}
+
+// withPhase runs fn under a phase span named name, passing it the span's
+// context so nodes it runs report underneath the row. End is deferred, per the
+// observe.Span contract, so a panic in fn cannot strand a live row; the span
+// still ends the moment fn returns, before the caller's next phase begins.
+func withPhase[T any](ctx context.Context, name string, fn func(context.Context) (T, error)) (T, error) {
+	pctx, phase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: name,
+	})
+	var (
+		v   T
+		err error
+	)
+	defer func() { phase.End(phaseStatus(err), err) }()
+	v, err = fn(pctx)
+	return v, err
+}
+
+// withPhase2 is withPhase for work that yields two values alongside its error.
+func withPhase2[A, B any](ctx context.Context, name string, fn func(context.Context) (A, B, error)) (A, B, error) {
+	pctx, phase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: name,
+	})
+	var (
+		a   A
+		b   B
+		err error
+	)
+	defer func() { phase.End(phaseStatus(err), err) }()
+	a, b, err = fn(pctx)
+	return a, b, err
+}
+
+// printProgress writes one completed-audit line through the UI so it scrolls
+// cleanly above the in-flight rows; when rows are disabled the UI passes it
+// straight through to stderr.
+func printProgress(disp *ui.UI, done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
 	prefix := color.HiBlackString("[%d/%d]", done, total)
 	var prov string
 	if p := manifestProvenance(loc); p != "" {
@@ -113,15 +167,16 @@ func printProgress(done, total int, key string, findingCount int, scoreErr error
 	if cachedAge >= 0 {
 		suffix = "  " + color.HiBlackString("(cached, %s ago)", roundDuration(cachedAge))
 	}
+	var status string
 	switch {
 	case scoreErr != nil:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.RedString("FAILED"), prov, suffix)
+		status = color.RedString("FAILED")
 	case findingCount > 0:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key,
-			color.YellowString("%d findings", findingCount), prov, suffix)
+		status = color.YellowString("%d findings", findingCount)
 	default:
-		fmt.Fprintf(os.Stderr, "%s %s  %s%s%s\n", prefix, key, color.GreenString("ok"), prov, suffix)
+		status = color.GreenString("ok")
 	}
+	disp.Printf("%s %s  %s%s%s\n", prefix, key, status, prov, suffix)
 }
 
 // manifestProvenance renders the manifest file (and line) a dependency was

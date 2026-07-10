@@ -3,16 +3,34 @@ package fetcher
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/language"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/registry"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
+
+// fetchConcurrency bounds how many packages are fetched from registries at once
+// during the bulk prefetch. Modest so npm/PyPI don't rate-limit the burst.
+const fetchConcurrency = 10
+
+// fetchStatus reports a package fetch as observed. A non-200 response is a
+// skipped package, not a failure, and is not distinguished here: the fetch
+// itself succeeded.
+func fetchStatus(err error) observe.Status {
+	if err != nil {
+		return observe.StatusError
+	}
+	return observe.StatusOK
+}
 
 type Node struct {
 	Description string                         `json:"description,omitempty"`
@@ -48,51 +66,75 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return NewOutput(executiondag.StatusSkipped, "no packages to fetch", nil, input), nil
 	}
 
-	log.Debug("fetching registry data for packages", zap.Int("count", len(input.Packages)))
+	packages := dedupePackages(input.Packages)
+	total := len(packages)
+	log.Debug("fetching registry data for packages", zap.Int("count", total))
 
-	var outputs []RegistryOutput
-	var lastError error
-	successCount := 0
-	skipCount := 0
+	var (
+		mu           sync.Mutex
+		outputs      []RegistryOutput
+		lastError    error
+		successCount int
+		skipCount    int
+	)
 
-	for _, pkg := range input.Packages {
-		log.Debug("fetching package",
-			zap.String("ecosystem", pkg.Ecosystem),
-			zap.String("name", pkg.Name))
+	// Announce the prefetch as a batch. Whether a batch of this size is worth
+	// showing, and what a finished package looks like on screen, is the
+	// observer's business — a per-package audit DAG fetches exactly one package
+	// and the CLI stays quiet for it.
+	ctx, batch := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind:  observe.KindBatch,
+		Name:  "registry metadata",
+		Total: total,
+	})
+	// lastError is settled by the time this runs: every writer holds mu and has
+	// been joined by g.Wait().
+	defer func() { batch.End(fetchStatus(lastError), lastError) }()
 
-		fetcher := registry.MustGetFetcher(n.fetchers, pkg.Ecosystem)
+	g := new(errgroup.Group)
+	g.SetLimit(fetchConcurrency)
+	for _, pkg := range packages {
+		g.Go(func() error {
+			_, span := observe.From(ctx).Begin(ctx, observe.Event{
+				Kind: observe.KindPackage,
+				Name: pkg.Ecosystem + "/" + pkg.Name,
+			})
+			var (
+				response *language.RegistryResponse
+				fetchErr error
+			)
+			defer func() { span.End(fetchStatus(fetchErr), fetchErr) }()
 
-		response, err := fetcher.FetchPackageFromRegistry(ctx, pkg)
-		if err != nil {
-			log.Error("failed to fetch package",
+			log.Debug("fetching package",
 				zap.String("ecosystem", pkg.Ecosystem),
-				zap.String("name", pkg.Name),
-				zap.Error(err))
-			lastError = err
-			continue
-		}
+				zap.String("name", pkg.Name))
 
-		// Create and store the registry output
-		outputs = append(outputs, RegistryOutput{
-			Ecosystem: pkg.Ecosystem,
-			Name:      pkg.Name,
-			Response:  response,
+			response, fetchErr = registry.MustGetFetcher(n.fetchers, pkg.Ecosystem).FetchPackageFromRegistry(ctx, pkg)
+
+			mu.Lock()
+			defer mu.Unlock()
+			if fetchErr != nil {
+				lastError = fetchErr
+				log.Error("failed to fetch package",
+					zap.String("ecosystem", pkg.Ecosystem),
+					zap.String("name", pkg.Name),
+					zap.Error(fetchErr))
+				return nil
+			}
+			outputs = append(outputs, RegistryOutput{
+				Ecosystem: pkg.Ecosystem,
+				Name:      pkg.Name,
+				Response:  response,
+			})
+			if response.StatusCode == 200 {
+				successCount++
+			} else {
+				skipCount++
+			}
+			return nil
 		})
-
-		if response.StatusCode == 200 {
-			successCount++
-			log.Debug("successfully fetched package",
-				zap.String("ecosystem", pkg.Ecosystem),
-				zap.String("name", pkg.Name),
-				zap.Int("status_code", response.StatusCode))
-		} else {
-			skipCount++
-			log.Debug("package fetch returned non-200 status",
-				zap.String("ecosystem", pkg.Ecosystem),
-				zap.String("name", pkg.Name),
-				zap.Int("status_code", response.StatusCode))
-		}
 	}
+	_ = g.Wait() // goroutines never return an error; failures are recorded in lastError
 
 	// Determine overall status
 	status := executiondag.StatusSuccess
@@ -110,11 +152,28 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 
 	log.Debug("fetcher node complete",
 		zap.String("status", string(status)),
-		zap.Int("total", len(input.Packages)),
+		zap.Int("total", total),
 		zap.Int("success", successCount),
 		zap.Int("skipped", skipCount))
 
 	return NewOutput(status, statusReason, outputs, input), nil
+}
+
+// dedupePackages removes duplicate packages (same ecosystem+name) so two
+// goroutines never write the same cache key concurrently — os.WriteFile is not
+// atomic, so a duplicate could otherwise cause a torn read. Order is preserved.
+func dedupePackages(packages []models.PackageInfo) []models.PackageInfo {
+	seen := make(map[string]struct{}, len(packages))
+	out := make([]models.PackageInfo, 0, len(packages))
+	for _, pkg := range packages {
+		key := pkg.Ecosystem + "/" + pkg.Name
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, pkg)
+	}
+	return out
 }
 
 func (n *Node) CreateSkippedOutput(reason string, input dag_impl.Input) *Output {

@@ -1,12 +1,19 @@
 package package_install_scripts
 
 import (
+	"context"
+	"strings"
 	"testing"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/package_detector_published"
+	"github.com/Risk-Guard/oss-risk-guard/src/language/metadata"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
+	"github.com/Risk-Guard/oss-risk-guard/src/registry"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
@@ -14,6 +21,108 @@ import (
 )
 
 func strPtr(s string) *string { return &s }
+
+func evidenceContains(evidence []string, substr string) bool {
+	for _, e := range evidence {
+		if strings.Contains(e, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+func testLogCtx(t *testing.T) context.Context {
+	t.Helper()
+	log, err := logger.NewLogger("error")
+	if err != nil {
+		t.Fatalf("Failed to create logger: %v", err)
+	}
+	return ctxutil.SetLogger(context.Background(), log)
+}
+
+// fakeExtractor returns a fixed set of scripts for any artifact files.
+type fakeExtractor struct{ scripts []string }
+
+func (f fakeExtractor) ExtractInstallScriptsFromFiles(map[string]string) ([]string, error) {
+	return f.scripts, nil
+}
+
+func (f fakeExtractor) Metadata() *metadata.Metadata { return nil }
+
+var _ registry.ArtifactInstallScriptExtractor = fakeExtractor{}
+
+// TestExecute_Source_DisclosesSourceRef verifies the source-tree path appends the
+// gitHead/HEAD provenance line to its violation evidence.
+func TestExecute_Source_DisclosesSourceRef(t *testing.T) {
+	manifests := []models.ManifestResult{{
+		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
+		InstallScripts:   []string{"postinstall"},
+	}}
+	input := dag_impl.Input{
+		AnalysisIdentifier: "source/npm/some-pkg",
+		Packages:           []models.PackageInfo{{Ecosystem: "npm", Name: "some-pkg", Version: "2.1.0"}},
+	}
+
+	run := func(sourceRef, sourceCommit string) *[]string {
+		ctx := testLogCtx(t)
+		detectorOut := &package_detector_published.Output{
+			BaseOutput:        dag_impl.NewBaseOutput(executiondag.StatusSuccess, "test", dag_impl.Input{}),
+			DetectedManifests: manifests,
+			SourceRef:         sourceRef,
+			SourceCommit:      sourceCommit,
+		}
+		ctx = context.WithValue(ctx, executiondag.DependsOn[*package_detector_published.Node](), detectorOut)
+		out, err := NewNode(nil).Execute(ctx, input)
+		if err != nil {
+			t.Fatalf("Execute returned error: %v", err)
+		}
+		if out.Check.CheckStatus != storage.StatusViolation {
+			t.Fatalf("expected violation, got %s", out.Check.CheckStatus)
+		}
+		return &out.Check.Evidence
+	}
+
+	head := *run(package_detector_published.SourceRefHead, "")
+	if !evidenceContains(head, "Scanned repository HEAD — no gitHead recorded for npm/some-pkg@2.1.0") {
+		t.Errorf("HEAD evidence %q missing provenance disclosure", head)
+	}
+
+	gh := *run(package_detector_published.SourceRefGitHead, "deadbeef1234567890abcdef1234567890abcdef")
+	if !evidenceContains(gh, "Scanned source as published (gitHead deadbee)") {
+		t.Errorf("gitHead evidence %q missing provenance disclosure", gh)
+	}
+}
+
+// TestExecute_Artifact_NoSourceRefLine verifies the artifact path (the literal
+// published .tgz) never adds a gitHead/HEAD line — gitHead is a source concept.
+func TestExecute_Artifact_NoSourceRefLine(t *testing.T) {
+	ctx := testLogCtx(t)
+	// No source key → source branch skipped; artifact branch is used.
+	input := dag_impl.Input{
+		AnalysisIdentifier: "npm/some-pkg",
+		Packages:           []models.PackageInfo{{Ecosystem: "npm", Name: "some-pkg", Version: "2.1.0"}},
+	}
+	artifactOut := artifact_fetch.NewOutput(executiondag.StatusSuccess, "ok", []artifact.ArtifactExtraction{{
+		Ecosystem:   "npm",
+		PackageName: "some-pkg",
+		Files:       map[string]string{"package/package.json": "{}"},
+	}}, input)
+	ctx = context.WithValue(ctx, executiondag.DependsOn[*artifact_fetch.Node](), artifactOut)
+
+	node := NewNode(map[string]registry.ArtifactInstallScriptExtractor{
+		"npm": fakeExtractor{scripts: []string{"postinstall"}},
+	})
+	out, err := node.Execute(ctx, input)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if out.Check.CheckStatus != storage.StatusViolation {
+		t.Fatalf("expected violation from artifact path, got %s", out.Check.CheckStatus)
+	}
+	if evidenceContains(out.Check.Evidence, "gitHead") || evidenceContains(out.Check.Evidence, "repository HEAD") {
+		t.Errorf("artifact path must not add a source-ref line, got evidence %q", out.Check.Evidence)
+	}
+}
 
 func TestNode_GetDependencies(t *testing.T) {
 	node := NewNode(nil)
@@ -23,9 +132,9 @@ func TestNode_GetDependencies(t *testing.T) {
 		t.Fatalf("Expected 2 dependencies, got %d", len(deps))
 	}
 
-	expectedDetectorDep := executiondag.DependsOn[*package_detector.Node]()
+	expectedDetectorDep := executiondag.DependsOn[*package_detector_published.Node]()
 	if deps[0] != expectedDetectorDep {
-		t.Error("First dependency should be *package_detector.Node")
+		t.Error("First dependency should be *package_detector_published.Node")
 	}
 
 	expectedArtifactDep := executiondag.DependsOn[*artifact_fetch.Node]()

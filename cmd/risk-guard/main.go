@@ -6,17 +6,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/cache"
 	"github.com/Risk-Guard/oss-risk-guard/src/logger"
 	"github.com/Risk-Guard/oss-risk-guard/src/runpath"
+	"github.com/Risk-Guard/oss-risk-guard/src/ui"
 	"github.com/Risk-Guard/oss-risk-guard/src/version"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"golang.org/x/term"
+)
+
+var (
+	// debugLogPath is where the current run's full-detail debug log is written.
+	// Set in PersistentPreRunE; surfaced to the user when a run hits problems.
+	debugLogPath string
+	// logIssueCount counts warn/error log entries so the debug-log hint is only
+	// shown when something actually went wrong (npm-style).
+	logIssueCount atomic.Int64
 )
 
 var rootCmd = &cobra.Command{
@@ -61,18 +75,56 @@ Examples:
 			return fmt.Errorf("failed to get logfile flag: %w", err)
 		}
 
+		// Resolve the cache dir up front: the default debug logfile lives under
+		// it, and the same value is reused below for runpath.SetCacheDir.
+		resolvedCacheDir, err := resolveCacheDirFromFlags(cmd)
+		if err != nil {
+			return fmt.Errorf("resolving cache dir: %w", err)
+		}
+
+		// A full-detail debug log is ALWAYS written, regardless of --log-level
+		// (which only gates console verbosity). --logfile overrides where it
+		// goes; otherwise it lands under <cache-dir>/logs. The path is surfaced
+		// to the user at the end of a run that hit warnings or errors.
+		logPath := logfile
+		if logPath == "" {
+			logPath = defaultLogPath(resolvedCacheDir)
+		}
+
+		// The UI owns stderr from here on. Live rows are gated on stderr being a
+		// terminal so piped/CI output is unaffected, and the logger's console
+		// output is routed through it so log lines and the rows don't collide.
+		//nolint:gosec // Stderr Fd() is 2; no overflow risk.
+		stderrFd := int(os.Stderr.Fd())
+		interactive := term.IsTerminal(stderrFd)
+		termWidth := 0
+		if interactive {
+			if w, _, werr := term.GetSize(stderrFd); werr == nil {
+				termWidth = w
+			}
+		}
+		display := ui.New(os.Stderr, interactive, termWidth)
+
 		var log *zap.Logger
-		if logfile != "" {
-			log, err = logger.NewLoggerWithFile(logLevel, logfile)
-			if err != nil {
+		log, err = logger.NewLoggerWithFileAndWriter(logLevel, logPath, display.LogWriter())
+		if err != nil {
+			if logfile != "" {
+				// An explicit --logfile that can't be created is a user error.
 				return fmt.Errorf("failed to create logger with file: %w", err)
 			}
-		} else {
-			log, err = logger.NewLogger(logLevel)
+			// The default log location must never block a run (e.g. a read-only
+			// cache dir): warn and fall back to console-only logging.
+			display.Printf("%s\n", color.YellowString("warning: could not open debug log %s: %v", logPath, err))
+			logPath = ""
+			log, err = logger.NewLoggerWithWriter(logLevel, display.LogWriter())
 			if err != nil {
 				return fmt.Errorf("failed to create logger: %w", err)
 			}
 		}
+		debugLogPath = logPath
+		// Count warn/error entries so the debug-log hint is only shown when
+		// something actually went wrong.
+		log = log.WithOptions(zap.Hooks(countLogIssues))
 
 		secureGit, err := cmd.Flags().GetBool("secure-git")
 		if err != nil {
@@ -105,23 +157,12 @@ Examples:
 		ctx := environment.SetConfig(cmd.Context(), cfg)
 		ctx = environment.SetSharedConfig(ctx, cfg)
 
-		cacheDir, err := cmd.Flags().GetString("cache-dir")
-		if err != nil {
-			return fmt.Errorf("failed to get cache-dir flag: %w", err)
-		}
-		// --output-dir is only registered on subcommands that predated --cache-dir;
-		// look it up best-effort so the root command (which omits it) still works.
-		if f := cmd.Flags().Lookup("output-dir"); f != nil && f.Value.String() != "" && cacheDir == "" {
-			fmt.Fprintln(os.Stderr, "warning: --output-dir is deprecated; use --cache-dir")
-			cacheDir = f.Value.String()
-		}
-		resolvedCacheDir, err := resolveCacheDir(cacheDir)
-		if err != nil {
-			return fmt.Errorf("resolving cache dir: %w", err)
-		}
 		ctx = runpath.SetCacheDir(ctx, resolvedCacheDir)
 
 		ctx = ctxutil.SetLogger(ctx, log)
+		// Installs the UI and, with it, the observe.Reporter that turns DAG
+		// spans into rows. Commands that never reach this stay silent.
+		ctx = ui.NewContext(ctx, display)
 
 		tmpDir, err := os.MkdirTemp("", "risk-guard-")
 		if err != nil {
@@ -141,6 +182,9 @@ Examples:
 
 		log := ctxutil.GetLogger(cmd.Context())
 
+		// Clear any lingering live status rows before final output.
+		ui.FromContext(cmd.Context()).Stop()
+
 		backend := cache.GetCacheBackend(cmd.Context())
 		if backend != nil {
 			if err := backend.Close(); err != nil {
@@ -152,6 +196,13 @@ Examples:
 			if err := os.RemoveAll(tmpDir); err != nil {
 				log.Warn("failed to remove temp directory", zap.String("path", tmpDir), zap.Error(err))
 			}
+		}
+
+		// On a successful exit, point at the full log only if something was
+		// flagged (e.g. a package that failed to score). Hard errors are handled
+		// in main(), which runs when RunE returns an error and PostRun is skipped.
+		if logIssueCount.Load() > 0 {
+			printDebugLogHint()
 		}
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -253,6 +304,47 @@ func platformDefaultCacheDir() string {
 	return filepath.Join(base, "risk-guard")
 }
 
+// resolveCacheDirFromFlags reads --cache-dir (honoring the deprecated
+// --output-dir fallback) and resolves it to a concrete path.
+func resolveCacheDirFromFlags(cmd *cobra.Command) (string, error) {
+	cacheDir, err := cmd.Flags().GetString("cache-dir")
+	if err != nil {
+		return "", fmt.Errorf("failed to get cache-dir flag: %w", err)
+	}
+	// --output-dir is only registered on subcommands that predated --cache-dir;
+	// look it up best-effort so the root command (which omits it) still works.
+	if f := cmd.Flags().Lookup("output-dir"); f != nil && f.Value.String() != "" && cacheDir == "" {
+		fmt.Fprintln(os.Stderr, "warning: --output-dir is deprecated; use --cache-dir")
+		cacheDir = f.Value.String()
+	}
+	return resolveCacheDir(cacheDir)
+}
+
+// defaultLogPath is where the full debug log is written when --logfile is not
+// given: <cache-dir>/logs/<timestamp>-<pid>.log. The pid keeps concurrent runs
+// from colliding within the same second.
+func defaultLogPath(cacheDir string) string {
+	name := fmt.Sprintf("%s-%d.log", time.Now().Format("2006-01-02T15-04-05"), os.Getpid())
+	return filepath.Join(cacheDir, "logs", name)
+}
+
+// countLogIssues records that a warn/error entry was logged, so we only point
+// the user at the full debug log when the run actually hit a problem.
+func countLogIssues(e zapcore.Entry) error {
+	if e.Level >= zapcore.WarnLevel {
+		logIssueCount.Add(1)
+	}
+	return nil
+}
+
+// printDebugLogHint tells the user where the complete run log lives, npm-style.
+func printDebugLogHint() {
+	if debugLogPath == "" {
+		return
+	}
+	fmt.Fprintln(os.Stderr, color.HiBlackString("\nA complete log of this run can be found in:\n  %s", debugLogPath))
+}
+
 func resolveCacheDir(flagValue string) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
@@ -277,6 +369,9 @@ func main() {
 		// printing "Error: blocking findings detected" on top is noise.
 		if !errors.Is(err, errBlockingFindings) && !errors.Is(err, errReported) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			printDebugLogHint()
+		} else if logIssueCount.Load() > 0 {
+			printDebugLogHint()
 		}
 		os.Exit(1)
 	}

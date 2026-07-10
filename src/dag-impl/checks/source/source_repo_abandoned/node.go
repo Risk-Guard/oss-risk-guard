@@ -63,7 +63,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	}
 
 	if gitMeta.LatestHumanCommit == nil {
-		return nil, fmt.Errorf("latest human commit is nil in git metadata")
+		return checks.NewSkippedOutput(n.Code, "No human commit history available", input), nil
 	}
 
 	// Calculate days since last commit

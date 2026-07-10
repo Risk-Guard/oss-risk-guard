@@ -7,6 +7,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
+	"github.com/Risk-Guard/oss-risk-guard/src/models"
 	"github.com/Risk-Guard/oss-risk-guard/src/package_detection"
 
 	"go.uber.org/zap"
@@ -40,12 +41,10 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 	repoPath := cloneOut.RepoPath
 
 	logger.Info("detecting packages in repository", zap.String("path", repoPath))
-	detectedPkgs, err := package_detection.DetectPackages(repoPath, n.ecosystems)
+	enrichedPkgs, err := DetectAndEnrich(repoPath, n.ecosystems, input.AnalysisIdentifier)
 	if err != nil {
-		return nil, fmt.Errorf("detecting packages: %w", err)
+		return nil, err
 	}
-
-	enrichedPkgs := enrichManifests(detectedPkgs, repoPath, input.AnalysisIdentifier)
 
 	logger.Info("detected packages",
 		zap.Int("count", len(enrichedPkgs)))
@@ -57,6 +56,19 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		enrichedPkgs,
 		input,
 	), nil
+}
+
+// DetectAndEnrich detects package manifests under repoPath and enriches them
+// (lockfile detection, manifest parsing). It is the shared detection core behind
+// this HEAD detector and the published-version detector, so both interpret a
+// source tree identically. sourceKey is the analysis identifier used to attribute
+// lockfile edges.
+func DetectAndEnrich(repoPath string, ecosystems []def.Ecosystem, sourceKey string) ([]models.ManifestResult, error) {
+	detectedPkgs, err := package_detection.DetectPackages(repoPath, ecosystems)
+	if err != nil {
+		return nil, fmt.Errorf("detecting packages: %w", err)
+	}
+	return enrichManifests(detectedPkgs, repoPath, sourceKey), nil
 }
 
 func (n *Node) GetDependencies() []any {

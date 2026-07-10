@@ -8,11 +8,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/environment"
+
+	"go.uber.org/zap"
 )
 
 func TestApplyGitEnv_NonSecureDisablesPrompts(t *testing.T) {
 	ctx := environment.SetSharedConfig(context.Background(), &environment.Config{})
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 	cmd := exec.Command("git", "status")
 	cmd.Env = []string{"FOO=bar", "GIT_TERMINAL_PROMPT=1"}
 	applyGitEnv(ctx, cmd)
@@ -33,6 +37,7 @@ func TestApplyGitEnv_NonSecureDisablesPrompts(t *testing.T) {
 
 func TestApplyGitEnv_SecureModeIsolatesAndDisablesPrompts(t *testing.T) {
 	ctx := environment.SetSharedConfig(context.Background(), &environment.Config{SecureGit: true})
+	ctx = ctxutil.SetLogger(ctx, zap.NewNop())
 	cmd := exec.Command("git", "status")
 	applyGitEnv(ctx, cmd)
 

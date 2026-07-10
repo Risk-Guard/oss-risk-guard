@@ -10,7 +10,23 @@ linters:
     - gocyclo
     - revive
     - modernize
+    - depguard
   settings:
+    depguard:
+      rules:
+        # src/ui owns os.Stderr. If a domain package imports it, anything
+        # embedding that package — the risk-guard server, a library caller —
+        # links the renderer and can print. Domain code reports work by
+        # beginning an observe span; whether that draws anything is not its
+        # business. cmd/ is outside src/ and may import ui freely.
+        no-terminal-ui-in-domain:
+          list-mode: lax
+          files:
+            - "**/src/**/*.go"
+            - "!**/src/ui/**"
+          deny:
+            - pkg: github.com/Risk-Guard/oss-risk-guard/src/ui
+              desc: "src/ui owns the terminal; domain code must emit observe spans instead (see src/observe)"
     gocyclo:
       min-complexity: 22
     revive:

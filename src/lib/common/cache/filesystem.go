@@ -76,9 +76,30 @@ func (f *FilesystemBackend) Set(ctx context.Context, key string, data []byte) er
 		return fmt.Errorf("creating cache directory: %w", err)
 	}
 
-	// Write to file
-	if err := os.WriteFile(cachePath, data, 0o600); err != nil {
-		return fmt.Errorf("writing cache file: %w", err)
+	// Write to a temp file in the same directory, then rename into place. Rename
+	// is atomic within a filesystem, so concurrent writers targeting the same key
+	// (e.g. the HEAD and published clone nodes when a version's gitHead equals
+	// HEAD) each publish a complete file and one wins wholesale — a reader never
+	// observes the torn, half-written archive a bare os.WriteFile would leave.
+	tmp, err := os.CreateTemp(cacheDir, ".tmp-*")
+	if err != nil {
+		return fmt.Errorf("creating temp cache file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }() // no-op once the rename succeeds
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing temp cache file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing temp cache file: %w", err)
+	}
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		return fmt.Errorf("setting cache file permissions: %w", err)
+	}
+	if err := os.Rename(tmpPath, cachePath); err != nil {
+		return fmt.Errorf("publishing cache file: %w", err)
 	}
 
 	logger.Debug("cache write",

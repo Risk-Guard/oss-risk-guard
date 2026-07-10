@@ -8,10 +8,23 @@ import (
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/overrides"
 
 	"go.uber.org/zap"
 )
+
+// spanStatus maps a node's outcome onto the vocabulary an observer understands.
+func spanStatus(out StatusProvider, err error) observe.Status {
+	switch {
+	case err != nil:
+		return observe.StatusError
+	case out != nil && out.GetStatus() == StatusSkipped:
+		return observe.StatusSkipped
+	default:
+		return observe.StatusOK
+	}
+}
 
 // NoFetchProvider is satisfied by Input types whose --no-fetch flag should be
 // honored. When the executor encounters an Input that implements this and
@@ -77,6 +90,21 @@ func (d *DAG[TInput]) executeNode(
 	}
 
 	nodeType := reflect.TypeOf(entry.GetNodeForReflection()).String()
+
+	// Announce the node to whatever is observing this run. Nothing here knows
+	// or cares whether that draws a spinner row; with no reporter installed
+	// (the server, tests, library callers) Begin and End cost nothing.
+	//
+	// ctx is rebound locally, so the sibling goroutines the stage loop hands
+	// the same parent context to each derive their own span without racing.
+	// The deferred End reads the named results, so it reports the true outcome
+	// on every return path — including a panic, which would otherwise strand
+	// the row on screen.
+	ctx, span := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: entry.GetKind(),
+		Type: nodeType,
+	})
+	defer func() { span.End(spanStatus(output, err), err) }()
 
 	var nodeOutput StatusProvider
 	var execErr error
