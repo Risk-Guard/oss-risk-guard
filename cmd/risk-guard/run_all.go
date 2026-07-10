@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom"
-	"github.com/Risk-Guard/oss-risk-guard/src/observe"
 	"github.com/Risk-Guard/oss-risk-guard/src/policy"
 	"github.com/Risk-Guard/oss-risk-guard/src/ui"
+	"github.com/Risk-Guard/oss-risk-guard/src/violations"
+
+	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
 	"github.com/fatih/color"
 	"github.com/owenrumney/go-sarif/v2/sarif"
@@ -83,12 +86,9 @@ func runAll(cmd *cobra.Command, args []string) error {
 	// isn't silent. The DAG executor reports each node it runs under this span,
 	// so the row names the current activity, and the registry prefetch adds its
 	// own per-package rows underneath while this one runs.
-	sctx, srcPhase := observe.From(ctx).Begin(ctx, observe.Event{
-		Kind: observe.KindPhase,
-		Name: "scoring local source",
+	localViolations, sourceInput, err := withPhase2(ctx, "scoring local source", func(sctx context.Context) (*violations.AnalysisViolations, dag_impl.Input, error) {
+		return scoreLocalSource(sctx, repoPath, overridesHash)
 	})
-	localViolations, sourceInput, err := scoreLocalSource(sctx, repoPath, overridesHash)
-	srcPhase.End(phaseStatus(err), err)
 	if err != nil {
 		return fmt.Errorf("scoring local source: %w", err)
 	}
@@ -96,12 +96,9 @@ func runAll(cmd *cobra.Command, args []string) error {
 	// The SBOM phase prints its manifest inventory as it goes. That is safe to
 	// do underneath a live row now only because every one of those lines goes
 	// through the UI, which erases the rows before printing and repaints after.
-	bctx, sbomPhase := observe.From(ctx).Begin(ctx, observe.Event{
-		Kind: observe.KindPhase,
-		Name: "building SBOM",
+	sbomBytes, err := withPhase(ctx, "building SBOM", func(bctx context.Context) ([]byte, error) {
+		return buildSBOMBytes(bctx, repoPath, runAllSBOMFormat)
 	})
-	sbomBytes, err := buildSBOMBytes(bctx, repoPath, runAllSBOMFormat)
-	sbomPhase.End(phaseStatus(err), err)
 	if err != nil {
 		return softFailLocalOnly(ctx, outPath, sourceInput.AnalysisIdentifier, localViolations, "building SBOM", err, logger)
 	}

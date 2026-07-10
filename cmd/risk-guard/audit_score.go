@@ -64,12 +64,9 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 			// runs underneath it, so the row tracks the real current activity
 			// (fetching registry metadata, reading git history, …) instead of a
 			// frozen label.
-			pctx, phase := observe.From(gctx).Begin(gctx, observe.Event{
-				Kind: observe.KindPhase,
-				Name: key,
+			analysis, cachedAge, scoreErr := withPhase2(gctx, key, func(pctx context.Context) (*violations.AnalysisViolations, time.Duration, error) {
+				return scoreOneCached(pctx, key, overridesHash, checkMetadata, cc)
 			})
-			analysis, cachedAge, scoreErr := scoreOneCached(pctx, key, overridesHash, checkMetadata, cc)
-			phase.End(phaseStatus(scoreErr), scoreErr)
 
 			mu.Lock()
 			results = append(results, indexedResult{key: key, analysis: analysis, err: scoreErr})
@@ -121,6 +118,40 @@ func phaseStatus(err error) observe.Status {
 		return observe.StatusError
 	}
 	return observe.StatusOK
+}
+
+// withPhase runs fn under a phase span named name, passing it the span's
+// context so nodes it runs report underneath the row. End is deferred, per the
+// observe.Span contract, so a panic in fn cannot strand a live row; the span
+// still ends the moment fn returns, before the caller's next phase begins.
+func withPhase[T any](ctx context.Context, name string, fn func(context.Context) (T, error)) (T, error) {
+	pctx, phase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: name,
+	})
+	var (
+		v   T
+		err error
+	)
+	defer func() { phase.End(phaseStatus(err), err) }()
+	v, err = fn(pctx)
+	return v, err
+}
+
+// withPhase2 is withPhase for work that yields two values alongside its error.
+func withPhase2[A, B any](ctx context.Context, name string, fn func(context.Context) (A, B, error)) (A, B, error) {
+	pctx, phase := observe.From(ctx).Begin(ctx, observe.Event{
+		Kind: observe.KindPhase,
+		Name: name,
+	})
+	var (
+		a   A
+		b   B
+		err error
+	)
+	defer func() { phase.End(phaseStatus(err), err) }()
+	a, b, err = fn(pctx)
+	return a, b, err
 }
 
 // printProgress writes one completed-audit line through the UI so it scrolls
