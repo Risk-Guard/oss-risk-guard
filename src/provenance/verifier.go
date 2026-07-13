@@ -27,6 +27,10 @@ const (
 	// FailDigestMismatch indicates the attested subject digest did not match the
 	// registry-reported artifact hash — the signature is for a different artifact.
 	FailDigestMismatch FailReason = "digest-mismatch"
+	// FailMalformedBundle indicates a provenance attestation was present but its
+	// bundle could not be parsed. This is a soft miss, not a tampering signal, so a
+	// registry-side format change cannot mass-flag packages as invalid.
+	FailMalformedBundle FailReason = "malformed-bundle"
 	// FailRepoMismatch indicates a validly-signed attestation that names a source
 	// repository other than the one being analyzed. Set by the consuming node, not
 	// the Verifier, since only the node knows the declared repo.

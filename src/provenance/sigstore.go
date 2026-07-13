@@ -87,16 +87,20 @@ func (s *SigstoreVerifier) Verify(_ context.Context, req Request) (Result, error
 	wantHex := hex.EncodeToString(want)
 
 	sawProvenance := false
+	sawMalformed := false
 	for _, att := range resp.Attestations {
-		if !strings.Contains(att.PredicateType, "slsa.dev/provenance") {
+		if !strings.HasPrefix(att.PredicateType, "https://slsa.dev/provenance/") {
 			continue
 		}
-		sawProvenance = true
 
 		b := &bundle.Bundle{}
 		if err := b.UnmarshalJSON(att.Bundle); err != nil {
+			// An unparseable bundle is a soft miss (e.g. a registry format change),
+			// not a tampering signal — don't mark provenance as cryptographically seen.
+			sawMalformed = true
 			continue
 		}
+		sawProvenance = true
 
 		// Pass 1: full crypto verification WITHOUT binding the artifact, so a
 		// signature/identity failure is distinguishable from a digest mismatch.
@@ -129,8 +133,13 @@ func (s *SigstoreVerifier) Verify(_ context.Context, req Request) (Result, error
 	}
 
 	if sawProvenance {
-		// A present-but-unverifiable provenance is a signal, not a soft miss.
+		// A parseable-but-unverifiable provenance is a signal, not a soft miss.
 		return Result{FailReason: FailInvalidSignature}, nil
+	}
+	if sawMalformed {
+		// Provenance was advertised but its bundle couldn't be parsed — treat as a
+		// soft miss so a registry format change can't be read as tampering.
+		return Result{FailReason: FailMalformedBundle}, nil
 	}
 	return Result{FailReason: FailNoAttestation}, nil
 }

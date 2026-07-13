@@ -104,7 +104,7 @@ func (n *Node) evaluate(extractions []artifact.ArtifactExtraction, provViolation
 	}
 
 	if len(violations) > 0 {
-		rationale := checks.BuildViolationRationale(violations, "failed hash verification", "failed hash verification")
+		rationale := checks.BuildViolationRationale(violations, "failed integrity verification", "failed integrity verification")
 		evidence := violations
 		if len(evidence) > checks.MaxEvidenceItems {
 			evidence = evidence[:checks.MaxEvidenceItems]
