@@ -86,7 +86,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 	// isn't silent. The DAG executor reports each node it runs under this span,
 	// so the row names the current activity, and the registry prefetch adds its
 	// own per-package rows underneath while this one runs.
-	localViolations, sourceInput, err := withPhase2(ctx, "scoring local source", func(sctx context.Context) (*violations.AnalysisViolations, dag_impl.Input, error) {
+	localViolations, sourceInput, err := withPhase2(ctx, "scoring local source", 0, func(sctx context.Context) (*violations.AnalysisViolations, dag_impl.Input, error) {
 		return scoreLocalSource(sctx, repoPath, overridesHash)
 	})
 	if err != nil {

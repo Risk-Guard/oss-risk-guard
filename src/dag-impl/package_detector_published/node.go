@@ -62,13 +62,23 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return nil, fmt.Errorf("detecting packages in published tree: %w", err)
 	}
 
+	// The published clone pins either the attested gitHead or, when the registry
+	// recorded none, a release tag matching the version (publishedOut.Ref names it).
+	sourceRef, at := SourceRefGitHead, "gitHead "+publishedOut.Commit
+	if publishedOut.Ref != "" {
+		sourceRef, at = SourceRefTag, "tag "+publishedOut.Ref
+	}
+
 	logger.Info("detected packages in published tree",
-		zap.Int("count", len(manifests)), zap.String("commit", publishedOut.Commit))
+		zap.Int("count", len(manifests)),
+		zap.String("commit", publishedOut.Commit),
+		zap.String("ref", publishedOut.Ref))
 	out := NewOutput(executiondag.StatusSuccess,
-		fmt.Sprintf("detected %d package(s) at gitHead %s", len(manifests), publishedOut.Commit),
+		fmt.Sprintf("detected %d package(s) at %s", len(manifests), at),
 		manifests, input)
-	out.SourceRef = SourceRefGitHead
+	out.SourceRef = sourceRef
 	out.SourceCommit = publishedOut.Commit
+	out.SourceRefName = publishedOut.Ref
 	return out, nil
 }
 

@@ -20,23 +20,49 @@ func AppendTruncatedEvidence(out *Output, items []string, prefix, overflowLabel 
 	}
 }
 
-// SourceProvenance formats the one-line clause disclosing which source tree a
-// provenance check compared against. gitHeadUsed is true when the manifests came
-// from the tree cloned at the published version's gitHead (commit is that SHA,
-// rendered short); false means the check fell back to the repository's current
-// HEAD, in which case the source may have diverged from the published artifact.
-// pkgRef is "eco/name@version" (or "eco/name" when the version is unknown).
-func SourceProvenance(gitHeadUsed bool, commit, pkgRef string) string {
-	if gitHeadUsed {
-		return fmt.Sprintf("source as published (gitHead %s)", shortSHA(commit))
-	}
-	return fmt.Sprintf("repository HEAD — no gitHead recorded for %s, so source may differ from the published artifact", pkgRef)
+// Source-provenance kinds, mirroring package_detector_published.SourceRef* so a
+// detector's raw SourceRef string maps straight onto SourceRef.Kind. They form an
+// assurance ladder: an attested gitHead is strongest, a version-matched release
+// tag is inferred (the tag could have been moved after release), and current HEAD
+// is weakest (the source may have diverged from the published artifact entirely).
+const (
+	ProvenanceGitHead = "gitHead" // registry-attested commit the version was published from
+	ProvenanceTag     = "tag"     // release tag matching the version, resolved on the remote
+	ProvenanceHead    = "head"    // fell back to current HEAD
+)
+
+// SourceRef records which source tree a provenance check scanned, so findings can
+// disclose that assurance level honestly.
+type SourceRef struct {
+	Kind   string // ProvenanceGitHead | ProvenanceTag | ProvenanceHead
+	Commit string // resolved SHA for the gitHead/tag kinds; empty for head
+	Name   string // tag ref name (e.g. "@dnd-kit/core@6.3.1") for the tag kind; empty otherwise
 }
 
-// ScannedProvenance renders SourceProvenance as a standalone evidence line, the
-// form every provenance check emits it in.
-func ScannedProvenance(gitHeadUsed bool, commit, pkgRef string) string {
-	return "Scanned " + SourceProvenance(gitHeadUsed, commit, pkgRef)
+// Published reports whether the scan compared against the source as-published —
+// either the attested gitHead or a version-matched release tag — rather than
+// current HEAD.
+func (r SourceRef) Published() bool {
+	return r.Kind == ProvenanceGitHead || r.Kind == ProvenanceTag
+}
+
+// Describe formats the one-line clause naming the compared source tree. pkgRef is
+// "eco/name@version" (or "eco/name" when the version is unknown) and is used only
+// in the HEAD wording.
+func (r SourceRef) Describe(pkgRef string) string {
+	switch r.Kind {
+	case ProvenanceGitHead:
+		return fmt.Sprintf("source as published (gitHead %s)", shortSHA(r.Commit))
+	case ProvenanceTag:
+		return fmt.Sprintf("source at tag %s (%s)", r.Name, shortSHA(r.Commit))
+	default:
+		return fmt.Sprintf("repository HEAD — no gitHead recorded for %s, so source may differ from the published artifact", pkgRef)
+	}
+}
+
+// Scanned renders Describe as the standalone evidence line every provenance check emits.
+func (r SourceRef) Scanned(pkgRef string) string {
+	return "Scanned " + r.Describe(pkgRef)
 }
 
 // PackagesRef renders the analyzed packages as "eco/name@version" (comma-joined,

@@ -50,9 +50,11 @@ type Event struct {
 	Type string
 	// Name is the subject: a phase title or a package key. Empty for nodes.
 	Name string
-	// Total is the member count of a KindBatch, and zero elsewhere. It is a
-	// fact about the work, not a rendering hint — how (and whether) a batch of
-	// a given size is shown is the renderer's business.
+	// Total is the sibling count of the work: the member count of a KindBatch,
+	// or the number of peer phases a KindPhase belongs to (e.g. packages being
+	// scored). Zero when the work stands alone. It is a fact about the work, not
+	// a rendering hint — how (and whether) a count is shown is the renderer's
+	// business.
 	Total int
 }
 

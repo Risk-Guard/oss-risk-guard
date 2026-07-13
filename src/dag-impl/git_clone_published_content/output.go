@@ -13,6 +13,10 @@ type Output struct {
 	dag_impl.BaseOutput
 	RepoPath string `json:"-"`
 	Commit   string `json:"commit,omitempty"`
+	// Ref names the git tag this SHA was resolved from when the commit came from a
+	// version-tag lookup (the fallback used when no gitHead is recorded); empty
+	// when Commit is the registry-attested gitHead.
+	Ref string `json:"ref,omitempty"`
 }
 
 func NewOutput(status executiondag.Status, statusReason, repoPath, commit string, input dag_impl.Input) *Output {

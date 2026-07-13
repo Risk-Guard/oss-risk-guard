@@ -167,7 +167,7 @@ func (n *Node) checkFromSource(ctx context.Context, input dag_impl.Input) (*chec
 		if len(evidence) > checks.MaxEvidenceItems-1 {
 			evidence = evidence[:checks.MaxEvidenceItems-1]
 		}
-		evidence = append(evidence, checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)))
+		evidence = append(evidence, detectorOut.Provenance().Scanned(checks.PackagesRef(input.Packages)))
 
 		return checks.NewViolationOutput(n.Code, rationale, evidence, input), nil
 	}
