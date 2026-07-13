@@ -62,10 +62,14 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return nil, fmt.Errorf("detecting packages in published tree: %w", err)
 	}
 
-	// The published clone pins either the attested gitHead or, when the registry
-	// recorded none, a release tag matching the version (publishedOut.Ref names it).
+	// The published clone pins the commit in order of assurance: verified build
+	// provenance (strongest), else the attested gitHead, else a release tag matching
+	// the version (publishedOut.Ref names the tag/provenance ref).
 	sourceRef, at := SourceRefGitHead, "gitHead "+publishedOut.Commit
-	if publishedOut.Ref != "" {
+	switch {
+	case publishedOut.ProvenanceVerified:
+		sourceRef, at = SourceRefProvenance, "verified provenance "+publishedOut.Commit
+	case publishedOut.Ref != "":
 		sourceRef, at = SourceRefTag, "tag "+publishedOut.Ref
 	}
 

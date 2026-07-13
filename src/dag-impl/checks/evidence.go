@@ -26,9 +26,10 @@ func AppendTruncatedEvidence(out *Output, items []string, prefix, overflowLabel 
 // tag is inferred (the tag could have been moved after release), and current HEAD
 // is weakest (the source may have diverged from the published artifact entirely).
 const (
-	ProvenanceGitHead = "gitHead" // registry-attested commit the version was published from
-	ProvenanceTag     = "tag"     // release tag matching the version, resolved on the remote
-	ProvenanceHead    = "head"    // fell back to current HEAD
+	ProvenanceVerified = "provenance" // cryptographically verified build-provenance attestation (strongest)
+	ProvenanceGitHead  = "gitHead"    // registry-attested commit the version was published from
+	ProvenanceTag      = "tag"        // release tag matching the version, resolved on the remote
+	ProvenanceHead     = "head"       // fell back to current HEAD
 )
 
 // SourceRef records which source tree a provenance check scanned, so findings can
@@ -43,7 +44,7 @@ type SourceRef struct {
 // either the attested gitHead or a version-matched release tag — rather than
 // current HEAD.
 func (r SourceRef) Published() bool {
-	return r.Kind == ProvenanceGitHead || r.Kind == ProvenanceTag
+	return r.Kind == ProvenanceVerified || r.Kind == ProvenanceGitHead || r.Kind == ProvenanceTag
 }
 
 // Describe formats the one-line clause naming the compared source tree. pkgRef is
@@ -51,6 +52,8 @@ func (r SourceRef) Published() bool {
 // in the HEAD wording.
 func (r SourceRef) Describe(pkgRef string) string {
 	switch r.Kind {
+	case ProvenanceVerified:
+		return fmt.Sprintf("source with verified build provenance (%s)", shortSHA(r.Commit))
 	case ProvenanceGitHead:
 		return fmt.Sprintf("source as published (gitHead %s)", shortSHA(r.Commit))
 	case ProvenanceTag:

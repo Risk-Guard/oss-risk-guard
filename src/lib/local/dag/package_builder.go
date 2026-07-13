@@ -6,7 +6,7 @@ import (
 
 	dag_builder "github.com/Risk-Guard/oss-risk-guard/src/dag-builder"
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
-	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/artifact_hash_mismatch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_invalid_artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_malformed_dependencies"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_name_mismatch"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_no_license"
@@ -67,7 +67,7 @@ func PackageBuilder(
 	executiondag.AddNode(dag, package_stale_release.NewNode())
 	executiondag.AddNode(dag, package_release_cooldown.NewNode())
 	executiondag.AddNode(dag, package_malformed_dependencies.NewNode())
-	executiondag.AddNode(dag, artifact_hash_mismatch.NewNode())
+	executiondag.AddNode(dag, package_invalid_artifact.NewNode())
 	executiondag.AddNode(dag, source_no_human_commits.NewNode())
 	executiondag.AddNode(dag, source_no_security_policy.NewNode())
 	executiondag.AddNode(dag, source_no_ci.NewNode())

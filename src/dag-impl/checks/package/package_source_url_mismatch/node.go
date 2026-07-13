@@ -9,7 +9,11 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_invalid_artifact"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/provenance_verify"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
+	"github.com/Risk-Guard/oss-risk-guard/src/provenance"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
 
@@ -37,8 +41,15 @@ func NewNode() *Node {
 func (n *Node) GetDependencies() []any {
 	return []any{
 		executiondag.DependsOn[*transformer.Node](),
+		executiondag.DependsOn[*provenance_verify.Node](),
+		executiondag.DependsOn[*package_invalid_artifact.Node](),
 	}
 }
+
+// AllowAutoSkip returns false so this check still runs when PACKAGE_INVALID_ARTIFACT
+// or its dependencies skip — it must be able to observe that check's verdict to
+// decide whether to defer, and to read provenance for a signed repo mismatch.
+func (n *Node) AllowAutoSkip() bool { return false }
 
 // normalizeAndCompareURLs compares two URLs after normalization.
 // Returns true if URLs are considered equal, false otherwise.
@@ -67,6 +78,16 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	}
 
 	inputSourceURL := *input.SourceURL
+
+	// A cryptographically invalid artifact (CRITICAL) dominates; a source-URL
+	// mismatch is lower-signal context on top of it, so defer to that finding.
+	invalidOut := executiondag.GetOutput[*package_invalid_artifact.Node](ctx).(*checks.Output)
+	if invalidOut.Check.CheckStatus == storage.StatusViolation {
+		log.Debug("PACKAGE_SOURCE_URL_MISMATCH check: deferred to PACKAGE_INVALID_ARTIFACT")
+		return checks.NewSkippedOutput(n.Code, "Deferred to PACKAGE_INVALID_ARTIFACT", input), nil
+	}
+
+	provOut := executiondag.GetOutput[*provenance_verify.Node](ctx).(*provenance_verify.Output)
 
 	// Get transformer output - DAG guarantees it succeeded
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
@@ -109,6 +130,16 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			)
 			compliantPackages = append(compliantPackages, compliant)
 		}
+	}
+
+	// A validly-signed build provenance that attests a different repo than the one
+	// analyzed is a high-confidence source mismatch, independent of (and stronger
+	// than) the registry's own self-reported repository field.
+	if provOut.FailReason == string(provenance.FailRepoMismatch) && provOut.SourceRepo != "" {
+		hasViolation = true
+		violations = append(violations, fmt.Sprintf(
+			"Build provenance (cryptographically signed) attests source repository %q, not the analyzed repository %q",
+			provOut.SourceRepo, inputSourceURL))
 	}
 
 	if hasViolation {

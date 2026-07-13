@@ -9,6 +9,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_resolve"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/provenance_verify"
 	"github.com/Risk-Guard/oss-risk-guard/src/ecosystem/def"
 	"github.com/Risk-Guard/oss-risk-guard/src/git"
 	"github.com/Risk-Guard/oss-risk-guard/src/language/dag/transformer"
@@ -59,9 +60,9 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return NewOutput(executiondag.StatusSkipped, "local source has no published gitHead", "", "", input), nil
 	}
 
-	commit, ref := resolvePublishedSource(ctx, input)
+	commit, ref, viaProvenance := resolvePublishedSource(ctx, input)
 	if commit == "" {
-		return NewOutput(executiondag.StatusSkipped, "no gitHead or version tag available for analyzed version", "", "", input), nil
+		return NewOutput(executiondag.StatusSkipped, "no provenance, gitHead, or version tag available for analyzed version", "", "", input), nil
 	}
 
 	resolveOut := executiondag.GetOutput[*git_resolve.Node](ctx).(*git_resolve.Output)
@@ -90,33 +91,45 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 
 	out := NewOutput(m.Status, m.Reason, m.RepoPath, m.Commit, input)
 	out.Ref = ref
+	out.ProvenanceVerified = viaProvenance
 	return out, nil
 }
 
-// resolvePublishedSource pins the source tree for the analyzed version. It prefers
-// the registry-attested gitHead (a full SHA the version was published from); when
-// none is recorded it falls back to resolving a release tag that matches the
-// version on the remote. It returns the resolved commit SHA and, for the tag
-// fallback, the matched tag ref name (empty for a gitHead). Returns ("","") when
-// neither is available, so the caller skips to the HEAD fallback. The DAG is
-// scoped to a single source URL, so the first package that resolves identifies the
-// published commit for that source.
-func resolvePublishedSource(ctx context.Context, input dag_impl.Input) (commit, ref string) {
+// resolvePublishedSource pins the source tree for the analyzed version, in order of
+// assurance: (1) a cryptographically verified build-provenance commit — the
+// strongest, since it is signed and bound to the artifact; (2) the registry-attested
+// gitHead (self-reported, a full SHA git can fetch by); (3) a release tag matching
+// the version on the remote. It returns the resolved commit SHA, the matched
+// ref name (tag/provenance ref; empty for a gitHead), and whether the commit came
+// from verified provenance. Returns ("","",false) when none is available, so the
+// caller skips to the HEAD fallback. The DAG is scoped to a single source URL, so
+// the first package that resolves identifies the published commit for that source.
+func resolvePublishedSource(ctx context.Context, input dag_impl.Input) (commit, ref string, viaProvenance bool) {
+	// Strongest: a verified build-provenance attestation pins the exact commit the
+	// artifact was built from, cryptographically bound to the declared repo.
+	// TryGetOutput (not GetOutput) so this is safe even if the dep is absent.
+	if v, ok := executiondag.TryGetOutput[*provenance_verify.Node](ctx); ok {
+		if provOut, ok := v.(*provenance_verify.Output); ok && provOut.Verified && git.IsFullSHA(provOut.Commit) {
+			return provOut.Commit, provOut.Ref, true
+		}
+	}
+
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
 
-	// First choice: an attested gitHead (the only form git can fetch by directly).
+	// Next: an attested gitHead (the only self-reported form git can fetch by directly).
 	for _, pkg := range input.Packages {
 		meta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
 		if meta == nil || meta.GitHead == nil {
 			continue
 		}
 		if git.IsFullSHA(*meta.GitHead) {
-			return *meta.GitHead, ""
+			return *meta.GitHead, "", false
 		}
 	}
 
 	// Fallback: resolve a release tag matching the version on the remote.
-	return resolveVersionTag(ctx, input, transformerOut)
+	commit, ref = resolveVersionTag(ctx, input, transformerOut)
+	return commit, ref, false
 }
 
 // resolveVersionTag looks up a git tag matching a package's version on the remote,

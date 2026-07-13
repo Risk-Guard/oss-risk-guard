@@ -263,6 +263,16 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		return nil, fmt.Errorf("git metadata is nil despite git_clone_metadata success")
 	}
 
+	// Cryptographically verified build provenance binds this artifact to its declared
+	// source repo, so a published-vs-source name difference (e.g. pdfjs-dist built from
+	// mozilla/pdf.js) is not impersonation — the name check is moot.
+	if prov.Kind == checks.ProvenanceVerified {
+		log.Debug("PACKAGE_NAME_MISMATCH check: compliant (verified build provenance)")
+		return checks.NewCompliantOutput(n.Code,
+			"Published artifact has verified build provenance from the source repository",
+			input).WithEvidence("Provenance verified: built from " + gitMeta.SourceURL + " — " + prov.Describe("")), nil
+	}
+
 	if len(manifests) == 0 {
 		log.Debug("PACKAGE_NAME_MISMATCH check: skipped - no package definitions found")
 		return checks.NewSkippedOutput(

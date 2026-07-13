@@ -1,4 +1,4 @@
-package artifact_hash_mismatch
+package package_invalid_artifact
 
 import (
 	"testing"
@@ -6,6 +6,7 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/artifact_fetch"
+	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/provenance_verify"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/storage"
 
 	dag_impl "github.com/Risk-Guard/oss-risk-guard/src/dag-impl"
@@ -19,13 +20,14 @@ func TestNode_GetDependencies(t *testing.T) {
 	node := NewNode()
 	deps := node.GetDependencies()
 
-	require.Len(t, deps, 1)
+	require.Len(t, deps, 2)
 	require.Equal(t, executiondag.DependsOn[*artifact_fetch.Node](), deps[0])
+	require.Equal(t, executiondag.DependsOn[*provenance_verify.Node](), deps[1])
 }
 
 func TestNode_GetCode(t *testing.T) {
 	node := NewNode()
-	require.Equal(t, "ARTIFACT_HASH_MISMATCH", node.GetCode())
+	require.Equal(t, "PACKAGE_INVALID_ARTIFACT", node.GetCode())
 }
 
 func TestNode_GetCategories(t *testing.T) {
@@ -53,7 +55,7 @@ func TestCheck_NoViolation_AllVerified(t *testing.T) {
 	}
 
 	node := NewNode()
-	output := node.evaluate(extractions, dag_impl.Input{})
+	output := node.evaluate(extractions, "", dag_impl.Input{})
 
 	require.Equal(t, storage.StatusCompliant, output.Check.CheckStatus)
 }
@@ -77,7 +79,7 @@ func TestCheck_Violation_HashMismatch(t *testing.T) {
 	}
 
 	node := NewNode()
-	output := node.evaluate(extractions, dag_impl.Input{})
+	output := node.evaluate(extractions, "", dag_impl.Input{})
 
 	require.Equal(t, storage.StatusViolation, output.Check.CheckStatus)
 	require.Len(t, output.Check.Evidence, 1)
@@ -87,7 +89,7 @@ func TestCheck_Violation_HashMismatch(t *testing.T) {
 
 func TestCheck_Skipped_NoExtractions(t *testing.T) {
 	node := NewNode()
-	output := node.evaluate(nil, dag_impl.Input{})
+	output := node.evaluate(nil, "", dag_impl.Input{})
 
 	require.Equal(t, storage.StatusCompliant, output.Check.CheckStatus)
 }
@@ -103,7 +105,7 @@ func TestCheck_SkipsSkippedExtractions(t *testing.T) {
 	}
 
 	node := NewNode()
-	output := node.evaluate(extractions, dag_impl.Input{})
+	output := node.evaluate(extractions, "", dag_impl.Input{})
 
 	require.Equal(t, storage.StatusCompliant, output.Check.CheckStatus)
 }

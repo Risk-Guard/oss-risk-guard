@@ -111,8 +111,8 @@ var checkRationales = map[string]checkRationale{
 	"PACKAGE_UNRELEASED_CHANGES": {
 		why: "Flags source with commits never published to the registry — what's installed may not match the code you reviewed.",
 	},
-	"ARTIFACT_HASH_MISMATCH": {
-		why: "Blocks packages whose downloaded artifact doesn't match the registry hash — a sign of tampering in transit or at rest.",
+	"PACKAGE_INVALID_ARTIFACT": {
+		why: "Blocks packages whose artifact fails integrity or build-provenance verification — a mismatched hash, a bad signature, or an attested digest that doesn't match all signal tampering.",
 	},
 }
 

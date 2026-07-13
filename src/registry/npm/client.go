@@ -53,9 +53,25 @@ type NPMUser struct {
 
 // NPMDist contains distribution information for a package version
 type NPMDist struct {
-	Tarball   string `json:"tarball"`
-	Shasum    string `json:"shasum"`              // SHA-1 hex
-	Integrity string `json:"integrity,omitempty"` // SRI format sha512-...
+	Tarball      string           `json:"tarball"`
+	Shasum       string           `json:"shasum"`              // SHA-1 hex
+	Integrity    string           `json:"integrity,omitempty"` // SRI format sha512-...
+	Attestations *NPMAttestations `json:"attestations,omitempty"`
+}
+
+// NPMAttestations is the registry-hosted pointer to a version's Sigstore
+// attestation bundle (build provenance). The registry stores only this pointer;
+// the bundle itself must be fetched from URL and cryptographically verified
+// before any of its claims (source repo, commit) can be trusted.
+type NPMAttestations struct {
+	URL        string                    `json:"url"`
+	Provenance *NPMAttestationProvenance `json:"provenance,omitempty"`
+}
+
+// NPMAttestationProvenance records the predicate type advertised for the
+// provenance attestation (e.g. "https://slsa.dev/provenance/v1").
+type NPMAttestationProvenance struct {
+	PredicateType string `json:"predicateType"`
 }
 
 // NPMVersionDetails contains version-specific information

@@ -31,5 +31,9 @@ func (j *JavaScript) extractDistribution(versions map[string]npmregistry.NPMVers
 		info.HashAlgorithm = "sha1"
 	}
 
+	if dist.Attestations != nil {
+		info.AttestationURL = dist.Attestations.URL
+	}
+
 	return info
 }
