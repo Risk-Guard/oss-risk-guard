@@ -13,9 +13,10 @@ import (
 // or fell back to current HEAD. Values match checks.Provenance* so SourceRef maps
 // straight onto checks.SourceRef.Kind.
 const (
-	SourceRefGitHead = checks.ProvenanceGitHead // detected at the published version's gitHead
-	SourceRefTag     = checks.ProvenanceTag     // detected at a release tag matching the version
-	SourceRefHead    = checks.ProvenanceHead    // fell back to current default-branch HEAD
+	SourceRefProvenance = checks.ProvenanceVerified // detected at a commit from verified build provenance
+	SourceRefGitHead    = checks.ProvenanceGitHead  // detected at the published version's gitHead
+	SourceRefTag        = checks.ProvenanceTag      // detected at a release tag matching the version
+	SourceRefHead       = checks.ProvenanceHead     // fell back to current default-branch HEAD
 )
 
 // Output mirrors package_detector.Output's DetectedManifests so provenance

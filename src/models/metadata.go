@@ -27,6 +27,11 @@ type DistributionInfo struct {
 	Filename      string `json:"filename,omitempty"`
 	Hash          string `json:"hash,omitempty"`
 	HashAlgorithm string `json:"hash_algorithm,omitempty"` // "sha256", "sha512", "sha1"
+	// AttestationURL points to the registry-hosted Sigstore attestation bundle
+	// (build provenance) for this version, when the registry advertises one; empty
+	// otherwise. The bundle must be fetched and cryptographically verified before
+	// its claims (source repo, commit) can be trusted — a bare URL is not proof.
+	AttestationURL string `json:"attestation_url,omitempty"`
 }
 
 // PackageMetadata represents package.yml - ecosystem package data

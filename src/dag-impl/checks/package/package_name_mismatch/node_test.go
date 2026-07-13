@@ -406,6 +406,42 @@ func makeTestCtxRef(t *testing.T, gitMeta *models.GitMetadata, manifests []model
 	return ctx
 }
 
+// TestExecute_ProvenanceVerified_Clears is the motivating case: pdfjs-dist is
+// published from mozilla/pdf.js whose in-tree manifest is named "pdf.js". The names
+// differ, but verified build provenance binds the artifact to the repo, so the
+// check must be compliant rather than a CRITICAL name mismatch.
+func TestExecute_ProvenanceVerified_Clears(t *testing.T) {
+	gitMeta := &models.GitMetadata{SourceURL: "https://github.com/mozilla/pdf.js"}
+	manifests := []models.ManifestResult{
+		{
+			DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
+			Name:             strPtr("pdf.js"), // source repo name — deliberately differs from the published name
+		},
+	}
+
+	ctx := makeTestCtxRef(t, gitMeta, manifests,
+		package_detector_published.SourceRefProvenance, "34781e0d9d757d35d8e44177fc7003286d562484")
+	node := NewNode(languageregistry.Languages())
+	input := dag_impl.Input{
+		Packages: []models.PackageInfo{
+			{Ecosystem: "npm", Name: "pdfjs-dist", Version: "5.7.284"},
+		},
+	}
+
+	output, err := node.Execute(ctx, input)
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if output.Check.CheckStatus != storage.StatusCompliant {
+		t.Fatalf("expected compliant with verified provenance, got %s: %s",
+			output.Check.CheckStatus, output.Check.Rationale)
+	}
+	if !evidenceContains(output.Check.Evidence, "Provenance verified") ||
+		!evidenceContains(output.Check.Evidence, "mozilla/pdf.js") {
+		t.Errorf("expected provenance evidence naming the repo, got %v", output.Check.Evidence)
+	}
+}
+
 func TestExecute_NilNameManifest_ShouldSkip(t *testing.T) {
 	gitMeta := &models.GitMetadata{SourceURL: "https://github.com/yaml/pyyaml"}
 	manifests := []models.ManifestResult{

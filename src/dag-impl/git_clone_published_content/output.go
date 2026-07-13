@@ -15,8 +15,14 @@ type Output struct {
 	Commit   string `json:"commit,omitempty"`
 	// Ref names the git tag this SHA was resolved from when the commit came from a
 	// version-tag lookup (the fallback used when no gitHead is recorded); empty
-	// when Commit is the registry-attested gitHead.
+	// when Commit is the registry-attested gitHead. For a provenance-pinned commit
+	// it carries the attested build ref (e.g. "refs/tags/v5.7.284").
 	Ref string `json:"ref,omitempty"`
+	// ProvenanceVerified is true when Commit was pinned from a cryptographically
+	// verified build-provenance attestation (the strongest source), rather than a
+	// self-reported gitHead or a version tag. The published detector maps this onto
+	// the shared SourceRef assurance tier.
+	ProvenanceVerified bool `json:"provenance_verified,omitempty"`
 }
 
 func NewOutput(status executiondag.Status, statusReason, repoPath, commit string, input dag_impl.Input) *Output {
