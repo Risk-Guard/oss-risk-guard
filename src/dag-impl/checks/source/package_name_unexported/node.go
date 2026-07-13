@@ -67,7 +67,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		log.Debug("SOURCE_PACKAGE_NAME_UNEXPORTED check: violation")
 		evidence := []string{
 			fmt.Sprintf("Found %d manifest(s) but none declare a package name", len(manifests)),
-			checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)),
+			detectorOut.Provenance().Scanned(checks.PackagesRef(input.Packages)),
 		}
 		return checks.NewViolationOutput(
 			n.Code,

@@ -27,6 +27,7 @@ type row struct {
 
 	note   string      // fixed parenthetical, for non-phase rows
 	active []*liveSpan // in-flight child node spans, for phase rows
+	total  int         // sibling count for a counted phase; 0 = no "[ ⠦/N]" prefix
 }
 
 // activity is the parenthetical for a row. A phase whose stage is running
@@ -184,12 +185,27 @@ func (u *UI) renderLocked(rw *row) string {
 		note = "  (" + note + ")"
 	}
 	var s string
-	if rw.phase {
+	switch {
+	case rw.phase && rw.total > 0:
+		// A counted phase leads with the same aligned "[  ⠦/N]" prefix the
+		// finished lines print as "[  8/N]", so in-flight and completed rows
+		// share one column. The spinner stands in for this row's number.
+		s = fmt.Sprintf("%s %s%s  %s", counterPrefix(frame, rw.total), rw.text, note, elapsed)
+	case rw.phase:
 		s = fmt.Sprintf("%c %s%s  %s", frame, rw.text, note, elapsed)
-	} else {
+	default:
 		s = fmt.Sprintf("%c %s  %s%s", frame, rw.text, elapsed, note)
 	}
 	return truncate(s, u.width)
+}
+
+// counterPrefix renders "[  ⠦/N]" with the spinner right-aligned to total's
+// digit width, matching printProgress's "[%*d/%d]" so a running row and the
+// completed line it becomes occupy the same column. The spinner is a single
+// display column, so it takes the place of one digit.
+func counterPrefix(frame rune, total int) string {
+	pad := strings.Repeat(" ", len(strconv.Itoa(total))-1)
+	return fmt.Sprintf("[%s%c/%d]", pad, frame, total)
 }
 
 // mmss formats a duration as M:SS (e.g. 3:26).

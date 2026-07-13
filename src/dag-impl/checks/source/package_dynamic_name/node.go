@@ -80,7 +80,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		}
 		evidence := make([]string, 0, len(reasons)+1)
 		evidence = append(evidence, reasons...)
-		evidence = append(evidence, checks.ScannedProvenance(detectorOut.GitHeadUsed(), detectorOut.SourceCommit, checks.PackagesRef(input.Packages)))
+		evidence = append(evidence, detectorOut.Provenance().Scanned(checks.PackagesRef(input.Packages)))
 
 		log.Debug("PACKAGE_DYNAMIC_NAME check: violation",
 			zap.Int("dynamic_count", len(dynamicPackages)))

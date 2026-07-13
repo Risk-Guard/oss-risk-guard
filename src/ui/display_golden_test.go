@@ -157,6 +157,30 @@ func TestGoldenRowLayouts(t *testing.T) {
 	}
 }
 
+// A counted phase leads with the aligned "[  ⠋/N]" prefix so the running row
+// lines up with the finished "[  8/N]" lines printProgress scrolls above it. The
+// spinner right-aligns to total's digit width, taking a single digit's place.
+func TestGoldenCountedPhasePrefix(t *testing.T) {
+	u, buf := goldenUI()
+	phase := fixedRow("package/npm/left-pad", true)
+	phase.total = 101
+	phase.active = []*liveSpan{{label: "detecting packages"}}
+	u.rows = []*row{phase}
+	u.redrawForTest()
+
+	out := buf.String()
+	if !strings.Contains(out, "[  ⠋/101] package/npm/left-pad  (detecting packages)  0:00") {
+		t.Errorf("counted phase should lead with aligned counter: %q", out)
+	}
+	// The prefix width must match printProgress's "[%*d/%d]" so columns align.
+	if got, want := counterPrefix('⠋', 101), "[  ⠋/101]"; got != want {
+		t.Errorf("counterPrefix = %q, want %q", got, want)
+	}
+	if got, want := counterPrefix('⠋', 5), "[⠋/5]"; got != want {
+		t.Errorf("counterPrefix single digit = %q, want %q", got, want)
+	}
+}
+
 // A row with no activity renders no empty parentheses.
 func TestGoldenEmptyActivityOmitsParens(t *testing.T) {
 	u, buf := goldenUI()

@@ -44,7 +44,7 @@ func (r *reporter) Begin(ctx context.Context, ev observe.Event) (context.Context
 
 	switch ev.Kind {
 	case observe.KindPhase:
-		s.row = r.ui.startRow(ev.Name, true, "")
+		s.row = r.ui.startRow(ev.Name, true, "", ev.Total)
 
 	case observe.KindBatch:
 		s.batch = &batchState{
@@ -59,7 +59,7 @@ func (r *reporter) Begin(ctx context.Context, ev observe.Event) (context.Context
 	case observe.KindPackage:
 		s.batch = batchOf(parent)
 		if s.batch != nil && !s.batch.silent {
-			s.row = r.ui.startRow(ev.Name, false, s.batch.note)
+			s.row = r.ui.startRow(ev.Name, false, s.batch.note, 0)
 		}
 
 	default: // a DAG node, running inside some phase
@@ -107,11 +107,11 @@ func batchOf(s *liveSpan) *batchState {
 }
 
 // startRow adds a live row, or returns nil when rows are suppressed.
-func (u *UI) startRow(text string, phase bool, note string) *row {
+func (u *UI) startRow(text string, phase bool, note string, total int) *row {
 	if !u.enabled {
 		return nil
 	}
-	rw := &row{text: text, start: time.Now(), phase: phase, note: note}
+	rw := &row{text: text, start: time.Now(), phase: phase, note: note, total: total}
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	u.addRowLocked(rw)

@@ -64,7 +64,7 @@ func scoreAll(ctx context.Context, keys []string, locByKey map[string]*models.Lo
 			// runs underneath it, so the row tracks the real current activity
 			// (fetching registry metadata, reading git history, …) instead of a
 			// frozen label.
-			analysis, cachedAge, scoreErr := withPhase2(gctx, key, func(pctx context.Context) (*violations.AnalysisViolations, time.Duration, error) {
+			analysis, cachedAge, scoreErr := withPhase2(gctx, key, len(keys), func(pctx context.Context) (*violations.AnalysisViolations, time.Duration, error) {
 				return scoreOneCached(pctx, key, overridesHash, checkMetadata, cc)
 			})
 
@@ -139,10 +139,15 @@ func withPhase[T any](ctx context.Context, name string, fn func(context.Context)
 }
 
 // withPhase2 is withPhase for work that yields two values alongside its error.
-func withPhase2[A, B any](ctx context.Context, name string, fn func(context.Context) (A, B, error)) (A, B, error) {
+// total, when > 0, is the number of sibling phases this one belongs to (e.g. the
+// package count during scoring); the renderer uses it to prefix an aligned
+// "[  ⠦/N]" counter that matches the completed "[  8/N]" lines. Pass 0 for a
+// standalone phase.
+func withPhase2[A, B any](ctx context.Context, name string, total int, fn func(context.Context) (A, B, error)) (A, B, error) {
 	pctx, phase := observe.From(ctx).Begin(ctx, observe.Event{
-		Kind: observe.KindPhase,
-		Name: name,
+		Kind:  observe.KindPhase,
+		Name:  name,
+		Total: total,
 	})
 	var (
 		a   A
@@ -158,7 +163,10 @@ func withPhase2[A, B any](ctx context.Context, name string, fn func(context.Cont
 // cleanly above the in-flight rows; when rows are disabled the UI passes it
 // straight through to stderr.
 func printProgress(disp *ui.UI, done, total int, key string, findingCount int, scoreErr error, cachedAge time.Duration, loc *models.LocationInfo) {
-	prefix := color.HiBlackString("[%d/%d]", done, total)
+	// Right-align done to total's digit width so the "[  8/101]" … "[101/101]"
+	// prefixes share a fixed column and the package names line up.
+	width := len(fmt.Sprintf("%d", total))
+	prefix := color.HiBlackString("[%*d/%d]", width, done, total)
 	var prov string
 	if p := manifestProvenance(loc); p != "" {
 		prov = "  " + color.HiBlackString("from %s", p)

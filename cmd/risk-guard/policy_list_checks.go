@@ -27,7 +27,9 @@ const uncategorized = "(uncategorized)"
 // renderCheckList produces a human-readable, colored catalog of every check the
 // tool can run, grouped by risk category. The category headers are colored to
 // mirror how the default policy grades them; a check with multiple categories is
-// listed under each. It returns the full text so the caller can do a single
+// listed under each. Each check's disclaimers (methodology, scope, or default
+// thresholds) are printed dimmed beneath it so the caller can interpret a
+// result correctly. It returns the full text so the caller can do a single
 // checked write to stdout.
 func renderCheckList(checks []dag_builder.CheckInfo) string {
 	var b strings.Builder
@@ -54,6 +56,12 @@ func renderCheckList(checks []dag_builder.CheckInfo) string {
 				color.HiBlackString("%s", c.Description))
 			if c.Deprecated {
 				fmt.Fprintf(&b, "  %-*s  %s\n", width, "", color.HiBlackString("(deprecated)"))
+			}
+			for _, d := range c.Disclaimers {
+				// Align each disclaimer under the description column and lead with a
+				// dim ↳ so methodology/threshold notes read as secondary detail.
+				fmt.Fprintf(&b, "  %-*s  %s %s\n", width, "",
+					color.HiBlackString("↳"), color.HiBlackString("%s", d))
 			}
 		}
 	}

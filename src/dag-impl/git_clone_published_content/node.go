@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/git_clone_content"
@@ -58,9 +59,9 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		return NewOutput(executiondag.StatusSkipped, "local source has no published gitHead", "", "", input), nil
 	}
 
-	gitHead := selectGitHead(ctx, input)
-	if gitHead == "" {
-		return NewOutput(executiondag.StatusSkipped, "no gitHead available for analyzed version", "", "", input), nil
+	commit, ref := resolvePublishedSource(ctx, input)
+	if commit == "" {
+		return NewOutput(executiondag.StatusSkipped, "no gitHead or version tag available for analyzed version", "", "", input), nil
 	}
 
 	resolveOut := executiondag.GetOutput[*git_resolve.Node](ctx).(*git_resolve.Output)
@@ -68,7 +69,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 	m, err := git_clone_content.Materialize(ctx, git_clone_content.MaterializeParams{
 		SourceURL:          *input.SourceURL,
 		IsLocal:            false,
-		CommitSHA:          gitHead,
+		CommitSHA:          commit,
 		RepoDirName:        repoDirName,
 		SparseCheckoutHash: n.sparseCheckoutHash,
 		Patterns:           git_clone_content.BuildSparsePatterns(n.ecosystems),
@@ -77,35 +78,103 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*Output, erro
 		Trusted:            input.Trusted,
 	}, input)
 	if err != nil {
-		// A gitHead that no longer resolves on the remote (force-push, deleted
-		// branch, unadvertised SHA) is a source-owner data problem, not a fatal
+		// A commit that no longer resolves on the remote (force-push, deleted
+		// branch/tag, unadvertised SHA) is a source-owner data problem, not a fatal
 		// error. Skip so the published detector falls back to HEAD instead of
 		// halting the DAG.
-		log.Info("published gitHead clone failed; provenance checks will fall back to HEAD",
-			zap.String("git_head", gitHead), zap.Error(err))
+		log.Info("published clone failed; provenance checks will fall back to HEAD",
+			zap.String("commit", commit), zap.String("ref", ref), zap.Error(err))
 		return NewOutput(executiondag.StatusSkipped,
-			fmt.Sprintf("cloning published gitHead %s: %v", gitHead, err), "", "", input), nil
+			fmt.Sprintf("cloning published source %s: %v", commit, err), "", "", input), nil
 	}
 
-	return NewOutput(m.Status, m.Reason, m.RepoPath, m.Commit, input), nil
+	out := NewOutput(m.Status, m.Reason, m.RepoPath, m.Commit, input)
+	out.Ref = ref
+	return out, nil
 }
 
-// selectGitHead returns the gitHead of the analyzed package's version when the
-// registry recorded one and it is a full SHA (the only form git can fetch by).
-// The DAG is scoped to a single source URL, so the first package carrying a
-// usable gitHead identifies the published commit for that source.
-func selectGitHead(ctx context.Context, input dag_impl.Input) string {
+// resolvePublishedSource pins the source tree for the analyzed version. It prefers
+// the registry-attested gitHead (a full SHA the version was published from); when
+// none is recorded it falls back to resolving a release tag that matches the
+// version on the remote. It returns the resolved commit SHA and, for the tag
+// fallback, the matched tag ref name (empty for a gitHead). Returns ("","") when
+// neither is available, so the caller skips to the HEAD fallback. The DAG is
+// scoped to a single source URL, so the first package that resolves identifies the
+// published commit for that source.
+func resolvePublishedSource(ctx context.Context, input dag_impl.Input) (commit, ref string) {
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
+
+	// First choice: an attested gitHead (the only form git can fetch by directly).
 	for _, pkg := range input.Packages {
 		meta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
 		if meta == nil || meta.GitHead == nil {
 			continue
 		}
 		if git.IsFullSHA(*meta.GitHead) {
-			return *meta.GitHead
+			return *meta.GitHead, ""
 		}
 	}
-	return ""
+
+	// Fallback: resolve a release tag matching the version on the remote.
+	return resolveVersionTag(ctx, input, transformerOut)
+}
+
+// resolveVersionTag looks up a git tag matching a package's version on the remote,
+// for versions the registry published without a gitHead. It queries once per
+// package with a "*<version>" glob (a single ls-remote round-trip) and selects the
+// tag that best identifies the package version. Returns the resolved SHA and tag
+// ref name, or ("","") when no version tag resolves.
+func resolveVersionTag(ctx context.Context, input dag_impl.Input, transformerOut *transformer.Output) (commit, ref string) {
+	log := ctxutil.GetLogger(ctx)
+
+	for _, pkg := range input.Packages {
+		version := pkg.Version
+		if meta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name); meta != nil && meta.Version != nil && *meta.Version != "" {
+			version = *meta.Version
+		}
+		if version == "" || !git.IsSafeTagVersion(version) {
+			continue
+		}
+
+		refs, err := git.ListRemoteRefs(ctx, *input.SourceURL, "*"+version)
+		if err != nil {
+			log.Info("version tag lookup failed; will fall back to HEAD",
+				zap.String("package", pkg.Name), zap.String("version", version), zap.Error(err))
+			continue
+		}
+
+		if name, sha := selectVersionTag(refs, pkg.Name, version); sha != "" {
+			log.Info("resolved published source via version tag",
+				zap.String("package", pkg.Name), zap.String("tag", name), zap.String("commit", sha))
+			return sha, name
+		}
+	}
+	return "", ""
+}
+
+const tagRefPrefix = "refs/tags/"
+
+// selectVersionTag picks the tag ref that best identifies pkgName@version from the
+// refs returned by a "*<version>" ls-remote glob. The glob is a coarse filter — it
+// also matches unrelated tags (e.g. "16.3.1" for "6.3.1") and, in a monorepo,
+// sibling packages' tags — so candidates are validated to encode exactly this
+// version and ranked by specificity: a package-scoped tag ("<pkg>@<version>") is
+// unambiguous and preferred over a bare release tag ("v<version>"/"<version>").
+func selectVersionTag(refs []git.RemoteRef, pkgName, version string) (name, sha string) {
+	candidates := []string{
+		pkgName + "@" + version,
+		pkgName + "@v" + version,
+		"v" + version,
+		version,
+	}
+	for _, want := range candidates {
+		for _, r := range refs {
+			if strings.TrimPrefix(r.Name, tagRefPrefix) == want && strings.HasPrefix(r.Name, tagRefPrefix) {
+				return want, r.SHA
+			}
+		}
+	}
+	return "", ""
 }
 
 func (n *Node) GetDependencies() []any { return n.deps }
