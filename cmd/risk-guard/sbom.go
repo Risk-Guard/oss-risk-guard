@@ -44,9 +44,10 @@ Reads lockfiles and manifests on disk and emits an SBOM. Fully offline: no
 registry calls, no artifact downloads, no scoring checks.
 
 Coverage of the transitive dep tree depends on the lockfile parser for each
-ecosystem. Ecosystems with a working lockfile parser (npm, uv) get full
-transitives; ecosystems without one (yarn/pnpm/bun, bundler, poetry, pipenv,
-pdm) get manifest-declared direct deps only.
+ecosystem. Ecosystems with a working lockfile parser (npm, uv, bun's text
+bun.lock) get full transitives; ecosystems without one (yarn/pnpm, binary
+bun.lockb, bundler, poetry, pipenv, pdm) get manifest-declared direct deps
+only.
 
 Writes to sbom.spdx.json (or sbom.cdx.json for CycloneDX) in the current
 directory unless --output is set (use --output - for stdout).
