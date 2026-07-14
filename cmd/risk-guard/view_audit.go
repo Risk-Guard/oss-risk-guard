@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/owenrumney/go-sarif/v2/sarif"
 	"github.com/spf13/cobra"
@@ -11,6 +13,7 @@ var (
 	viewAuditGitHub   bool
 	viewAuditGitLab   string
 	viewAuditRepoRoot string
+	viewAuditPackages []string
 )
 
 var viewAuditCmd = &cobra.Command{
@@ -26,6 +29,14 @@ the same policy.
 Use --level to lower the display threshold and surface the suppressed findings
 the summary otherwise only counts: --level acknowledged also shows acknowledged
 findings, and --level all shows ignored ones too.
+
+Use --package to show only the findings for one or more packages. A spec matches
+by any of a package's identifying forms, so both the bare name and the full
+logical location select it — --package embla-carousel-react,
+--package package/npm/embla-carousel-react, --package npm/embla-carousel-react,
+and --package embla-carousel-react@8.6.0 all pick the same package. Repeat the
+flag to keep several packages. The policy summary and pass/fail verdict still
+reflect the whole report; only the displayed findings are narrowed.
 
 With --github, emit GitHub Actions workflow annotations on stdout instead of the
 text summary. With --gitlab <file>, also write a GitLab Code Quality (CodeClimate)
@@ -45,6 +56,7 @@ func init() {
 	viewAuditCmd.Flags().BoolVar(&viewAuditGitHub, "github", false, "Emit GitHub Actions workflow annotations on stdout instead of the text summary")
 	viewAuditCmd.Flags().StringVar(&viewAuditGitLab, "gitlab", "", "Write a GitLab Code Quality (CodeClimate) report to this file (e.g. gl-code-quality-report.json)")
 	viewAuditCmd.Flags().StringVar(&viewAuditRepoRoot, "repo-root", "", "Repo root: where .risk-guard.yml lives and what file paths are relative to (defaults to $GITHUB_WORKSPACE/$CI_PROJECT_DIR then CWD)")
+	viewAuditCmd.Flags().StringArrayVar(&viewAuditPackages, "package", nil, "Show only findings for this package; matches the bare name, package/<eco>/<name>, <eco>/<name>, or <name>@<version>. Repeat to keep several packages")
 	registerLevelFlag(viewAuditCmd)
 	auditCmd.AddCommand(viewAuditCmd)
 }
@@ -56,6 +68,9 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("reading SARIF: %w", err)
 	}
+	if err := ensurePackagesPresent(report, viewAuditPackages); err != nil {
+		return err
+	}
 	root := resolveRepoRoot(viewAuditRepoRoot)
 	mode, err := resolveWorkflowMode("", root)
 	if err != nil {
@@ -65,7 +80,127 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return renderReport(report, mode, viewAuditGitHub, viewAuditGitLab, root, args[0], levelFilter)
+	return renderReport(report, mode, viewAuditGitHub, viewAuditGitLab, root, args[0], levelFilter, packageFilterFor(viewAuditPackages))
+}
+
+// ensurePackagesPresent errors when a --package spec names no package that appears
+// in the report, so a typo (e.g. "pdfjs-distsdf") fails loudly instead of
+// rendering a misleading empty, all-clear view. A clean package leaves no result
+// in the SARIF (only findings are stored), so "not present" here means "this
+// report records no findings for it".
+func ensurePackagesPresent(report *sarif.Report, specs []string) error {
+	if len(specs) == 0 {
+		return nil
+	}
+
+	forms := map[string]bool{} // every match-form of every package present
+	names := map[string]bool{} // human names, for the "packages present" hint
+	for _, run := range report.Runs {
+		keys := map[string]bool{}
+		for _, res := range run.Results {
+			if k := packageFromResult(res); k != "" {
+				keys[k] = true
+			}
+		}
+		// A per-package run may carry its key as the automation ID even with no
+		// results; the top-level graded run uses "risk-guard", which we skip.
+		if run.AutomationDetails != nil && run.AutomationDetails.ID != nil {
+			if id := *run.AutomationDetails.ID; id != "" && id != "risk-guard" {
+				keys[id] = true
+			}
+		}
+		for k := range keys {
+			names[humanPackageName(k)] = true
+			for _, form := range packageMatchForms(k) {
+				forms[strings.ToLower(form)] = true
+			}
+		}
+	}
+
+	var missing []string
+	for _, s := range specs {
+		if s = strings.ToLower(strings.TrimSpace(s)); s != "" && !forms[s] {
+			missing = append(missing, s)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	avail := make([]string, 0, len(names))
+	for n := range names {
+		avail = append(avail, n)
+	}
+	sort.Strings(avail)
+	present := "(none)"
+	if len(avail) > 0 {
+		present = strings.Join(avail, ", ")
+	}
+	return fmt.Errorf("package not found in report: %s\npackages present: %s",
+		strings.Join(missing, ", "), present)
+}
+
+// packageFilterFor builds a predicate that keeps a finding whose package
+// logical-location key matches any of the given specs, or nil when no spec was
+// given (keep every package). A spec matches by exact, case-insensitive
+// comparison against the package's identifying forms (see packageMatchForms), so
+// the same package can be named by its bare name, its full logical location, its
+// ecosystem/name, or its name@version — whichever the operator has in hand.
+func packageFilterFor(specs []string) func(string) bool {
+	want := make(map[string]bool, len(specs))
+	for _, s := range specs {
+		if s = strings.ToLower(strings.TrimSpace(s)); s != "" {
+			want[s] = true
+		}
+	}
+	if len(want) == 0 {
+		return nil
+	}
+	return func(pkgKey string) bool {
+		for _, form := range packageMatchForms(pkgKey) {
+			if want[strings.ToLower(form)] {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// packageMatchForms lists the strings a --package spec may use to name the
+// package identified by pkgKey: the raw key, the key without its ?version=
+// query, the ecosystem/name, the bare name, and name@version. A key
+// parseKeyIdentity can't decode still matches on its raw form.
+func packageMatchForms(pkgKey string) []string {
+	if pkgKey == "" {
+		return nil
+	}
+	forms := []string{pkgKey}
+	if base, _, ok := strings.Cut(pkgKey, "?"); ok {
+		forms = append(forms, base)
+	}
+	eco, name, version := parseKeyIdentity(pkgKey)
+	if name != "" {
+		forms = append(forms, name)
+		if eco != "" {
+			forms = append(forms, eco+"/"+name)
+		}
+		if version != "" {
+			forms = append(forms, name+"@"+version)
+		}
+	}
+	return forms
+}
+
+// keepMatchingPackages returns only the findings whose package satisfies keep,
+// preserving order. It backs the --package filter on `audit view`.
+func keepMatchingPackages(findings []ghFinding, keep func(string) bool) []ghFinding {
+	out := make([]ghFinding, 0, len(findings))
+	for _, f := range findings {
+		if keep(f.pkg) {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // auditFinding is one finding extracted from a SARIF result: its level, rule,
