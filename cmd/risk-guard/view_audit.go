@@ -102,13 +102,6 @@ func ensurePackagesPresent(report *sarif.Report, specs []string) error {
 				keys[k] = true
 			}
 		}
-		// A per-package run may carry its key as the automation ID even with no
-		// results; the top-level graded run uses "risk-guard", which we skip.
-		if run.AutomationDetails != nil && run.AutomationDetails.ID != nil {
-			if id := *run.AutomationDetails.ID; id != "" && id != "risk-guard" {
-				keys[id] = true
-			}
-		}
 		for k := range keys {
 			names[humanPackageName(k)] = true
 			for _, form := range packageMatchForms(k) {
