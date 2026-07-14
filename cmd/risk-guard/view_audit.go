@@ -85,9 +85,9 @@ func runViewAudit(_ *cobra.Command, args []string) error {
 
 // ensurePackagesPresent errors when a --package spec names no package that appears
 // in the report, so a typo (e.g. "pdfjs-distsdf") fails loudly instead of
-// rendering a misleading empty, all-clear view. A clean package leaves no result
-// in the SARIF (only findings are stored), so "not present" here means "this
-// report records no findings for it".
+// rendering a misleading empty, all-clear view. Because the SARIF report stores
+// only findings (no explicit “clean package” entries), a package is considered
+// "present" here only if the report records at least one finding for it.
 func ensurePackagesPresent(report *sarif.Report, specs []string) error {
 	if len(specs) == 0 {
 		return nil
