@@ -277,35 +277,60 @@ func softFailLocalOnly(ctx context.Context, outPath, sourceID string, local *vio
 
 // printPolicySummary prints a post-grading tally to stderr: how many SARIF
 // results landed at each level after the rulebook was applied. This is the
-// "policy violations" view, distinct from the pre-grade "findings" total
-// printed by runPackageAudits.
-func printPolicySummary(report *sarif.Report) {
-	var blocking, warning, ack, ignored int
+// "policy violations" view, distinct from the pre-grade "findings" total printed
+// by runPackageAudits. When pkgFilter is non-nil (a --package view), each level is
+// shown as <subject>/<report-total> so a narrowed view can never read as a full
+// pass — 0 blocking for one package sits visibly inside the report's real total
+// (e.g. "0/29 blocking").
+func printPolicySummary(report *sarif.Report, pkgFilter func(string) bool) {
+	var blocking, warning, ack, ignored int     // whole report
+	var mBlocking, mWarning, mAck, mIgnored int // subject matched by pkgFilter
 	for _, run := range report.Runs {
 		for _, res := range run.Results {
 			lvl := ""
 			if res.Level != nil {
 				lvl = *res.Level
 			}
+			matched := pkgFilter == nil || pkgFilter(packageFromResult(res))
 			switch lvl {
 			case "error":
 				blocking++
+				if matched {
+					mBlocking++
+				}
 			case "warning", "":
 				warning++
+				if matched {
+					mWarning++
+				}
 			case "note":
 				ack++
+				if matched {
+					mAck++
+				}
 			case "none":
 				ignored++
+				if matched {
+					mIgnored++
+				}
 			}
 		}
 	}
 	bold := color.New(color.Bold).FprintfFunc()
 	bold(os.Stderr, "\nPolicy result:\n")
+	if pkgFilter == nil {
+		fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s\n",
+			color.RedString("%d blocking", blocking),
+			color.YellowString("%d warning", warning),
+			color.CyanString("%d acknowledged", ack),
+			color.HiBlackString("%d ignored", ignored))
+		return
+	}
 	fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s\n",
-		color.RedString("%d blocking", blocking),
-		color.YellowString("%d warning", warning),
-		color.CyanString("%d acknowledged", ack),
-		color.HiBlackString("%d ignored", ignored))
+		color.RedString("%d/%d blocking", mBlocking, blocking),
+		color.YellowString("%d/%d warning", mWarning, warning),
+		color.CyanString("%d/%d acknowledged", mAck, ack),
+		color.HiBlackString("%d/%d ignored", mIgnored, ignored))
 }
 
 // writeReport persists report to outPath (mkdir-p of parent dir) and prints

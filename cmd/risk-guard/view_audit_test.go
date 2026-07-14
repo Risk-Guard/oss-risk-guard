@@ -144,6 +144,99 @@ func TestTextPrinter_LevelFilter(t *testing.T) {
 	}
 }
 
+func TestPackageFilterFor_MatchesEveryForm(t *testing.T) {
+	// The same package, named four different ways, all select it; unrelated
+	// specs and near-misses do not.
+	keep := packageFilterFor([]string{
+		"embla-carousel-react",               // bare name
+		"package/npm/lodash?version=4.17.20", // full key
+		"npm/express",                        // eco/name
+		"react-dom@18.2.0",                   // name@version
+	})
+	cases := []struct {
+		pkg  string
+		want bool
+	}{
+		{"package/npm/embla-carousel-react?version=8.6.0", true}, // matched by bare name, any version
+		{"package/npm/embla-carousel-react", true},
+		{"package/npm/lodash?version=4.17.20", true}, // matched by full key
+		{"package/npm/express", true},                // matched by eco/name
+		{"package/npm/react-dom?version=18.2.0", true},
+		{"package/npm/react-dom?version=19.0.0", false}, // name@version pins the version
+		{"package/npm/embla-carousel-react-utils?version=1.0.0", false},
+		{"package/pypi/express", false}, // eco/name pins the ecosystem
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := keep(c.pkg); got != c.want {
+			t.Errorf("keep(%q) = %v, want %v", c.pkg, got, c.want)
+		}
+	}
+}
+
+func TestPackageFilterFor_CaseInsensitiveAndEmpty(t *testing.T) {
+	if packageFilterFor(nil) != nil {
+		t.Error("no specs should yield a nil (keep-all) filter")
+	}
+	if packageFilterFor([]string{"  ", ""}) != nil {
+		t.Error("blank specs should yield a nil (keep-all) filter")
+	}
+	keep := packageFilterFor([]string{"  Embla-Carousel-React  "})
+	if !keep("package/npm/embla-carousel-react?version=8.6.0") {
+		t.Error("spec match should be trimmed and case-insensitive")
+	}
+}
+
+func TestKeepMatchingPackages_NarrowsRenderedFindings(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/npm/embla-carousel-react?version=8.6.0", RuleID: "R1", Level: "warning", Message: "unreleased"},
+		{Package: "package/npm/lodash?version=4.17.20", RuleID: "R2", Level: "warning", Message: "stale"},
+	})
+	findings := keepMatchingPackages(
+		selectFindingsByLevel(report, allLevels),
+		packageFilterFor([]string{"embla-carousel-react"}),
+	)
+	var buf bytes.Buffer
+	if err := renderFindings(findings, []Printer{newTextPrinter(&buf)}); err != nil {
+		t.Fatalf("renderFindings: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "embla-carousel-react@8.6.0 (npm)") {
+		t.Errorf("expected the filtered package in output:\n%s", out)
+	}
+	if strings.Contains(out, "lodash") {
+		t.Errorf("did not expect the excluded package in output:\n%s", out)
+	}
+}
+
+func TestEnsurePackagesPresent(t *testing.T) {
+	report := newTestReport(t, []testFinding{
+		{Package: "package/npm/lodash?version=4.17.20", RuleID: "R1", Level: "warning", Message: "stale"},
+	})
+
+	// A present package (by any form) passes; no --package spec passes.
+	for _, spec := range []string{"lodash", "lodash@4.17.20", "npm/lodash", "package/npm/lodash?version=4.17.20"} {
+		if err := ensurePackagesPresent(report, []string{spec}); err != nil {
+			t.Errorf("ensurePackagesPresent(%q) = %v, want nil", spec, err)
+		}
+	}
+	if err := ensurePackagesPresent(report, nil); err != nil {
+		t.Errorf("ensurePackagesPresent(nil) = %v, want nil", err)
+	}
+
+	// A typo'd package errors loudly instead of rendering a misleading empty view.
+	err := ensurePackagesPresent(report, []string{"lodashsdf"})
+	if err == nil {
+		t.Fatal("expected error for a package absent from the report, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") || !strings.Contains(err.Error(), "lodashsdf") {
+		t.Errorf("error should name the missing package: %v", err)
+	}
+	if !strings.Contains(err.Error(), "lodash@4.17.20") {
+		t.Errorf("error should list packages present: %v", err)
+	}
+}
+
 func TestTextPrinter_EmptyReportPrintsNothing(t *testing.T) {
 	report := newTestReport(t, nil)
 	var buf bytes.Buffer

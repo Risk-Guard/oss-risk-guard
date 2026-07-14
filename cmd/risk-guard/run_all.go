@@ -138,7 +138,7 @@ func runAll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return renderReport(report, effectiveMode, runAllGitHub, runAllGitLab, repoPath, outPath, levelFilter)
+	return renderReport(report, effectiveMode, runAllGitHub, runAllGitLab, repoPath, outPath, levelFilter, nil)
 }
 
 // renderReport is the one output pipeline `run`/`checks` and `audit view` share.
@@ -148,9 +148,18 @@ func runAll(cmd *cobra.Command, args []string) error {
 // only thing that differs between the two commands is where the report came
 // from. mode gates output and decides whether blocking findings fail the run;
 // repoRoot and sarifPath phrase the acknowledge hint and relativize file paths.
-func renderReport(report *sarif.Report, mode policy.WorkflowMode, toGitHub bool, gitlabPath, repoRoot, sarifPath string, levelFilter func(string) bool) error {
-	printPolicySummary(report)
-	if err := renderFindings(selectFindingsByLevel(report, levelFilter), reportPrinters(mode, toGitHub, gitlabPath, repoRoot)); err != nil {
+func renderReport(report *sarif.Report, mode policy.WorkflowMode, toGitHub bool, gitlabPath, repoRoot, sarifPath string, levelFilter func(string) bool, pkgFilter func(string) bool) error {
+	printPolicySummary(report, pkgFilter)
+	findings := selectFindingsByLevel(report, levelFilter)
+	// pkgFilter narrows the displayed findings to a subject the caller named
+	// (the --package flag on `audit view`); nil keeps every package. Like the
+	// level filter, it only shapes what is rendered — the policy summary and
+	// verdict above/below still reflect the whole report, so filtering the view
+	// never changes the pass/fail outcome.
+	if pkgFilter != nil {
+		findings = keepMatchingPackages(findings, pkgFilter)
+	}
+	if err := renderFindings(findings, reportPrinters(mode, toGitHub, gitlabPath, repoRoot)); err != nil {
 		return err
 	}
 	return printRunVerdict(mode, report, repoRoot, sarifPath)
@@ -174,7 +183,7 @@ func renderReportSummary(report *sarif.Report, modeOverride string, toGitHub boo
 	if err != nil {
 		return err
 	}
-	return renderReport(report, mode, toGitHub, gitlabPath, repoRoot, "", levelFilter)
+	return renderReport(report, mode, toGitHub, gitlabPath, repoRoot, "", levelFilter, nil)
 }
 
 // printRunVerdict ends the run with an explicit verdict so the outcome (and
