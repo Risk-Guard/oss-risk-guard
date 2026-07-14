@@ -24,6 +24,7 @@ type PyProjectToml struct {
 type Project struct {
 	Name                 string              `toml:"name"`
 	Dynamic              []string            `toml:"dynamic"`
+	Classifiers          []string            `toml:"classifiers"`
 	Dependencies         []string            `toml:"dependencies"`
 	OptionalDependencies map[string][]string `toml:"optional-dependencies"`
 }
@@ -78,6 +79,33 @@ func ParseName(content string) NameResult {
 	}
 
 	return NameResult{}
+}
+
+// ParsePrivate reports whether the pyproject.toml marks the package as private
+// via a "Private :: ..." Trove classifier (canonically "Private :: Do Not
+// Upload"). PyPI has no boolean private flag; instead it rejects any classifier
+// under the unregistered "Private" category, so projects use one to block
+// publication. We treat that as the private signal, mirroring npm's
+// "private": true.
+func ParsePrivate(content string) bool {
+	var pyproject PyProjectToml
+
+	if err := toml.Unmarshal([]byte(content), &pyproject); err != nil {
+		return false
+	}
+
+	if pyproject.Project == nil {
+		return false
+	}
+
+	for _, classifier := range pyproject.Project.Classifiers {
+		category, _, _ := strings.Cut(classifier, "::")
+		if strings.EqualFold(strings.TrimSpace(category), "Private") {
+			return true
+		}
+	}
+
+	return false
 }
 
 type Tool struct {
