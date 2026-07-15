@@ -2,6 +2,7 @@ package bun
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -344,6 +345,11 @@ func TestParseLockfileMalformedEntrySkipped(t *testing.T) {
 	}
 	if !directDeps["package/npm/chalk?version=5.4.1"] {
 		t.Errorf("valid chalk entry should survive malformed siblings; got %v", directDeps)
+	}
+	for _, e := range edges {
+		if strings.Contains(e.ChildKey, "noatsign") || strings.Contains(e.ParentKey, "noatsign") {
+			t.Errorf("no-'@' descriptor must be skipped, but appears in edge %+v", e)
+		}
 	}
 }
 

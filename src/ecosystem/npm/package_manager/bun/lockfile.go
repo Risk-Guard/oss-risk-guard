@@ -190,13 +190,18 @@ func parseBunPackage(raw json.RawMessage) (bunPackage, bool) {
 
 // splitDescriptor splits "name@version" on the last '@' so scoped names survive
 // (@babel/core@7.24.0 -> @babel/core + 7.24.0). A leading-'@' only descriptor
-// (scoped name, no version) keeps its name and an empty version.
+// (scoped name, no version) keeps its name and an empty version. An unscoped
+// name with no '@' at all (e.g. "noatsign") is not a usable descriptor and is
+// rejected so malformed entries skip consistently.
 func splitDescriptor(d string) (name, version string, ok bool) {
 	if d == "" {
 		return "", "", false
 	}
 	idx := strings.LastIndex(d, "@")
-	if idx <= 0 {
+	if idx < 0 {
+		return "", "", false
+	}
+	if idx == 0 {
 		return d, "", true
 	}
 	return d[:idx], d[idx+1:], true
