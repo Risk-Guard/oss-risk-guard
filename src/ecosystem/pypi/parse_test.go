@@ -249,3 +249,55 @@ setup(name='my-package')
 		t.Errorf("expected name 'my-package', got %v", result.Name)
 	}
 }
+
+func TestParseManifest_PyprojectPrivateClassifierSetsPrivate(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `[project]
+name = "benchmark_cpp_extension"
+classifiers = ["Private :: Do Not Upload"]
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "pyproject.toml"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := models.DetectedManifest{
+		Ecosystem: "pypi",
+		Paths:     []string{"pyproject.toml"},
+	}
+
+	result, err := ParseManifest(manifest, tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !result.Private {
+		t.Error("expected result.Private=true for pyproject.toml with 'Private :: Do Not Upload' classifier")
+	}
+}
+
+func TestParseManifest_PyprojectNoPrivateClassifier(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `[project]
+name = "requests"
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+`
+	if err := os.WriteFile(filepath.Join(tmpDir, "pyproject.toml"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := models.DetectedManifest{
+		Ecosystem: "pypi",
+		Paths:     []string{"pyproject.toml"},
+	}
+
+	result, err := ParseManifest(manifest, tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result.Private {
+		t.Error("expected result.Private=false for a public pyproject.toml")
+	}
+}

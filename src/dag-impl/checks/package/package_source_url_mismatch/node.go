@@ -8,6 +8,8 @@ import (
 	"github.com/Risk-Guard/oss-risk-guard/src/category"
 	"github.com/Risk-Guard/oss-risk-guard/src/common"
 	"github.com/Risk-Guard/oss-risk-guard/src/ctxutil"
+	"github.com/Risk-Guard/oss-risk-guard/src/git"
+
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/checks/package/package_invalid_artifact"
 	"github.com/Risk-Guard/oss-risk-guard/src/dag-impl/provenance_verify"
@@ -64,6 +66,22 @@ func normalizeAndCompareURLs(url1, url2 string) bool {
 	return normalized1 == normalized2
 }
 
+// resolveComparisonURL returns the canonical repository URL to compare against a
+// package's registry-declared source URL. A remote scan already supplies a URL,
+// returned unchanged. A local scan supplies an on-disk path whose canonical
+// identity is its git "origin" remote; ok is false when no origin is configured
+// (nothing meaningful to compare — the caller should skip the check).
+func resolveComparisonURL(ctx context.Context, sourceURL string) (string, bool) {
+	if isLocal, _ := common.IsLocalPath(sourceURL); !isLocal {
+		return sourceURL, true
+	}
+	host, owner, repo, ok, err := git.GetOriginOwnerRepo(ctx, sourceURL)
+	if err != nil || !ok {
+		return "", false
+	}
+	return "https://" + host + "/" + owner + "/" + repo, true
+}
+
 func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Output, error) {
 	log := ctxutil.GetLogger(ctx)
 
@@ -91,6 +109,24 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 
 	// Get transformer output - DAG guarantees it succeeded
 	transformerOut := executiondag.GetOutput[*transformer.Node](ctx).(*transformer.Output)
+
+	// For a local scan, input.SourceURL is the on-disk path (e.g.
+	// /Users/me/pytorch), not a repository URL. Resolve its canonical identity
+	// from the git origin remote so the comparison below is URL-against-URL. A
+	// local source with no resolvable origin has nothing canonical to compare,
+	// so skip rather than diff a registry URL against a filesystem path (which
+	// can never match, a guaranteed false positive).
+	compareURL, ok := resolveComparisonURL(ctx, inputSourceURL)
+	if !ok {
+		log.Debug("PACKAGE_SOURCE_URL_MISMATCH check: skipped - local source has no resolvable git origin remote",
+			zap.String("path", inputSourceURL))
+		return checks.NewSkippedOutput(
+			n.Code,
+			"Local source has no git origin remote to compare against the registry",
+			input,
+		), nil
+	}
+	inputSourceURL = compareURL
 
 	var violations []string
 	var compliantPackages []string

@@ -258,3 +258,63 @@ dependencies = [
 		}
 	}
 }
+
+func TestParsePrivateDoNotUploadClassifier(t *testing.T) {
+	content := `
+[project]
+name = "benchmark_cpp_extension"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Private :: Do Not Upload",
+]
+`
+	if !ParsePrivate(content) {
+		t.Error("expected ParsePrivate=true for 'Private :: Do Not Upload' classifier")
+	}
+}
+
+func TestParsePrivateAnyPrivateCategory(t *testing.T) {
+	content := `
+[project]
+name = "internal-tool"
+classifiers = ["Private :: Internal"]
+`
+	if !ParsePrivate(content) {
+		t.Error("expected ParsePrivate=true for any 'Private ::' classifier")
+	}
+}
+
+func TestParsePrivateCaseAndSpacingInsensitive(t *testing.T) {
+	content := `
+[project]
+name = "internal-tool"
+classifiers = ["private::Do Not Upload"]
+`
+	if !ParsePrivate(content) {
+		t.Error("expected ParsePrivate=true regardless of case and spacing")
+	}
+}
+
+func TestParsePrivateFalseForPublicPackage(t *testing.T) {
+	content := `
+[project]
+name = "requests"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+]
+`
+	if ParsePrivate(content) {
+		t.Error("expected ParsePrivate=false when no 'Private ::' classifier is present")
+	}
+}
+
+func TestParsePrivateFalseWhenNoClassifiers(t *testing.T) {
+	content := `
+[project]
+name = "requests"
+`
+	if ParsePrivate(content) {
+		t.Error("expected ParsePrivate=false when classifiers are absent")
+	}
+}

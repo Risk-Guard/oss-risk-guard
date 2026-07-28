@@ -100,6 +100,10 @@ func parseFile(result *models.ManifestResult, relPath, repoRoot string) error {
 		nameResult := pyproject.ParseName(string(content))
 		def.ApplyNameResult(result, nameResult)
 
+		if pyproject.ParsePrivate(string(content)) {
+			result.Private = true
+		}
+
 		parsed, err := pyproject.Parse(string(content), relPath)
 		if err != nil {
 			parseErr := "failed to parse: " + err.Error()
