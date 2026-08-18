@@ -30,10 +30,18 @@
       <section class="py-16">
         <h1 class="text-3xl font-bold tracking-tight text-slate-900">What Risk Guard is</h1>
         <p class="mt-6 text-lg leading-relaxed text-slate-600">
-          Risk Guard examines the third-party packages a project depends on and scores
-          how risky they are to rely on. It checks your own source and your direct
-          dependencies, and gathers everything into a single report — run it on your
-          machine, or automatically on every pull request.
+          Risk Guard tells you whether a package is safe to depend on. Point it at a
+          repository and you get a full report back — a single SARIF file covering
+          everything you already depend on — and from then on it runs on every pull
+          request, where your policy decides which findings block the merge. AI
+          assistants add dependencies faster than any human can review them; Risk Guard
+          puts the review back in, automatically.
+        </p>
+        <p class="mt-4 text-lg leading-relaxed text-slate-600">
+          It builds an SBOM from your repository and scores your own source and your
+          direct dependencies for supply-chain risk — is this package what it claims to
+          be, is anyone still maintaining it, what does it do at install time, and does
+          it declare a license at all. Findings render inline where you review code.
         </p>
         <p class="mt-4 text-lg leading-relaxed text-slate-600">
           Ecosystems: <span class="font-medium text-slate-800">npm, PyPI, RubyGems</span>.
@@ -70,6 +78,12 @@
           </svg>
         </a>
 
+        <p class="mt-4 text-sm text-slate-500">
+          A hosted service at
+          <a href="https://ossriskguard.app" class="text-indigo-600 underline">ossriskguard.app</a>
+          scores the full transitive dependency graph and adds vulnerability and malware
+          data — opt in with <code class="rounded bg-slate-100 px-1 text-xs">--risk-guard</code>.
+        </p>
       </section>
 
       <!-- How it works -->
@@ -305,7 +319,10 @@ expected_failures:                            # accept a finding; still reported
           Risk Guard reads public information from the package registries (npm, PyPI,
           RubyGems) and from projects' source repositories, so it needs network access to
           them. It runs entirely on your machine or CI runner — your code and your
-          dependency list are never uploaded to any Risk Guard server.
+          dependency list are never uploaded. The one exception is the opt-in
+          <code class="rounded bg-slate-100 px-1 text-sm">--risk-guard</code> flag, which
+          uploads your SBOM and your local source findings to the hosted service to score
+          your dependencies there.
         </p>
       </section>
 
