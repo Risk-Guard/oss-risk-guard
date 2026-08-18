@@ -62,6 +62,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	var rationaleItems []string
 	var evidence []string
 	var compliantPackages []string
+	var unknownPackages []string
 
 	for _, pkg := range input.Packages {
 		pkgMeta := transformerOut.GetPackageMetadata(pkg.Ecosystem, pkg.Name)
@@ -76,8 +77,12 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		var releaseDate *time.Time
 		var latestVersion string
 
+		// The latest version wins outright once it is known, date or no date: its
+		// missing date makes this package unmeasurable, whereas pkgMeta.ReleaseDate
+		// describes the version under analysis and would time staleness from the
+		// wrong release. The fallback is for having no version index at all.
 		versionMeta := versionOut.GetVersionMetadata(pkg.Ecosystem, pkg.Name)
-		if versionMeta != nil && versionMeta.LatestVersion != nil && versionMeta.LatestVersion.ReleasedAt != nil {
+		if versionMeta != nil && versionMeta.LatestVersion != nil {
 			releaseDate = versionMeta.LatestVersion.ReleasedAt
 			latestVersion = versionMeta.LatestVersion.Version
 		} else if pkgMeta.ReleaseDate != nil {
@@ -87,16 +92,22 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			}
 		}
 
-		if releaseDate == nil {
-			log.Warn("Package release date not available",
-				zap.String("ecosystem", pkg.Ecosystem),
-				zap.String("package", pkg.Name))
-			continue
-		}
-
 		versionSuffix := ""
 		if latestVersion != "" {
 			versionSuffix = "@" + latestVersion
+		}
+
+		// Without a release date there is nothing to measure staleness from.
+		// Counting the package as compliant would assert a recent release nobody
+		// saw, so it is recorded as undetermined instead.
+		if releaseDate == nil {
+			log.Info("No release date available for stale release check",
+				zap.String("ecosystem", pkg.Ecosystem),
+				zap.String("package", pkg.Name),
+				zap.String("version", latestVersion))
+			unknownPackages = append(unknownPackages,
+				fmt.Sprintf("%s/%s%s: registry publishes no release date", pkg.Ecosystem, pkg.Name, versionSuffix))
+			continue
 		}
 
 		daysSinceRelease := int(time.Since(*releaseDate).Hours() / 24)
@@ -119,7 +130,9 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	}
 
 	if len(rationaleItems) > 0 {
-		rationale := checks.BuildViolationRationale(rationaleItems, "", "")
+		rationale := checks.BuildViolationRationale(rationaleItems, "", "") +
+			checks.UnknownReleaseDateSuffix(len(unknownPackages))
+		evidence = append(evidence, unknownPackages...)
 		if len(evidence) > checks.MaxEvidenceItems {
 			evidence = evidence[:checks.MaxEvidenceItems]
 		}
@@ -127,15 +140,25 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			WithThresholds(n.Thresholds), nil
 	}
 
-	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages), input).WithThresholds(n.Thresholds), nil
+	// Nothing was measurable: say so rather than reporting a pass nobody verified.
+	if len(compliantPackages) == 0 && len(unknownPackages) > 0 {
+		return checks.NewSkippedOutput(n.Code,
+			fmt.Sprintf("Release dates unavailable for %d package(s)%s",
+				len(unknownPackages), checks.FormatScannedItems(unknownPackages)), input).
+			WithThresholds(n.Thresholds), nil
+	}
+
+	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages, unknownPackages), input).WithThresholds(n.Thresholds), nil
 }
 
-func buildCompliantRationale(compliantPackages []string) string {
+func buildCompliantRationale(compliantPackages, unknownPackages []string) string {
+	suffix := checks.UnknownReleaseDateSuffix(len(unknownPackages))
+
 	if len(compliantPackages) == 0 {
-		return "No packages checked"
+		return "No packages checked" + suffix
 	}
 	if len(compliantPackages) == 1 {
-		return compliantPackages[0]
+		return compliantPackages[0] + suffix
 	}
-	return fmt.Sprintf("All %d packages have recent releases", len(compliantPackages))
+	return fmt.Sprintf("All %d packages have recent releases%s", len(compliantPackages), suffix)
 }

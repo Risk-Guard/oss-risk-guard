@@ -125,8 +125,12 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		}
 	}
 
+	// The unknown count belongs in the rationale, not only in the evidence: a
+	// violating batch large enough to fill MaxEvidenceItems truncates the unknown
+	// entries off the tail, and they would otherwise vanish from the result.
 	if len(rationaleItems) > 0 {
-		rationale := checks.BuildViolationRationale(rationaleItems, "", "")
+		rationale := checks.BuildViolationRationale(rationaleItems, "", "") +
+			checks.UnknownReleaseDateSuffix(len(unknownPackages))
 		evidence = append(evidence, unknownPackages...)
 		if len(evidence) > checks.MaxEvidenceItems {
 			evidence = evidence[:checks.MaxEvidenceItems]
@@ -147,10 +151,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 }
 
 func buildCompliantRationale(compliantPackages, unknownPackages []string) string {
-	suffix := ""
-	if len(unknownPackages) > 0 {
-		suffix = fmt.Sprintf("; %d package(s) had no release date and were not evaluated", len(unknownPackages))
-	}
+	suffix := checks.UnknownReleaseDateSuffix(len(unknownPackages))
 
 	if len(compliantPackages) == 0 {
 		return "No packages checked" + suffix

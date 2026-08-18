@@ -20,6 +20,7 @@ server, which does upload your SBOM and source findings.)
 
 ```bash
 # Linux / macOS — detects OS/arch, verifies checksum, installs to /usr/local/bin
+# (or ~/.local/bin when that isn't writable; override with RISK_GUARD_INSTALL_DIR)
 curl -fsSL https://risk-guard.github.io/oss-risk-guard/get.sh | sh
 
 # Go 1.25.8+
@@ -50,8 +51,17 @@ Subcommands expose individual stages:
 | `init [path]` | Scan and write a `.risk-guard.yml` seeded from the findings. |
 | `policy show [path]` | Print the effective policy. |
 | `policy checks` | List all available checks and their risk categories. |
-| `policy override [path]` | Set a package/source output override in `.risk-guard.yml`. |
+| `policy override <entity-key> <path> <value> [repo-path]` | Set a package/source output override in `.risk-guard.yml`; `--reason` is required and `<path>` must be under `output.`. |
 | `policy add-expected-failures [path]` | Merge a report's blocking findings into `expected_failures`. |
+
+Overrides correct metadata before a package is audited, so a fixed source URL
+re-resolves the repository rather than only relabeling it:
+
+```bash
+risk-guard policy override package/npm/left-pad \
+  output.source_url https://github.com/stevemao/left-pad \
+  --reason "npm metadata points at a dead fork"
+```
 
 `risk-guard audit view risk-guard-report.sarif` re-renders a saved report:
 
@@ -70,8 +80,15 @@ your repository — 4 finding(s): 1 error, 3 warning
 GitHub Actions — findings appear in the **Security** tab and inline on PRs:
 
 ```yaml
-- uses: actions/checkout@v6
-- uses: Risk-Guard/action@v1   # needs security-events: write
+jobs:
+  risk-guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Risk-Guard/action@v1
 ```
 
 GitLab CI/CD — findings show in the merge request widget:
