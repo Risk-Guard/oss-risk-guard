@@ -247,14 +247,15 @@ func (r *Ruby) extractVersions(versions []rubygemsregistry.VersionInfo) ([]model
 			return nil, fmt.Errorf("parsing timestamp for version %s: %w", v.Number, err)
 		}
 
+		released := parsedTime
 		result = append(result, models.VersionInfo{
 			Version:    v.Number,
-			ReleasedAt: parsedTime,
+			ReleasedAt: &released,
 		})
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].ReleasedAt.After(result[j].ReleasedAt)
+		return result[i].ReleasedAfter(result[j])
 	})
 
 	return result, nil

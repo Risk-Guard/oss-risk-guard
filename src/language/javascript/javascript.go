@@ -326,11 +326,12 @@ func (j *JavaScript) extractVersions(timeMap map[string]string, versionsMap map[
 		if err != nil {
 			return nil, fmt.Errorf("parsing timestamp for version %s: %w", version, err)
 		}
-		versions = append(versions, models.VersionInfo{Version: version, ReleasedAt: parsedTime})
+		released := parsedTime
+		versions = append(versions, models.VersionInfo{Version: version, ReleasedAt: &released})
 	}
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("no valid versions found")
 	}
-	sort.Slice(versions, func(i, j int) bool { return versions[i].ReleasedAt.After(versions[j].ReleasedAt) })
+	sort.Slice(versions, func(i, j int) bool { return versions[i].ReleasedAfter(versions[j]) })
 	return versions, nil
 }

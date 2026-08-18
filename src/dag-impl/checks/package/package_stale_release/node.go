@@ -77,8 +77,8 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		var latestVersion string
 
 		versionMeta := versionOut.GetVersionMetadata(pkg.Ecosystem, pkg.Name)
-		if versionMeta != nil && versionMeta.LatestVersion != nil {
-			releaseDate = &versionMeta.LatestVersion.ReleasedAt
+		if versionMeta != nil && versionMeta.LatestVersion != nil && versionMeta.LatestVersion.ReleasedAt != nil {
+			releaseDate = versionMeta.LatestVersion.ReleasedAt
 			latestVersion = versionMeta.LatestVersion.Version
 		} else if pkgMeta.ReleaseDate != nil {
 			releaseDate = pkgMeta.ReleaseDate
