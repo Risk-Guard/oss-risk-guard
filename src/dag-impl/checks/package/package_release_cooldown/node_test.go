@@ -1,6 +1,7 @@
 package package_release_cooldown
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -146,7 +147,7 @@ func TestBuildCompliantRationale(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildCompliantRationale(tt.compliantPackages)
+			result := buildCompliantRationale(tt.compliantPackages, nil)
 			if result != tt.expected {
 				t.Errorf("Expected rationale %q, got %q", tt.expected, result)
 			}
@@ -233,5 +234,22 @@ func TestDaysCalculation(t *testing.T) {
 					tt.expectedDays, daysSince, diff)
 			}
 		})
+	}
+}
+
+// A package whose release date the registry does not publish must not be
+// silently folded into the compliant count: the cooldown was never measured.
+func TestBuildCompliantRationale_UnknownDatesAreCalledOut(t *testing.T) {
+	unknown := []string{"maven/com.example:demo@1.0.0: registry publishes no release date"}
+
+	got := buildCompliantRationale([]string{"npm/express@4.19.0: Released 30 days ago"}, unknown)
+	want := "npm/express@4.19.0: Released 30 days ago; 1 package(s) had no release date and were not evaluated"
+	if got != want {
+		t.Errorf("rationale = %q, want %q", got, want)
+	}
+
+	got = buildCompliantRationale(nil, unknown)
+	if !strings.Contains(got, "not evaluated") {
+		t.Errorf("rationale = %q, want it to state the packages were not evaluated", got)
 	}
 }

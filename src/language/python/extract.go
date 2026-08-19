@@ -223,9 +223,10 @@ func (p *Python) extractVersions(releasesMap map[string][]pypiregistry.Release) 
 			continue
 		}
 
+		released := earliestTime
 		versions = append(versions, models.VersionInfo{
 			Version:    version,
-			ReleasedAt: earliestTime,
+			ReleasedAt: &released,
 		})
 	}
 
@@ -234,7 +235,7 @@ func (p *Python) extractVersions(releasesMap map[string][]pypiregistry.Release) 
 	}
 
 	sort.Slice(versions, func(i, j int) bool {
-		return versions[i].ReleasedAt.After(versions[j].ReleasedAt)
+		return versions[i].ReleasedAfter(versions[j])
 	})
 
 	return versions, nil

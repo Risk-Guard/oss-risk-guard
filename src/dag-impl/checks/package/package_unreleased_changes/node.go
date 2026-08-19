@@ -75,6 +75,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	var violations []string
 	var caveats []string
 	var compliantPackages []string
+	var unknownPackages []string
 	hasViolation := false
 
 	skewDays := n.Thresholds["skew_days"].(int)
@@ -92,9 +93,14 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		var releaseDate *time.Time
 		var latestVersion string
 
+		// The latest version wins outright once it is known, date or no date: its
+		// missing date makes this package unmeasurable, whereas pkgMeta.ReleaseDate
+		// describes the version under analysis and would measure commit skew
+		// against the wrong release. The fallback is for having no version index
+		// at all.
 		versionMeta := versionOut.GetVersionMetadata(pkg.Ecosystem, pkg.Name)
 		if versionMeta != nil && versionMeta.LatestVersion != nil {
-			releaseDate = &versionMeta.LatestVersion.ReleasedAt
+			releaseDate = versionMeta.LatestVersion.ReleasedAt
 			latestVersion = versionMeta.LatestVersion.Version
 		} else if pkgMeta.ReleaseDate != nil {
 			releaseDate = pkgMeta.ReleaseDate
@@ -103,16 +109,22 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			}
 		}
 
-		if releaseDate == nil {
-			log.Warn("Package release date not available",
-				zap.String("ecosystem", pkg.Ecosystem),
-				zap.String("package", pkg.Name))
-			continue
-		}
-
 		versionSuffix := ""
 		if latestVersion != "" {
 			versionSuffix = "@" + latestVersion
+		}
+
+		// Without a release date there is no point to measure the newest commit
+		// against. Counting the package as compliant would assert the source is in
+		// step with a release nobody dated, so it is recorded as undetermined.
+		if releaseDate == nil {
+			log.Info("No release date available for unreleased changes check",
+				zap.String("ecosystem", pkg.Ecosystem),
+				zap.String("package", pkg.Name),
+				zap.String("version", latestVersion))
+			unknownPackages = append(unknownPackages,
+				fmt.Sprintf("%s/%s%s: registry publishes no release date", pkg.Ecosystem, pkg.Name, versionSuffix))
+			continue
 		}
 
 		// Whole-repo latest commit. The metadata clone is treeless, so a
@@ -168,20 +180,32 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	}
 
 	if hasViolation {
-		rationale := checks.BuildViolationRationale(violations, "", "")
+		rationale := checks.BuildViolationRationale(violations, "", "") +
+			checks.UnknownReleaseDateSuffix(len(unknownPackages))
 		evidence := append(checks.TruncateEvidence(violations), caveats...)
+		evidence = append(evidence, unknownPackages...)
 		return checks.NewViolationOutput(n.Code, rationale, evidence, input).WithThresholds(n.Thresholds), nil
 	}
 
-	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages), input).WithThresholds(n.Thresholds), nil
+	// Nothing was measurable: say so rather than reporting a pass nobody verified.
+	if len(compliantPackages) == 0 && len(unknownPackages) > 0 {
+		return checks.NewSkippedOutput(n.Code,
+			fmt.Sprintf("Release dates unavailable for %d package(s)%s",
+				len(unknownPackages), checks.FormatScannedItems(unknownPackages)), input).
+			WithThresholds(n.Thresholds), nil
+	}
+
+	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages, unknownPackages), input).WithThresholds(n.Thresholds), nil
 }
 
-func buildCompliantRationale(compliantPackages []string) string {
+func buildCompliantRationale(compliantPackages, unknownPackages []string) string {
+	suffix := checks.UnknownReleaseDateSuffix(len(unknownPackages))
+
 	if len(compliantPackages) == 0 {
-		return "No packages checked"
+		return "No packages checked" + suffix
 	}
 	if len(compliantPackages) == 1 {
-		return compliantPackages[0]
+		return compliantPackages[0] + suffix
 	}
-	return fmt.Sprintf("All %d packages are up to date with source", len(compliantPackages))
+	return fmt.Sprintf("All %d packages are up to date with source%s", len(compliantPackages), suffix)
 }

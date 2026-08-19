@@ -58,6 +58,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 	var rationaleItems []string
 	var evidence []string
 	var compliantPackages []string
+	var unknownPackages []string
 
 	for _, pkg := range input.Packages {
 		versionMeta := versionOut.GetVersionMetadata(pkg.Ecosystem, pkg.Name)
@@ -68,7 +69,7 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			continue
 		}
 
-		var releasedAt time.Time
+		var releasedAt *time.Time
 		var resolvedVersion string
 
 		if pkg.Version != "" {
@@ -92,7 +93,20 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			continue
 		}
 
-		daysSinceRelease := int(time.Since(releasedAt).Hours() / 24)
+		// Without a release date the cooldown cannot be evaluated. Reporting the
+		// package as compliant would assert it cleared a period we never measured,
+		// so it is listed as undetermined instead.
+		if releasedAt == nil {
+			log.Info("No release date available for cooldown check",
+				zap.String("ecosystem", pkg.Ecosystem),
+				zap.String("package", pkg.Name),
+				zap.String("version", resolvedVersion))
+			unknownPackages = append(unknownPackages,
+				fmt.Sprintf("%s/%s@%s: registry publishes no release date", pkg.Ecosystem, pkg.Name, resolvedVersion))
+			continue
+		}
+
+		daysSinceRelease := int(time.Since(*releasedAt).Hours() / 24)
 		versionSuffix := "@" + resolvedVersion
 
 		if daysSinceRelease < cooldownDays {
@@ -111,8 +125,13 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 		}
 	}
 
+	// The unknown count belongs in the rationale, not only in the evidence: a
+	// violating batch large enough to fill MaxEvidenceItems truncates the unknown
+	// entries off the tail, and they would otherwise vanish from the result.
 	if len(rationaleItems) > 0 {
-		rationale := checks.BuildViolationRationale(rationaleItems, "", "")
+		rationale := checks.BuildViolationRationale(rationaleItems, "", "") +
+			checks.UnknownReleaseDateSuffix(len(unknownPackages))
+		evidence = append(evidence, unknownPackages...)
 		if len(evidence) > checks.MaxEvidenceItems {
 			evidence = evidence[:checks.MaxEvidenceItems]
 		}
@@ -120,15 +139,25 @@ func (n *Node) Execute(ctx context.Context, input dag_impl.Input) (*checks.Outpu
 			WithThresholds(n.Thresholds), nil
 	}
 
-	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages), input).WithThresholds(n.Thresholds), nil
+	// Nothing was measurable: say so rather than reporting a pass nobody verified.
+	if len(compliantPackages) == 0 && len(unknownPackages) > 0 {
+		return checks.NewSkippedOutput(n.Code,
+			fmt.Sprintf("Release dates unavailable for %d package(s)%s",
+				len(unknownPackages), checks.FormatScannedItems(unknownPackages)), input).
+			WithThresholds(n.Thresholds), nil
+	}
+
+	return checks.NewCompliantOutput(n.Code, buildCompliantRationale(compliantPackages, unknownPackages), input).WithThresholds(n.Thresholds), nil
 }
 
-func buildCompliantRationale(compliantPackages []string) string {
+func buildCompliantRationale(compliantPackages, unknownPackages []string) string {
+	suffix := checks.UnknownReleaseDateSuffix(len(unknownPackages))
+
 	if len(compliantPackages) == 0 {
-		return "No packages checked"
+		return "No packages checked" + suffix
 	}
 	if len(compliantPackages) == 1 {
-		return compliantPackages[0]
+		return compliantPackages[0] + suffix
 	}
-	return fmt.Sprintf("All %d packages passed the cooldown period", len(compliantPackages))
+	return fmt.Sprintf("All %d packages passed the cooldown period%s", len(compliantPackages), suffix)
 }
