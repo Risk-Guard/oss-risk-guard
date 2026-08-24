@@ -18,7 +18,9 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/krolaw/zipstream v0.0.0-20241109034754-4a67be70fe31
 	github.com/owenrumney/go-sarif/v2 v2.3.3
+	github.com/package-url/packageurl-go v0.1.7
 	github.com/sigstore/sigstore-go v1.3.0
+	github.com/spdx/tools-golang v0.5.7
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/thessem/zap-prettyconsole v0.7.0
@@ -31,6 +33,7 @@ require (
 )
 
 require (
+	github.com/anchore/go-struct-converter v0.1.0 // indirect
 	github.com/aquasecurity/go-version v0.0.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
