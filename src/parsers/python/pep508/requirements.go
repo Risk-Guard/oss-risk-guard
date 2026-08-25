@@ -143,8 +143,19 @@ func ParseRequirementLine(line string, sourceFile string) *models.Dependency {
 		parseError = &result.ParseError
 	}
 
+	// An exact pin is the version that will be installed, so it belongs in the
+	// analysis key: downstream version-sensitive checks fall back to the
+	// registry's latest release for a package that arrives without one, which
+	// would report on a version this manifest never installs. A malformed line
+	// yields whatever specifiers parsed before the error, which is too little to
+	// pin on confidently.
+	pin := ""
+	if parseError == nil {
+		pin = ExactPin(result.Specifiers)
+	}
+
 	return &models.Dependency{
-		AnalysisIdentifier: models.MakeSimplePackageAnalysisIdentifier("pypi", pythonnormalize.NormalizePyPIName(result.Name)),
+		AnalysisIdentifier: models.MakeVersionedPackageAnalysisIdentifier("pypi", pythonnormalize.NormalizePyPIName(result.Name), pin),
 		Specifiers:         result.Specifiers,
 		ParseError:         parseError,
 		Location:           &models.LocationInfo{File: &sourceFile},

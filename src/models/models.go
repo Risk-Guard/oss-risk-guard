@@ -2,12 +2,27 @@ package models
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 )
 
 func MakeSimplePackageAnalysisIdentifier(ecosystem, name string) string {
 	return fmt.Sprintf("package/%s/%s", ecosystem, name)
+}
+
+// MakeVersionedPackageAnalysisIdentifier builds an analysis key carrying a
+// resolved version ("package/<eco>/<name>?version=<v>"), falling back to the
+// unversioned form when version is empty.
+//
+// The version is query-escaped because readers unescape it (see
+// parseKeyIdentity): a PEP 440 local version such as "1.0+local" would
+// otherwise decode with the "+" turned into a space.
+func MakeVersionedPackageAnalysisIdentifier(ecosystem, name, version string) string {
+	if version == "" {
+		return MakeSimplePackageAnalysisIdentifier(ecosystem, name)
+	}
+	return fmt.Sprintf("package/%s/%s?version=%s", ecosystem, name, url.QueryEscape(version))
 }
 
 type LocationInfo struct {
@@ -31,7 +46,9 @@ type Dependency struct {
 func (d Dependency) GetName() string {
 	parts := strings.Split(d.AnalysisIdentifier, "/")
 	if len(parts) >= 3 {
-		return strings.Join(parts[2:], "/")
+		// Identifiers may carry a "?version=" suffix, which is not part of the name.
+		name, _, _ := strings.Cut(strings.Join(parts[2:], "/"), "?")
+		return name
 	}
 	return ""
 }
