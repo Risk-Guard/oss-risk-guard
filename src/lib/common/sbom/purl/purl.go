@@ -84,7 +84,10 @@ func ToAnalysisKey(purlStr string) (string, bool) {
 	// The only unescaped '@' is the version separator: a scoped npm namespace
 	// is carried encoded as %40.
 	name, version := nameVersion, ""
-	if i := strings.LastIndex(nameVersion, "@"); i > 0 {
+	if i := strings.LastIndex(nameVersion, "@"); i >= 0 {
+		if i == 0 || i == len(nameVersion)-1 {
+			return "", false
+		}
 		name, version = nameVersion[:i], nameVersion[i+1:]
 	}
 
@@ -105,8 +108,8 @@ func ToAnalysisKey(purlStr string) (string, bool) {
 	// Keys carry the version verbatim (see makeKey in the lockfile parsers),
 	// so unescape without re-escaping.
 	version, err = url.PathUnescape(version)
-	if err != nil || version == "" {
-		return key, true
+	if err != nil {
+		return "", false
 	}
 	return key + "?version=" + version, true
 }
