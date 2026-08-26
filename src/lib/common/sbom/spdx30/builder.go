@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/depsgraph"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/purl"
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/sbomkey"
 )
 
 type Builder struct {
@@ -16,6 +16,7 @@ type Builder struct {
 	nodes     map[string]depsgraph.SBOMNode
 	toolName  string
 	namespace string
+	refByKey  map[string]string
 }
 
 func NewBuilder(rootKey string, nodes []depsgraph.SBOMNode, toolName string) *Builder {
@@ -23,12 +24,45 @@ func NewBuilder(rootKey string, nodes []depsgraph.SBOMNode, toolName string) *Bu
 	for _, n := range nodes {
 		nodeMap[n.Key] = n
 	}
-	return &Builder{
+	b := &Builder{
 		rootKey:   rootKey,
 		nodes:     nodeMap,
 		toolName:  toolName,
 		namespace: "app.ossriskguard/" + b64(rootKey) + "." + time.Now().UTC().Format(time.RFC3339),
 	}
+	b.refByKey = b.buildRefs()
+	return b
+}
+
+// buildRefs assigns every node its spdxId suffix, preferring the node's purl so
+// the identifier means something to tools other than this one. Anything without
+// a purl that round-trips — a source-tree root, an unresolved ecosystem, or a
+// purl another node already claimed — keeps the base64url-encoded analysis key.
+// Keys are walked in sorted order so a contested purl goes to the same node
+// every time.
+func (b *Builder) buildRefs() map[string]string {
+	keys := make([]string, 0, len(b.nodes))
+	for key := range b.nodes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	refs := make(map[string]string, len(b.nodes))
+	taken := make(map[string]bool, len(b.nodes))
+	for _, key := range keys {
+		ref := b64(key)
+		if p := sbomkey.StableNodePURL(b.nodes[key], key); p != "" && !taken[p] {
+			ref = p
+		}
+		refs[key] = ref
+		taken[ref] = true
+	}
+	return refs
+}
+
+// elementID is the fully-qualified spdxId for a node's analysis key.
+func (b *Builder) elementID(key string) string {
+	return b.namespace + "#" + b.refByKey[key]
 }
 
 func (b *Builder) Build() (*Document, error) {
@@ -91,8 +125,8 @@ func (b *Builder) Build() (*Document, error) {
 					SpdxID:           relID,
 					CreationInfo:     creationInfoID,
 					RelationshipType: RelationshipDependsOn,
-					From:             b.namespace + "#" + b64(key),
-					To:               []string{b.namespace + "#" + b64(childKey)},
+					From:             b.elementID(key),
+					To:               []string{b.elementID(childKey)},
 				}
 				relationships = append(relationships, rel)
 				elementIDs = append(elementIDs, relID)
@@ -140,7 +174,7 @@ func (b *Builder) Build() (*Document, error) {
 				SpdxID:           relID,
 				CreationInfo:     creationInfoID,
 				RelationshipType: RelationshipHasDependencyManifest,
-				From:             b.namespace + "#" + b64(key),
+				From:             b.elementID(key),
 				To:               []string{manifestTarget},
 			}
 			relationships = append(relationships, rel)
@@ -161,7 +195,7 @@ func (b *Builder) Build() (*Document, error) {
 
 	var rootElements []string
 	if _, exists := b.nodes[b.rootKey]; exists {
-		rootPkgID := b.namespace + "#" + b64(b.rootKey)
+		rootPkgID := b.elementID(b.rootKey)
 		rootElements = []string{rootPkgID}
 
 		relID := fmt.Sprintf("%s#Relationship-%d", b.namespace, relIndex)
@@ -221,16 +255,13 @@ func (b *Builder) buildPackage(key string, node depsgraph.SBOMNode, creationInfo
 
 	pkg := Package{
 		Type:             "software_Package",
-		SpdxID:           b.namespace + "#" + b64(key),
+		SpdxID:           b.elementID(key),
 		Name:             name,
 		CreationInfo:     creationInfoID,
 		PackageVersion:   version,
+		PackageURL:       sbomkey.NodePURL(node),
 		DownloadLocation: NoAssertion,
 		CopyrightText:    NoAssertion,
-	}
-
-	if node.Ecosystem != nil && node.PackageName != nil {
-		pkg.PackageURL = purl.Build(*node.Ecosystem, *node.PackageName, version)
 	}
 
 	if len(node.Violations) > 0 {

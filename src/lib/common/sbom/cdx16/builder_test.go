@@ -92,9 +92,9 @@ func TestBuilder_Dependencies(t *testing.T) {
 		depMap[dep.Ref] = dep.DependsOn
 	}
 
-	expressDeps := depMap[bomRef("package/npm/express")]
+	expressDeps := depMap["pkg:npm/express"]
 	require.Len(t, expressDeps, 1)
-	assert.Equal(t, bomRef("package/npm/debug"), expressDeps[0])
+	assert.Equal(t, "pkg:npm/debug", expressDeps[0])
 }
 
 func TestBuilder_ViolationsAsProperties(t *testing.T) {
@@ -275,7 +275,8 @@ func TestBuilder_SkipsUnknownDeps(t *testing.T) {
 		depMap[dep.Ref] = dep.DependsOn
 	}
 
-	myPkgDeps := depMap[bomRef("package/npm/mypackage")]
-	assert.Len(t, myPkgDeps, 1)
+	myPkgDeps := depMap["pkg:npm/mypackage"]
+	require.Len(t, myPkgDeps, 1)
+	// real-dep records no package name, so it has no purl to be identified by.
 	assert.Equal(t, bomRef("package/npm/real-dep"), myPkgDeps[0])
 }

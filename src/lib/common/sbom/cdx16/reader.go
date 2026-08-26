@@ -1,10 +1,10 @@
 package cdx16
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/sbomkey"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
@@ -16,8 +16,7 @@ type DirectDep struct {
 }
 
 // ReadDirectDeps returns the deduped, sorted analysis-identifier keys for the
-// SBOM's direct (depth=1) dependencies. The returned keys are decoded from the
-// CycloneDX bom-ref encoding produced by Builder (base64 of the original key).
+// SBOM's direct (depth=1) dependencies.
 func ReadDirectDeps(raw []byte) ([]string, error) {
 	deps, err := ReadDirectDepsWithLocations(raw)
 	if err != nil {
@@ -42,6 +41,7 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 		} `json:"metadata"`
 		Components []struct {
 			BOMRef   string `json:"bom-ref"`
+			PURL     string `json:"purl"`
 			Evidence *struct {
 				Occurrences []Occurrence `json:"occurrences"`
 			} `json:"evidence"`
@@ -61,7 +61,9 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	rootRef := bom.Metadata.Component.BOMRef
 
 	locByRef := make(map[string]*models.LocationInfo)
+	purlByRef := make(map[string]string, len(bom.Components))
 	for _, c := range bom.Components {
+		purlByRef[c.BOMRef] = c.PURL
 		if c.Evidence == nil || len(c.Evidence.Occurrences) == 0 {
 			continue
 		}
@@ -87,19 +89,19 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 
 	out := make([]DirectDep, 0, len(directRefs))
 	for _, ref := range directRefs {
-		decoded, err := base64.RawURLEncoding.DecodeString(ref)
-		if err != nil {
+		key, ok := sbomkey.Resolve(ref, purlByRef[ref])
+		if !ok {
 			continue
 		}
-		out = append(out, DirectDep{Key: string(decoded), Location: locByRef[ref]})
+		out = append(out, DirectDep{Key: key, Location: locByRef[ref]})
 	}
 	return out, nil
 }
 
 // PackageInfo is one component enumerated from a CycloneDX BOM for display: its
-// analysis-identifier key (decoded from the bom-ref), the stored name/version,
-// its purl, manifest provenance from Component.Evidence, and the decoded keys
-// of its own dependencies (Deps) from the BOM's dependency graph.
+// analysis-identifier key, the stored name/version, its purl, manifest
+// provenance from Component.Evidence, and the keys of its own dependencies
+// (Deps) from the BOM's dependency graph.
 type PackageInfo struct {
 	Key      string
 	Name     string
@@ -122,10 +124,10 @@ type Overview struct {
 	Packages    []PackageInfo
 }
 
-// ReadOverview parses a CycloneDX 1.6 BOM and returns its metadata, the
-// dependency graph, and the full component set minus the root, each with its
-// decoded analysis key and manifest provenance. Components whose bom-ref does
-// not decode are skipped.
+// ReadOverview parses a CycloneDX BOM and returns its metadata, the dependency
+// graph, and the full component set minus the root, each with its resolved
+// analysis key and manifest provenance. Components whose identity cannot be
+// resolved are skipped.
 func ReadOverview(raw []byte) (*Overview, error) {
 	var bom BOM
 	if err := json.Unmarshal(raw, &bom); err != nil {
@@ -142,12 +144,17 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		ov.RootName = bom.Metadata.Component.Name
 	}
 
-	// Decode the dependency edges once: bom-ref -> decoded child keys.
+	purlByRef := make(map[string]string, len(bom.Components))
+	for _, c := range bom.Components {
+		purlByRef[c.BOMRef] = c.PURL
+	}
+
+	// Resolve the dependency edges once: bom-ref -> child keys.
 	childKeysByRef := make(map[string][]string, len(bom.Dependencies))
 	for _, d := range bom.Dependencies {
 		children := make([]string, 0, len(d.DependsOn))
 		for _, ref := range d.DependsOn {
-			if key, ok := decodeRef(ref); ok {
+			if key, ok := sbomkey.Resolve(ref, purlByRef[ref]); ok {
 				children = append(children, key)
 			}
 		}
@@ -159,7 +166,7 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		if c.BOMRef == rootRef {
 			continue
 		}
-		key, ok := decodeRef(c.BOMRef)
+		key, ok := sbomkey.Resolve(c.BOMRef, c.PURL)
 		if !ok {
 			continue
 		}
@@ -174,16 +181,6 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		ov.Packages = append(ov.Packages, pkg)
 	}
 	return ov, nil
-}
-
-// decodeRef decodes a CycloneDX bom-ref (base64 of the analysis key) back to the
-// original analysis-identifier key, reporting false when it does not decode.
-func decodeRef(ref string) (string, bool) {
-	decoded, err := base64.RawURLEncoding.DecodeString(ref)
-	if err != nil {
-		return "", false
-	}
-	return string(decoded), true
 }
 
 // occurrenceLocation extracts the first occurrence's file/line from a
