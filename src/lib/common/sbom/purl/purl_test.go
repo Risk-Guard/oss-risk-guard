@@ -122,6 +122,21 @@ func TestBuild_RubyGems(t *testing.T) {
 	}
 }
 
+func TestToAnalysisKey_Malformed(t *testing.T) {
+	for _, purlStr := range []string{
+		"pkg:npm/lodash@",
+		"pkg:npm/@1.0.0",
+		"pkg:npm/lodash@%ZZ",
+		"pkg:npm/%ZZ@1.0.0",
+	} {
+		t.Run(purlStr, func(t *testing.T) {
+			key, ok := ToAnalysisKey(purlStr)
+			assert.False(t, ok)
+			assert.Empty(t, key)
+		})
+	}
+}
+
 func TestBuild_OtherEcosystems(t *testing.T) {
 	tests := []struct {
 		name     string

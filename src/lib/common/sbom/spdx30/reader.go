@@ -1,11 +1,10 @@
 package spdx30
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/sbomkey"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
 
@@ -17,8 +16,7 @@ type DirectDep struct {
 }
 
 // ReadDirectDeps returns the analysis-identifier keys for the SBOM's direct
-// (depth=1) dependencies. Keys are decoded from the SPDX spdxId suffix
-// produced by Builder (base64 of the original key).
+// (depth=1) dependencies.
 func ReadDirectDeps(raw []byte) ([]string, error) {
 	deps, err := ReadDirectDepsWithLocations(raw)
 	if err != nil {
@@ -200,27 +198,18 @@ func (g *spdxGraph) dependsChildrenByFrom() map[string][]string {
 	return out
 }
 
-// decodeSpdxID recovers the analysis-identifier key from a package spdxId by
-// base64-decoding the suffix after the last '#'. Reports false when it does not
-// decode.
-func decodeSpdxID(id string) (string, bool) {
-	suffix := id
-	if i := strings.LastIndex(id, "#"); i >= 0 {
-		suffix = id[i+1:]
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(suffix)
-	if err != nil {
-		return "", false
-	}
-	return string(decoded), true
+// resolveKey recovers the analysis-identifier key for an element, using the
+// package's purl where the document records one.
+func (g *spdxGraph) resolveKey(id string) (string, bool) {
+	return sbomkey.Resolve(id, g.pkgByID[id].PURL)
 }
 
-// decodeSpdxIDs decodes a list of spdxIds to analysis keys, dropping any that
-// do not decode.
-func decodeSpdxIDs(ids []string) []string {
+// resolveKeys resolves a list of spdxIds to analysis keys, dropping any that do
+// not resolve.
+func (g *spdxGraph) resolveKeys(ids []string) []string {
 	out := make([]string, 0, len(ids))
 	for _, id := range ids {
-		if key, ok := decodeSpdxID(id); ok {
+		if key, ok := g.resolveKey(id); ok {
 			out = append(out, key)
 		}
 	}
@@ -246,23 +235,19 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 
 	out := make([]DirectDep, 0, len(directIDs))
 	for _, id := range directIDs {
-		suffix := id
-		if i := strings.LastIndex(id, "#"); i >= 0 {
-			suffix = id[i+1:]
-		}
-		decoded, err := base64.RawURLEncoding.DecodeString(suffix)
-		if err != nil {
+		key, ok := g.resolveKey(id)
+		if !ok {
 			continue
 		}
-		out = append(out, DirectDep{Key: string(decoded), Location: locByPkgID[id]})
+		out = append(out, DirectDep{Key: key, Location: locByPkgID[id]})
 	}
 	return out, nil
 }
 
 // PackageInfo is one software package enumerated from an SPDX document for
-// display: its analysis-identifier key (decoded from the spdxId suffix), the
-// stored name/version, its purl, manifest provenance, and the decoded keys of
-// its own dependencies (Deps) from the document's dependsOn relationships.
+// display: its analysis-identifier key, the stored name/version, its purl,
+// manifest provenance, and the keys of its own dependencies (Deps) from the
+// document's dependsOn relationships.
 type PackageInfo struct {
 	Key      string
 	Name     string
@@ -287,8 +272,8 @@ type Overview struct {
 
 // ReadOverview parses an SPDX 3.0.1 document and returns its metadata, the
 // dependency graph, and the full software_Package set minus the root, each with
-// its decoded analysis key and manifest provenance. Packages whose spdxId
-// suffix does not decode are skipped.
+// its resolved analysis key and manifest provenance. Packages whose identity
+// cannot be resolved are skipped.
 func ReadOverview(raw []byte) (*Overview, error) {
 	g, err := parseSPDXGraph(raw)
 	if err != nil {
@@ -301,14 +286,14 @@ func ReadOverview(raw []byte) (*Overview, error) {
 	}
 
 	childIDsByFrom := g.dependsChildrenByFrom()
-	ov.RootDeps = decodeSpdxIDs(childIDsByFrom[g.rootElement])
+	ov.RootDeps = g.resolveKeys(childIDsByFrom[g.rootElement])
 
 	locByPkgID := g.locationsByPkgID()
 	for _, p := range g.packages {
 		if p.SpdxID == g.rootElement {
 			continue
 		}
-		key, ok := decodeSpdxID(p.SpdxID)
+		key, ok := g.resolveKey(p.SpdxID)
 		if !ok {
 			continue
 		}
@@ -317,7 +302,7 @@ func ReadOverview(raw []byte) (*Overview, error) {
 			Name:     p.Name,
 			Version:  p.Version,
 			PURL:     p.PURL,
-			Deps:     decodeSpdxIDs(childIDsByFrom[p.SpdxID]),
+			Deps:     g.resolveKeys(childIDsByFrom[p.SpdxID]),
 			Location: locByPkgID[p.SpdxID],
 		})
 	}
