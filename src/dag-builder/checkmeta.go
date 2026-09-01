@@ -119,6 +119,9 @@ func GetAllCheckMetadata(builder DagBuilder) ([]CheckInfo, map[string]executiond
 		result = append(result, info)
 	}
 
+	// GetNodes iterates a map; sort so SARIF rules and docs output are stable.
+	sort.Slice(result, func(i, j int) bool { return result[i].Code < result[j].Code })
+
 	return result, allSources
 }
 

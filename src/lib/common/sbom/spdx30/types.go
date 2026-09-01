@@ -7,6 +7,7 @@ const (
 
 	RelationshipDescribes             = "describes"
 	RelationshipDependsOn             = "dependsOn"
+	RelationshipContains              = "contains"
 	RelationshipHasDependencyManifest = "hasDependencyManifest"
 
 	ProfileSoftware = "software"
