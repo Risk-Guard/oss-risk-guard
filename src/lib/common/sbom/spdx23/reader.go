@@ -75,28 +75,7 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		filePathByID[f.FileSPDXIdentifier] = f.FileName
 	}
 
-	dependsByID := make(map[spdx.ElementID][]spdx.ElementID)
-	containsByID := make(map[spdx.ElementID][]spdx.ElementID)
-	manifestByID := make(map[spdx.ElementID]string)
-	for _, rel := range doc.Relationships {
-		a, b := rel.RefA.ElementRefID, rel.RefB.ElementRefID
-		if a == "" || b == "" {
-			continue
-		}
-		switch rel.Relationship {
-		case "DEPENDS_ON":
-			dependsByID[a] = append(dependsByID[a], b)
-		case "CONTAINS":
-			containsByID[a] = append(containsByID[a], b)
-		case "DEPENDENCY_MANIFEST_OF":
-			// RefA is the manifest file, RefB the package it declares.
-			if path, ok := filePathByID[a]; ok {
-				if _, exists := manifestByID[b]; !exists {
-					manifestByID[b] = path
-				}
-			}
-		}
-	}
+	dependsByID, containsByID, manifestByID := indexRelationships(doc, filePathByID)
 
 	keyByID := make(map[spdx.ElementID]string, len(doc.Packages))
 	infoByKey := make(map[spdx.ElementID]*PackageInfo, len(doc.Packages))
@@ -121,27 +100,7 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		infoByKey[p.PackageSPDXIdentifier] = info
 	}
 
-	// Direct deps are the root's DEPENDS_ON targets plus, for extractors that
-	// don't record edges yet, every root-CONTAINS package that no DEPENDS_ON
-	// edge points at (i.e. not a known transitive). When no edges exist at all
-	// this degrades to the flat CONTAINS list. The comparison is by derived key,
-	// not SPDXID, because the same logical package can be enumerated more than
-	// once (lockfile + installed node_modules manifest) under different IDs.
-	dependedOnKeys := make(map[string]bool)
-	for _, targets := range dependsByID {
-		for _, id := range targets {
-			if key, ok := keyByID[id]; ok {
-				dependedOnKeys[key] = true
-			}
-		}
-	}
-	rootChildIDs := append([]spdx.ElementID{}, dependsByID[rootID]...)
-	for _, id := range containsByID[rootID] {
-		if key, ok := keyByID[id]; ok && !dependedOnKeys[key] {
-			rootChildIDs = append(rootChildIDs, id)
-		}
-	}
-	ov.RootDeps = dedupeKeys(rootChildIDs, keyByID)
+	ov.RootDeps = rootDepKeys(rootID, dependsByID, containsByID, keyByID)
 
 	seen := make(map[string]bool, len(infoByKey))
 	for _, p := range doc.Packages {
@@ -164,6 +123,65 @@ func ReadOverview(raw []byte) (*Overview, error) {
 
 // findRootID returns the SPDXID of the package the document DESCRIBES, or ""
 // when there is none.
+// indexRelationships buckets the document's relationships into the dependency
+// edges, the containment edges, and each package's declaring manifest path.
+func indexRelationships(doc *spdx23.Document, filePathByID map[spdx.ElementID]string) (
+	dependsByID, containsByID map[spdx.ElementID][]spdx.ElementID,
+	manifestByID map[spdx.ElementID]string,
+) {
+	dependsByID = make(map[spdx.ElementID][]spdx.ElementID)
+	containsByID = make(map[spdx.ElementID][]spdx.ElementID)
+	manifestByID = make(map[spdx.ElementID]string)
+	for _, rel := range doc.Relationships {
+		a, b := rel.RefA.ElementRefID, rel.RefB.ElementRefID
+		if a == "" || b == "" {
+			continue
+		}
+		switch rel.Relationship {
+		case "DEPENDS_ON":
+			dependsByID[a] = append(dependsByID[a], b)
+		case "CONTAINS":
+			containsByID[a] = append(containsByID[a], b)
+		case "DEPENDENCY_MANIFEST_OF":
+			// RefA is the manifest file, RefB the package it declares.
+			if path, ok := filePathByID[a]; ok {
+				if _, exists := manifestByID[b]; !exists {
+					manifestByID[b] = path
+				}
+			}
+		}
+	}
+	return dependsByID, containsByID, manifestByID
+}
+
+// rootDepKeys returns the root's DEPENDS_ON targets plus, for extractors that
+// don't record edges yet, every root-CONTAINS package that no DEPENDS_ON edge
+// points at (i.e. not a known transitive). When no edges exist at all this
+// degrades to the flat CONTAINS list. The comparison is by derived key, not
+// SPDXID, because the same logical package can be enumerated more than once
+// (lockfile + installed node_modules manifest) under different IDs.
+func rootDepKeys(
+	rootID spdx.ElementID,
+	dependsByID, containsByID map[spdx.ElementID][]spdx.ElementID,
+	keyByID map[spdx.ElementID]string,
+) []string {
+	dependedOnKeys := make(map[string]bool)
+	for _, targets := range dependsByID {
+		for _, id := range targets {
+			if key, ok := keyByID[id]; ok {
+				dependedOnKeys[key] = true
+			}
+		}
+	}
+	rootChildIDs := append([]spdx.ElementID{}, dependsByID[rootID]...)
+	for _, id := range containsByID[rootID] {
+		if key, ok := keyByID[id]; ok && !dependedOnKeys[key] {
+			rootChildIDs = append(rootChildIDs, id)
+		}
+	}
+	return dedupeKeys(rootChildIDs, keyByID)
+}
+
 func findRootID(doc *spdx23.Document) spdx.ElementID {
 	for _, rel := range doc.Relationships {
 		if rel.Relationship == "DESCRIBES" && rel.RefA.ElementRefID == "DOCUMENT" {

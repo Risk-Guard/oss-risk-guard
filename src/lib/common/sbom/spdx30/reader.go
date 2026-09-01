@@ -174,14 +174,77 @@ func (g *spdxGraph) resolveLocation(target string) *models.LocationInfo {
 	return loc
 }
 
-func (g *spdxGraph) directDepIDs() []string {
+// rootChildIDs returns the spdxIds to audit as the root's direct dependencies,
+// degrading through three levels of producer detail.
+//
+// A root dependsOn edge is the statement of intent and wins outright; producers
+// that emit it also tend to emit a flat root-contains list of the whole
+// installed set, which must not be mistaken for the direct set.
+//
+// With no root dependsOn, root-contains targets stand in, minus any that some
+// other package depends on — those are transitives the producer did record.
+//
+// With no root edges at all, every package is a candidate, since returning none
+// would pass the audit silently.
+func (g *spdxGraph) rootChildIDs() []string {
 	var ids []string
 	for _, r := range g.rels {
 		if r.RelationshipType == RelationshipDependsOn && r.From == g.rootElement {
 			ids = append(ids, r.To...)
 		}
 	}
-	return ids
+	if len(ids) > 0 {
+		return g.dedupeByKey(ids)
+	}
+
+	dependedOnKeys := make(map[string]bool)
+	for _, r := range g.rels {
+		if r.RelationshipType != RelationshipDependsOn {
+			continue
+		}
+		for _, id := range r.To {
+			if key, ok := g.resolveKey(id); ok {
+				dependedOnKeys[key] = true
+			}
+		}
+	}
+	for _, r := range g.rels {
+		if r.RelationshipType != RelationshipContains || r.From != g.rootElement {
+			continue
+		}
+		for _, id := range r.To {
+			if key, ok := g.resolveKey(id); ok && !dependedOnKeys[key] {
+				ids = append(ids, id)
+			}
+		}
+	}
+	if len(ids) > 0 {
+		return g.dedupeByKey(ids)
+	}
+
+	for _, p := range g.packages {
+		if p.SpdxID != g.rootElement {
+			ids = append(ids, p.SpdxID)
+		}
+	}
+	return g.dedupeByKey(ids)
+}
+
+// dedupeByKey keeps the first spdxId for each resolved analysis key, dropping
+// ids that do not resolve. The same logical package is often enumerated more
+// than once under different ids (lockfile plus installed manifest).
+func (g *spdxGraph) dedupeByKey(ids []string) []string {
+	seen := make(map[string]bool, len(ids))
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		key, ok := g.resolveKey(id)
+		if !ok || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 // dependsChildrenByFrom collects every dependsOn relationship into a map from
@@ -231,7 +294,7 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	}
 
 	locByPkgID := g.locationsByPkgID()
-	directIDs := g.directDepIDs()
+	directIDs := g.rootChildIDs()
 
 	out := make([]DirectDep, 0, len(directIDs))
 	for _, id := range directIDs {
@@ -286,7 +349,7 @@ func ReadOverview(raw []byte) (*Overview, error) {
 	}
 
 	childIDsByFrom := g.dependsChildrenByFrom()
-	ov.RootDeps = g.resolveKeys(childIDsByFrom[g.rootElement])
+	ov.RootDeps = g.resolveKeys(g.rootChildIDs())
 
 	locByPkgID := g.locationsByPkgID()
 	for _, p := range g.packages {

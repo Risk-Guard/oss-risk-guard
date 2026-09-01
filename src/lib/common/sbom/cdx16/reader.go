@@ -33,24 +33,7 @@ func ReadDirectDeps(raw []byte) ([]string, error) {
 // each direct dep's manifest-file provenance, parsed from Component.Evidence.
 // Components without evidence yield a nil Location.
 func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
-	var bom struct {
-		Metadata struct {
-			Component *struct {
-				BOMRef string `json:"bom-ref"`
-			} `json:"component"`
-		} `json:"metadata"`
-		Components []struct {
-			BOMRef   string `json:"bom-ref"`
-			PURL     string `json:"purl"`
-			Evidence *struct {
-				Occurrences []Occurrence `json:"occurrences"`
-			} `json:"evidence"`
-		} `json:"components"`
-		Dependencies []struct {
-			Ref       string   `json:"ref"`
-			DependsOn []string `json:"dependsOn"`
-		} `json:"dependencies"`
-	}
+	var bom BOM
 	if err := json.Unmarshal(raw, &bom); err != nil {
 		return nil, fmt.Errorf("decoding CycloneDX: %w", err)
 	}
@@ -64,28 +47,12 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	purlByRef := make(map[string]string, len(bom.Components))
 	for _, c := range bom.Components {
 		purlByRef[c.BOMRef] = c.PURL
-		if c.Evidence == nil || len(c.Evidence.Occurrences) == 0 {
-			continue
+		if loc := occurrenceLocation(c.Evidence); loc != nil {
+			locByRef[c.BOMRef] = loc
 		}
-		occ := c.Evidence.Occurrences[0]
-		if occ.Location == "" {
-			continue
-		}
-		loc := &models.LocationInfo{File: strPtr(occ.Location)}
-		if occ.Line > 0 {
-			ln := occ.Line
-			loc.LineNumber = &ln
-		}
-		locByRef[c.BOMRef] = loc
 	}
 
-	var directRefs []string
-	for _, d := range bom.Dependencies {
-		if d.Ref == rootRef {
-			directRefs = d.DependsOn
-			break
-		}
-	}
+	directRefs := rootDirectRefs(rootRef, bom.Components, bom.Dependencies, purlByRef)
 
 	out := make([]DirectDep, 0, len(directRefs))
 	for _, ref := range directRefs {
@@ -96,6 +63,58 @@ func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 		out = append(out, DirectDep{Key: key, Location: locByRef[ref]})
 	}
 	return out, nil
+}
+
+// rootDirectRefs returns the bom-refs to audit as the root's direct
+// dependencies, degrading the same way spdx30's rootChildIDs does.
+//
+// A root dependsOn edge is the statement of intent and wins outright. With
+// none, every component stands in, minus any that another component depends on
+// — those are transitives the producer did record. Returning nothing would pass
+// the audit silently.
+func rootDirectRefs(rootRef string, components []Component, deps []Dep, purlByRef map[string]string) []string {
+	for _, d := range deps {
+		if d.Ref == rootRef && len(d.DependsOn) > 0 {
+			return dedupeByKey(d.DependsOn, purlByRef)
+		}
+	}
+
+	dependedOnKeys := make(map[string]bool)
+	for _, d := range deps {
+		for _, ref := range d.DependsOn {
+			if key, ok := sbomkey.Resolve(ref, purlByRef[ref]); ok {
+				dependedOnKeys[key] = true
+			}
+		}
+	}
+
+	var refs []string
+	for _, c := range components {
+		if c.BOMRef == rootRef {
+			continue
+		}
+		if key, ok := sbomkey.Resolve(c.BOMRef, c.PURL); ok && !dependedOnKeys[key] {
+			refs = append(refs, c.BOMRef)
+		}
+	}
+	return dedupeByKey(refs, purlByRef)
+}
+
+// dedupeByKey keeps the first bom-ref for each resolved analysis key, dropping
+// refs that do not resolve. The same logical package is often enumerated more
+// than once under different refs (lockfile plus installed manifest).
+func dedupeByKey(refs []string, purlByRef map[string]string) []string {
+	seen := make(map[string]bool, len(refs))
+	out := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		key, ok := sbomkey.Resolve(ref, purlByRef[ref])
+		if !ok || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, ref)
+	}
+	return out
 }
 
 // PackageInfo is one component enumerated from a CycloneDX BOM for display: its
@@ -160,7 +179,11 @@ func ReadOverview(raw []byte) (*Overview, error) {
 		}
 		childKeysByRef[d.Ref] = children
 	}
-	ov.RootDeps = childKeysByRef[rootRef]
+	for _, ref := range rootDirectRefs(rootRef, bom.Components, bom.Dependencies, purlByRef) {
+		if key, ok := sbomkey.Resolve(ref, purlByRef[ref]); ok {
+			ov.RootDeps = append(ov.RootDeps, key)
+		}
+	}
 
 	for _, c := range bom.Components {
 		if c.BOMRef == rootRef {
