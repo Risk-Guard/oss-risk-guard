@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/cdx16"
-	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx23"
 	"github.com/Risk-Guard/oss-risk-guard/src/lib/common/sbom/spdx30"
 	"github.com/Risk-Guard/oss-risk-guard/src/models"
 )
@@ -39,29 +38,14 @@ func ReadDirectDeps(raw []byte) ([]string, error) {
 // each direct dep's manifest-file provenance when the SBOM carries it.
 func ReadDirectDepsWithLocations(raw []byte) ([]DirectDep, error) {
 	var probe struct {
-		BOMFormat   string `json:"bomFormat"`
-		Context     string `json:"@context"`
-		SPDXVersion string `json:"spdxVersion"`
+		BOMFormat string `json:"bomFormat"`
+		Context   string `json:"@context"`
 	}
 	if err := json.Unmarshal(raw, &probe); err != nil {
 		return nil, fmt.Errorf("not valid JSON: %w", err)
 	}
 
 	switch {
-	case strings.HasPrefix(probe.SPDXVersion, "SPDX-2"):
-		ov, err := spdx23.ReadOverview(raw)
-		if err != nil {
-			return nil, err
-		}
-		out := make([]DirectDep, 0, len(ov.RootDeps))
-		byKey := make(map[string]*models.LocationInfo, len(ov.Packages))
-		for _, p := range ov.Packages {
-			byKey[p.Key] = p.Location
-		}
-		for _, key := range ov.RootDeps {
-			out = append(out, DirectDep{Key: key, Location: byKey[key]})
-		}
-		return dedupeAndSort(out), nil
 	case probe.BOMFormat == "CycloneDX":
 		deps, err := cdx16.ReadDirectDepsWithLocations(raw)
 		if err != nil {
@@ -120,26 +104,14 @@ type Summary struct {
 // package (excluding the root), sorted by ecosystem then name then version.
 func ReadSummary(raw []byte) (*Summary, error) {
 	var probe struct {
-		BOMFormat   string `json:"bomFormat"`
-		Context     string `json:"@context"`
-		SPDXVersion string `json:"spdxVersion"`
+		BOMFormat string `json:"bomFormat"`
+		Context   string `json:"@context"`
 	}
 	if err := json.Unmarshal(raw, &probe); err != nil {
 		return nil, fmt.Errorf("not valid JSON: %w", err)
 	}
 
 	switch {
-	case strings.HasPrefix(probe.SPDXVersion, "SPDX-2"):
-		ov, err := spdx23.ReadOverview(raw)
-		if err != nil {
-			return nil, err
-		}
-		s := &Summary{Format: "SPDX", SpecVersion: ov.SpecVersion, Tool: ov.Tool, RootName: ov.RootName, RootDeps: ov.RootDeps}
-		for _, p := range ov.Packages {
-			s.Packages = append(s.Packages, toPackage(p.Key, p.Name, p.Version, p.PURL, p.Location, p.Deps))
-		}
-		sortPackages(s.Packages)
-		return s, nil
 	case probe.BOMFormat == "CycloneDX":
 		ov, err := cdx16.ReadOverview(raw)
 		if err != nil {
