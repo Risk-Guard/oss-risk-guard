@@ -1,6 +1,6 @@
 module github.com/Risk-Guard/oss-risk-guard
 
-go 1.25.8
+go 1.26.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
@@ -24,7 +24,7 @@ require (
 	github.com/thessem/zap-prettyconsole v0.7.0
 	github.com/tidwall/jsonc v0.3.3
 	go.uber.org/zap v1.28.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/sync v0.23.0
 	golang.org/x/term v0.45.0
 	gopkg.in/ini.v1 v1.67.3
 	sigs.k8s.io/yaml v1.6.0

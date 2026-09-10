@@ -84,42 +84,42 @@ func TestLastCommitLogic(t *testing.T) {
 	}{
 		{
 			name:            "Recent commit (1 day ago) - compliant",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1)),
+			lastCommit:      new(now.AddDate(0, 0, -1)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Commit from 1 day ago should be compliant",
 		},
 		{
 			name:            "Commit 1 year ago - compliant",
-			lastCommit:      timePtr(now.AddDate(-1, 0, 0)),
+			lastCommit:      new(now.AddDate(-1, 0, 0)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Commit from 1 year ago should be compliant",
 		},
 		{
 			name:            "Commit exactly 5 years ago - compliant",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1825)),
+			lastCommit:      new(now.AddDate(0, 0, -1825)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Commit exactly 1825 days ago should be compliant",
 		},
 		{
 			name:            "Commit 5 years + 1 day ago - violation",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1826)),
+			lastCommit:      new(now.AddDate(0, 0, -1826)),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Commit 1826 days ago should be a violation",
 		},
 		{
 			name:            "Commit 6 years ago - violation",
-			lastCommit:      timePtr(now.AddDate(-6, 0, 0)),
+			lastCommit:      new(now.AddDate(-6, 0, 0)),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Commit from 6 years ago should be a violation",
 		},
 		{
 			name:            "Commit 10 years ago - violation",
-			lastCommit:      timePtr(now.AddDate(-10, 0, 0)),
+			lastCommit:      new(now.AddDate(-10, 0, 0)),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Commit from 10 years ago should be a violation",
@@ -251,8 +251,4 @@ func TestThresholdValue(t *testing.T) {
 	if thresholds["legacy_days"] != expectedThreshold {
 		t.Errorf("Expected threshold 'legacy_days' to be %d, got %v", expectedThreshold, thresholds["legacy_days"])
 	}
-}
-
-func timePtr(t time.Time) *time.Time {
-	return &t
 }

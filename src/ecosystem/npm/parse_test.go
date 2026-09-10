@@ -57,7 +57,7 @@ func TestParseManifest_LockfileEdges_CarryManifestLocation(t *testing.T) {
 	detected := models.DetectedManifest{
 		Ecosystem: "npm",
 		Paths:     []string{"package.json"},
-		Lockfile:  strPtr("package-lock.json"),
+		Lockfile:  new("package-lock.json"),
 	}
 
 	result, err := ParseManifest(detected, dir)
@@ -108,8 +108,6 @@ func TestParseManifest_LockfileEdges_CarryManifestLocation(t *testing.T) {
 		}
 	}
 }
-
-func strPtr(s string) *string { return &s }
 
 func TestParseManifest_PrivateTrue(t *testing.T) {
 	dir := t.TempDir()

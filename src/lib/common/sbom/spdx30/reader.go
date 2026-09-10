@@ -156,7 +156,7 @@ func (g *spdxGraph) locationsByPkgID() map[string]*models.LocationInfo {
 
 func (g *spdxGraph) resolveLocation(target string) *models.LocationInfo {
 	if fileName, ok := g.files[target]; ok {
-		return &models.LocationInfo{File: strPtr(fileName)}
+		return &models.LocationInfo{File: new(fileName)}
 	}
 	s, ok := g.snippets[target]
 	if !ok {
@@ -166,7 +166,7 @@ func (g *spdxGraph) resolveLocation(target string) *models.LocationInfo {
 	if !fileOK {
 		return nil
 	}
-	loc := &models.LocationInfo{File: strPtr(fileName)}
+	loc := &models.LocationInfo{File: new(fileName)}
 	if s.LineRange != nil && s.LineRange.BeginIntegerRange > 0 {
 		ln := s.LineRange.BeginIntegerRange
 		loc.LineNumber = &ln
@@ -371,5 +371,3 @@ func ReadOverview(raw []byte) (*Overview, error) {
 	}
 	return ov, nil
 }
-
-func strPtr(s string) *string { return &s }

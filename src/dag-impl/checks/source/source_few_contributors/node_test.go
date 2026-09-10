@@ -74,42 +74,42 @@ func TestAuthorCountLogic(t *testing.T) {
 	}{
 		{
 			name:            "Zero authors - violation",
-			authorCount:     intPtr(0),
+			authorCount:     new(0),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with 0 authors should be a violation",
 		},
 		{
 			name:            "One author - violation",
-			authorCount:     intPtr(1),
+			authorCount:     new(1),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with 1 author should be a violation",
 		},
 		{
 			name:            "Two authors - violation",
-			authorCount:     intPtr(2),
+			authorCount:     new(2),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with 2 authors should be a violation",
 		},
 		{
 			name:            "Three authors - compliant",
-			authorCount:     intPtr(3),
+			authorCount:     new(3),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with 3 authors should be compliant (threshold)",
 		},
 		{
 			name:            "Four authors - compliant",
-			authorCount:     intPtr(4),
+			authorCount:     new(4),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with 4 authors should be compliant",
 		},
 		{
 			name:            "Many authors - compliant",
-			authorCount:     intPtr(100),
+			authorCount:     new(100),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with many authors should be compliant",
@@ -209,9 +209,4 @@ func TestNewNode(t *testing.T) {
 	if node == nil {
 		t.Error("NewNode() should not return nil")
 	}
-}
-
-// Helper function to create int pointers
-func intPtr(i int) *int {
-	return &i
 }

@@ -20,8 +20,6 @@ import (
 	languageregistry "github.com/Risk-Guard/oss-risk-guard/src/language/registry"
 )
 
-func strPtr(s string) *string { return &s }
-
 func TestNode_GetDependencies(t *testing.T) {
 	node := NewNode(nil)
 	deps := node.GetDependencies()
@@ -121,9 +119,9 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("process.env.PKG_NAME"),
+					Name:             new("process.env.PKG_NAME"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("computed from env"),
+					DynamicReason:    new("computed from env"),
 				},
 			},
 			expectViolation: false,
@@ -139,7 +137,7 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 					IsDynamic:        false,
 				},
 			},
@@ -156,7 +154,7 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 					IsDynamic:        false,
 				},
 			},
@@ -173,7 +171,7 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("different-package"),
+					Name:             new("different-package"),
 					IsDynamic:        false,
 				},
 			},
@@ -190,7 +188,7 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"setup.py"}},
-					Name:             strPtr("some-python-package"),
+					Name:             new("some-python-package"),
 					IsDynamic:        false,
 				},
 			},
@@ -208,12 +206,12 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 					IsDynamic:        false,
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"other/package.json"}},
-					Name:             strPtr("wrong-name"),
+					Name:             new("wrong-name"),
 					IsDynamic:        false,
 				},
 			},
@@ -230,13 +228,13 @@ func TestPackageNameMismatchLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"dynamic/package.json"}},
-					Name:             strPtr("dynamic-pkg"),
+					Name:             new("dynamic-pkg"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("computed"),
+					DynamicReason:    new("computed"),
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 					IsDynamic:        false,
 				},
 			},
@@ -415,7 +413,7 @@ func TestExecute_ProvenanceVerified_Clears(t *testing.T) {
 	manifests := []models.ManifestResult{
 		{
 			DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-			Name:             strPtr("pdf.js"), // source repo name — deliberately differs from the published name
+			Name:             new("pdf.js"), // source repo name — deliberately differs from the published name
 		},
 	}
 
@@ -474,7 +472,7 @@ func TestExecute_NoMatchingEcosystem_ShouldSkip(t *testing.T) {
 	manifests := []models.ManifestResult{
 		{
 			DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"setup.py"}},
-			Name:             strPtr("some-python-package"),
+			Name:             new("some-python-package"),
 		},
 	}
 
@@ -494,10 +492,6 @@ func TestExecute_NoMatchingEcosystem_ShouldSkip(t *testing.T) {
 		t.Errorf("Expected skipped when no manifests match ecosystem, got %s: %s",
 			output.Check.CheckStatus, output.Check.Rationale)
 	}
-}
-
-func stringPtr(s string) *string {
-	return &s
 }
 
 func evidenceContains(evidence []string, substr string) bool {
@@ -521,11 +515,11 @@ func TestExecute_SourceRefDisclosure(t *testing.T) {
 
 	mismatchManifests := []models.ManifestResult{{
 		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-		Name:             strPtr("dnd-kit-experimental"),
+		Name:             new("dnd-kit-experimental"),
 	}}
 	matchManifests := []models.ManifestResult{{
 		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/core/package.json"}},
-		Name:             strPtr("@dnd-kit/core"),
+		Name:             new("@dnd-kit/core"),
 	}}
 
 	tests := []struct {

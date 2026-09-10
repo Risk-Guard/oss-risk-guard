@@ -254,7 +254,7 @@ func TestEnsurePhysicalLocations(t *testing.T) {
 	// (b) result with only a logical location.
 	logicalOnly := run.CreateResultForRule("LOGICAL_ONLY")
 	logicalOnly.WithLocations([]*sarif.Location{
-		sarif.NewLocation().WithLogicalLocations([]*sarif.LogicalLocation{{Name: ptr("source/repo"), Kind: ptr("package")}}),
+		sarif.NewLocation().WithLogicalLocations([]*sarif.LogicalLocation{{Name: new("source/repo"), Kind: new("package")}}),
 	})
 
 	// (c) result with no locations at all.

@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ptr(s string) *string { return &s }
-
 func TestNewOutput_SourceAnalysis_SetsPackagesOnOutput(t *testing.T) {
 	input := dag_impl.Input{
 		AnalysisIdentifier: "source/github.com/test/repo",
@@ -20,7 +18,7 @@ func TestNewOutput_SourceAnalysis_SetsPackagesOnOutput(t *testing.T) {
 	manifests := []models.ManifestResult{
 		{
 			DetectedManifest: models.DetectedManifest{Ecosystem: "npm"},
-			Name:             ptr("express"),
+			Name:             new("express"),
 		},
 	}
 
@@ -42,7 +40,7 @@ func TestNewOutput_PackageAnalysis_DoesNotSetOutput(t *testing.T) {
 	manifests := []models.ManifestResult{
 		{
 			DetectedManifest: models.DetectedManifest{Ecosystem: "npm"},
-			Name:             ptr("core-js-compat"),
+			Name:             new("core-js-compat"),
 		},
 	}
 

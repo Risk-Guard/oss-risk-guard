@@ -20,8 +20,6 @@ import (
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
-func strPtr(s string) *string { return &s }
-
 func evidenceContains(evidence []string, substr string) bool {
 	for _, e := range evidence {
 		if strings.Contains(e, substr) {
@@ -210,7 +208,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 				},
 			},
 			expectViolation: false,
@@ -223,7 +221,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/package.json"}},
-					Name:             strPtr("malicious-pkg"),
+					Name:             new("malicious-pkg"),
 					InstallScripts:   []string{"preinstall"},
 				},
 			},
@@ -237,7 +235,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/package.json"}},
-					Name:             strPtr("some-pkg"),
+					Name:             new("some-pkg"),
 					InstallScripts:   []string{"postinstall"},
 				},
 			},
@@ -251,7 +249,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/package.json"}},
-					Name:             strPtr("build-pkg"),
+					Name:             new("build-pkg"),
 					InstallScripts:   []string{"prepare"},
 				},
 			},
@@ -265,7 +263,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/package.json"}},
-					Name:             strPtr("complex-pkg"),
+					Name:             new("complex-pkg"),
 					InstallScripts:   []string{"preinstall", "postinstall", "prepare"},
 				},
 			},
@@ -279,7 +277,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"/setup.py"}},
-					Name:             strPtr("my-package"),
+					Name:             new("my-package"),
 					InstallScripts:   []string{"setup.py"},
 				},
 			},
@@ -293,7 +291,7 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"/pyproject.toml"}},
-					Name:             strPtr("modern-pkg"),
+					Name:             new("modern-pkg"),
 				},
 			},
 			expectViolation: false,
@@ -306,11 +304,11 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/frontend/package.json"}},
-					Name:             strPtr("frontend"),
+					Name:             new("frontend"),
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"/backend/setup.py"}},
-					Name:             strPtr("backend"),
+					Name:             new("backend"),
 					InstallScripts:   []string{"setup.py"},
 				},
 			},
@@ -324,15 +322,15 @@ func TestInstallScriptsLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/packages/pkg1/package.json"}},
-					Name:             strPtr("pkg1"),
+					Name:             new("pkg1"),
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"/packages/pkg2/package.json"}},
-					Name:             strPtr("pkg2"),
+					Name:             new("pkg2"),
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "pypi", Paths: []string{"/python/pyproject.toml"}},
-					Name:             strPtr("pkg3"),
+					Name:             new("pkg3"),
 				},
 			},
 			expectViolation: false,

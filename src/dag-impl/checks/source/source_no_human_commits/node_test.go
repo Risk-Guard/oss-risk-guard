@@ -74,21 +74,21 @@ func TestCommitCountLogic(t *testing.T) {
 	}{
 		{
 			name:            "Zero commits - violation",
-			commitCount:     intPtr(0),
+			commitCount:     new(0),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with 0 commits should be a violation",
 		},
 		{
 			name:            "One commit - compliant",
-			commitCount:     intPtr(1),
+			commitCount:     new(1),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with 1 commit should be compliant",
 		},
 		{
 			name:            "Many commits - compliant",
-			commitCount:     intPtr(1000),
+			commitCount:     new(1000),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with many commits should be compliant",
@@ -174,9 +174,4 @@ func TestNewNode(t *testing.T) {
 	if node == nil {
 		t.Error("NewNode() should not return nil")
 	}
-}
-
-// Helper function to create int pointers
-func intPtr(i int) *int {
-	return &i
 }
