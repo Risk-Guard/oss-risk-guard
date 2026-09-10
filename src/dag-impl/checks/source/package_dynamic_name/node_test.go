@@ -17,8 +17,6 @@ import (
 	executiondag "github.com/Risk-Guard/oss-risk-guard/src/execution-dag"
 )
 
-func strPtr(s string) *string { return &s }
-
 func makeTestCtxRef(t *testing.T, manifests []models.ManifestResult, sourceRef, sourceCommit string) context.Context {
 	t.Helper()
 	log, err := logger.NewLogger("error")
@@ -48,7 +46,7 @@ func TestExecute_Violation_DisclosesSourceRef(t *testing.T) {
 	manifests := []models.ManifestResult{{
 		DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
 		IsDynamic:        true,
-		DynamicReason:    strPtr("name computed from process.env"),
+		DynamicReason:    new("name computed from process.env"),
 	}}
 	input := dag_impl.Input{Packages: []models.PackageInfo{{Ecosystem: "npm", Name: "some-pkg", Version: "2.1.0"}}}
 
@@ -148,12 +146,12 @@ func TestDynamicPackageNameLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("express"),
+					Name:             new("express"),
 					IsDynamic:        false,
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/utils/package.json"}},
-					Name:             strPtr("lodash"),
+					Name:             new("lodash"),
 					IsDynamic:        false,
 				},
 			},
@@ -167,9 +165,9 @@ func TestDynamicPackageNameLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("dynamic-pkg"),
+					Name:             new("dynamic-pkg"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("name field uses template string"),
+					DynamicReason:    new("name field uses template string"),
 				},
 			},
 			expectViolation: true,
@@ -182,15 +180,15 @@ func TestDynamicPackageNameLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("pkg1"),
+					Name:             new("pkg1"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("uses variable"),
+					DynamicReason:    new("uses variable"),
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/lib/package.json"}},
-					Name:             strPtr("pkg2"),
+					Name:             new("pkg2"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("uses function call"),
+					DynamicReason:    new("uses function call"),
 				},
 			},
 			expectViolation: true,
@@ -203,14 +201,14 @@ func TestDynamicPackageNameLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/static/package.json"}},
-					Name:             strPtr("static-pkg"),
+					Name:             new("static-pkg"),
 					IsDynamic:        false,
 				},
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"packages/dynamic/package.json"}},
-					Name:             strPtr("dynamic-pkg"),
+					Name:             new("dynamic-pkg"),
 					IsDynamic:        true,
-					DynamicReason:    stringPtr("computed at runtime"),
+					DynamicReason:    new("computed at runtime"),
 				},
 			},
 			expectViolation: true,
@@ -223,7 +221,7 @@ func TestDynamicPackageNameLogic(t *testing.T) {
 			manifests: []models.ManifestResult{
 				{
 					DetectedManifest: models.DetectedManifest{Ecosystem: "npm", Paths: []string{"package.json"}},
-					Name:             strPtr("dynamic-pkg"),
+					Name:             new("dynamic-pkg"),
 					IsDynamic:        true,
 					DynamicReason:    nil,
 				},
@@ -326,8 +324,4 @@ func TestNewNode(t *testing.T) {
 	if node == nil {
 		t.Error("NewNode() should not return nil")
 	}
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

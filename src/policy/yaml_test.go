@@ -74,7 +74,7 @@ func TestSeverityPathToString(t *testing.T) {
 		{
 			name: "with ecosystem",
 			path: SeverityPath{
-				Ecosystem: ptr("npm"),
+				Ecosystem: new("npm"),
 				Target:    PathTarget{IsCategory: true, Name: "critical"},
 			},
 			expected: "ecosystem/npm/category/critical",
@@ -98,7 +98,7 @@ func TestSeverityPathToString(t *testing.T) {
 		{
 			name: "with source path",
 			path: SeverityPath{
-				SourcePath: ptr("github.com/org/repo"),
+				SourcePath: new("github.com/org/repo"),
 				Target:     PathTarget{IsCategory: true, Name: "critical"},
 			},
 			expected: `source/"github.com/org/repo"/category/critical`,
@@ -134,7 +134,7 @@ func TestSeverityPathToString_Env(t *testing.T) {
 		{
 			name: "ecosystem + depth + env dev + category",
 			path: SeverityPath{
-				Ecosystem:  ptr("npm"),
+				Ecosystem:  new("npm"),
 				DepthRange: &DepthRange{Min: 2, Max: -1},
 				Env:        &devTrue,
 				Target:     PathTarget{IsCategory: true, Name: "critical"},
@@ -153,8 +153,4 @@ func TestSeverityPathToString_Env(t *testing.T) {
 			require.Equal(t, tt.expected, severityPathToString(*parsed))
 		})
 	}
-}
-
-func ptr(s string) *string {
-	return &s
 }

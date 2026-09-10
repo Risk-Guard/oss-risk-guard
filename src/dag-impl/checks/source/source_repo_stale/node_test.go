@@ -91,7 +91,7 @@ func TestLastCommitLogic(t *testing.T) {
 	}{
 		{
 			name:            "Recent commit (1 day ago) - compliant",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1)),
+			lastCommit:      new(now.AddDate(0, 0, -1)),
 			expectViolation: false,
 			expectCompliant: true,
 			expectSkipped:   false,
@@ -99,7 +99,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 100 days ago - compliant",
-			lastCommit:      timePtr(now.AddDate(0, 0, -100)),
+			lastCommit:      new(now.AddDate(0, 0, -100)),
 			expectViolation: false,
 			expectCompliant: true,
 			expectSkipped:   false,
@@ -107,7 +107,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit exactly 1 year ago - compliant",
-			lastCommit:      timePtr(now.AddDate(0, 0, -365)),
+			lastCommit:      new(now.AddDate(0, 0, -365)),
 			expectViolation: false,
 			expectCompliant: true,
 			expectSkipped:   false,
@@ -115,7 +115,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 1 year + 1 day ago - violation",
-			lastCommit:      timePtr(now.AddDate(0, 0, -366)),
+			lastCommit:      new(now.AddDate(0, 0, -366)),
 			expectViolation: true,
 			expectCompliant: false,
 			expectSkipped:   false,
@@ -123,7 +123,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 2 years ago - violation",
-			lastCommit:      timePtr(now.AddDate(-2, 0, 0)),
+			lastCommit:      new(now.AddDate(-2, 0, 0)),
 			expectViolation: true,
 			expectCompliant: false,
 			expectSkipped:   false,
@@ -131,7 +131,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit exactly 5 years ago - violation",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1825)),
+			lastCommit:      new(now.AddDate(0, 0, -1825)),
 			expectViolation: true,
 			expectCompliant: false,
 			expectSkipped:   false,
@@ -139,7 +139,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 5 years + 1 day ago - skipped",
-			lastCommit:      timePtr(now.AddDate(0, 0, -1826)),
+			lastCommit:      new(now.AddDate(0, 0, -1826)),
 			expectViolation: false,
 			expectCompliant: false,
 			expectSkipped:   true,
@@ -147,7 +147,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 6 years ago - skipped",
-			lastCommit:      timePtr(now.AddDate(-6, 0, 0)),
+			lastCommit:      new(now.AddDate(-6, 0, 0)),
 			expectViolation: false,
 			expectCompliant: false,
 			expectSkipped:   true,
@@ -155,7 +155,7 @@ func TestLastCommitLogic(t *testing.T) {
 		},
 		{
 			name:            "Commit 10 years ago - skipped",
-			lastCommit:      timePtr(now.AddDate(-10, 0, 0)),
+			lastCommit:      new(now.AddDate(-10, 0, 0)),
 			expectViolation: false,
 			expectCompliant: false,
 			expectSkipped:   true,
@@ -315,8 +315,4 @@ func TestThresholdValue(t *testing.T) {
 	if thresholds["stale_days"] != expectedThreshold {
 		t.Errorf("Expected threshold 'stale_days' to be %d, got %v", expectedThreshold, thresholds["stale_days"])
 	}
-}
-
-func timePtr(t time.Time) *time.Time {
-	return &t
 }

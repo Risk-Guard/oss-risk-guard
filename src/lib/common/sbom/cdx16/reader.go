@@ -213,12 +213,10 @@ func occurrenceLocation(ev *Evidence) *models.LocationInfo {
 		return nil
 	}
 	occ := ev.Occurrences[0]
-	loc := &models.LocationInfo{File: strPtr(occ.Location)}
+	loc := &models.LocationInfo{File: new(occ.Location)}
 	if occ.Line > 0 {
 		ln := occ.Line
 		loc.LineNumber = &ln
 	}
 	return loc
 }
-
-func strPtr(s string) *string { return &s }

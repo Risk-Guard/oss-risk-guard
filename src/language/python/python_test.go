@@ -53,27 +53,27 @@ func TestExtractExtraMarker(t *testing.T) {
 		{
 			name:   "double quotes",
 			marker: `extra == "dev"`,
-			want:   ptr("dev"),
+			want:   new("dev"),
 		},
 		{
 			name:   "single quotes",
 			marker: `extra == 'test'`,
-			want:   ptr("test"),
+			want:   new("test"),
 		},
 		{
 			name:   "no spaces",
 			marker: `extra=="dev"`,
-			want:   ptr("dev"),
+			want:   new("dev"),
 		},
 		{
 			name:   "compound with python_version first",
 			marker: `python_version >= "3.6" and extra == "dev"`,
-			want:   ptr("dev"),
+			want:   new("dev"),
 		},
 		{
 			name:   "compound with sys_platform",
 			marker: `sys_platform == "win32" and extra == "dev"`,
-			want:   ptr("dev"),
+			want:   new("dev"),
 		},
 		{
 			name:   "no extra marker",
@@ -88,7 +88,7 @@ func TestExtractExtraMarker(t *testing.T) {
 		{
 			name:   "i18n extra",
 			marker: `extra == "i18n"`,
-			want:   ptr("i18n"),
+			want:   new("i18n"),
 		},
 		{
 			name:   "mismatched quotes double-single",
@@ -113,8 +113,4 @@ func TestExtractExtraMarker(t *testing.T) {
 			}
 		})
 	}
-}
-
-func ptr(s string) *string {
-	return &s
 }

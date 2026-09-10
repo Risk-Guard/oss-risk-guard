@@ -76,7 +76,7 @@ func addResult(run *sarif.Run, f policy.Finding) {
 	name := normalizeLogicalName(f.Package)
 	logicalLoc := &sarif.LogicalLocation{
 		Name: &name,
-		Kind: ptr("package"),
+		Kind: new("package"),
 	}
 	if len(f.DependencyPath) > 0 {
 		fqn := buildDependencyPathString(f.DependencyPath)
@@ -135,10 +135,6 @@ func buildMessage(f policy.Finding) string {
 
 func buildDependencyPathString(path []string) string {
 	return strings.Join(path, " -> ")
-}
-
-func ptr(s string) *string {
-	return &s
 }
 
 // normalizeLogicalName cleans up the logical-location name derived from an

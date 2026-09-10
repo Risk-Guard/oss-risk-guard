@@ -78,49 +78,49 @@ func TestThresholdLogic(t *testing.T) {
 	}{
 		{
 			name:            "0 days old - violation",
-			firstCommit:     timePtr(now),
+			firstCommit:     new(now),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with first commit today should be a violation",
 		},
 		{
 			name:            "100 days old - violation",
-			firstCommit:     timePtr(now.AddDate(0, 0, -100)),
+			firstCommit:     new(now.AddDate(0, 0, -100)),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository 100 days old should be a violation",
 		},
 		{
 			name:            "364 days old - violation",
-			firstCommit:     timePtr(now.AddDate(0, 0, -364)),
+			firstCommit:     new(now.AddDate(0, 0, -364)),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository 364 days old (just under threshold) should be a violation",
 		},
 		{
 			name:            "365 days old - compliant",
-			firstCommit:     timePtr(now.AddDate(0, 0, -365)),
+			firstCommit:     new(now.AddDate(0, 0, -365)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository exactly 365 days old should be compliant",
 		},
 		{
 			name:            "366 days old - compliant",
-			firstCommit:     timePtr(now.AddDate(0, 0, -366)),
+			firstCommit:     new(now.AddDate(0, 0, -366)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository 366 days old should be compliant",
 		},
 		{
 			name:            "2 years old - compliant",
-			firstCommit:     timePtr(now.AddDate(-2, 0, 0)),
+			firstCommit:     new(now.AddDate(-2, 0, 0)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository 2 years old should be compliant",
 		},
 		{
 			name:            "10 years old - compliant",
-			firstCommit:     timePtr(now.AddDate(-10, 0, 0)),
+			firstCommit:     new(now.AddDate(-10, 0, 0)),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository 10 years old should be compliant",
@@ -247,9 +247,4 @@ func TestNewNode(t *testing.T) {
 	if node == nil {
 		t.Error("NewNode() should not return nil")
 	}
-}
-
-// Helper function to create time pointers
-func timePtr(t time.Time) *time.Time {
-	return &t
 }

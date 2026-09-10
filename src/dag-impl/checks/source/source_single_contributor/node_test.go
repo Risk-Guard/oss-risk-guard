@@ -92,28 +92,28 @@ func TestAuthorCountLogic(t *testing.T) {
 	}{
 		{
 			name:            "One author - violation",
-			authorCount:     intPtr(1),
+			authorCount:     new(1),
 			expectViolation: true,
 			expectCompliant: false,
 			description:     "Repository with 1 author should be a violation",
 		},
 		{
 			name:            "Two authors - compliant",
-			authorCount:     intPtr(2),
+			authorCount:     new(2),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with 2 authors should be compliant",
 		},
 		{
 			name:            "Many authors - compliant",
-			authorCount:     intPtr(10),
+			authorCount:     new(10),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with many authors should be compliant",
 		},
 		{
 			name:            "Zero authors - compliant",
-			authorCount:     intPtr(0),
+			authorCount:     new(0),
 			expectViolation: false,
 			expectCompliant: true,
 			description:     "Repository with 0 authors should be compliant (edge case)",
@@ -229,9 +229,4 @@ func TestNode_Execute_ErrorsWhenGitCloneSkipped(t *testing.T) {
 	if output.Check.CheckStatus != storage.StatusSkipped {
 		t.Errorf("Expected skipped status, got %s", output.Check.CheckStatus)
 	}
-}
-
-// Helper function to create int pointers
-func intPtr(i int) *int {
-	return &i
 }

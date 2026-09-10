@@ -111,13 +111,13 @@ func TestHasLicenseLogic(t *testing.T) {
 	}{
 		{
 			name:           "Package with license",
-			license:        stringPtr("MIT"),
+			license:        new("MIT"),
 			expectedHasLic: true,
 			description:    "Package with MIT license should pass HasLicense()",
 		},
 		{
 			name:           "Package with empty license",
-			license:        stringPtr(""),
+			license:        new(""),
 			expectedHasLic: false,
 			description:    "Package with empty license string should fail HasLicense()",
 		},
@@ -143,8 +143,4 @@ func TestHasLicenseLogic(t *testing.T) {
 			}
 		})
 	}
-}
-
-func stringPtr(s string) *string {
-	return &s
 }

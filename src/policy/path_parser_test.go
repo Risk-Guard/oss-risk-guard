@@ -421,12 +421,12 @@ func TestComputeSpecificity(t *testing.T) {
 		},
 		{
 			name: "env + category",
-			path: SeverityPath{Env: boolPtr(true), Target: PathTarget{IsCategory: true, Name: "critical"}},
+			path: SeverityPath{Env: new(true), Target: PathTarget{IsCategory: true, Name: "critical"}},
 			want: 1,
 		},
 		{
 			name: "ecosystem + env + category",
-			path: SeverityPath{Ecosystem: &eco, Env: boolPtr(true), Target: PathTarget{IsCategory: true, Name: "critical"}},
+			path: SeverityPath{Ecosystem: &eco, Env: new(true), Target: PathTarget{IsCategory: true, Name: "critical"}},
 			want: 2,
 		},
 		{
@@ -434,7 +434,7 @@ func TestComputeSpecificity(t *testing.T) {
 			path: SeverityPath{
 				Ecosystem:  &eco,
 				DepthRange: &DepthRange{Min: 2, Max: -1},
-				Env:        boolPtr(false),
+				Env:        new(false),
 				Target:     PathTarget{IsCategory: false, Name: "CHECK"},
 			},
 			want: 4,
@@ -547,8 +547,4 @@ func TestParseSeverityPath_Source(t *testing.T) {
 			}
 		})
 	}
-}
-
-func boolPtr(v bool) *bool {
-	return &v
 }

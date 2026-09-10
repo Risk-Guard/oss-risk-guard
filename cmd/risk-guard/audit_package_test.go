@@ -22,14 +22,14 @@ func TestParsePackageKey(t *testing.T) {
 			key:         "package/npm/lodash?version=4.17.20",
 			wantEco:     "npm",
 			wantName:    "lodash",
-			wantVersion: strPtr("4.17.20"),
+			wantVersion: new("4.17.20"),
 		},
 		{
 			name:        "key with URL-escaped version",
 			key:         "package/npm/foo?version=1.0.0%2Bbuild",
 			wantEco:     "npm",
 			wantName:    "foo",
-			wantVersion: strPtr("1.0.0+build"),
+			wantVersion: new("1.0.0+build"),
 		},
 		{
 			name:    "invalid key (no package prefix)",
@@ -77,5 +77,3 @@ func TestParsePackageKey(t *testing.T) {
 		})
 	}
 }
-
-func strPtr(s string) *string { return &s }
