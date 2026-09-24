@@ -9,7 +9,7 @@ require (
 	github.com/aquasecurity/go-npm-version v0.0.2
 	github.com/aquasecurity/go-pep440-version v0.0.1
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/charmbracelet/huh v1.0.0
 	github.com/fatih/color v1.19.0
@@ -25,7 +25,7 @@ require (
 	github.com/tidwall/jsonc v0.3.3
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.23.0
-	golang.org/x/term v0.45.0
+	golang.org/x/term v0.46.0
 	gopkg.in/ini.v1 v1.67.3
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -119,7 +119,7 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
